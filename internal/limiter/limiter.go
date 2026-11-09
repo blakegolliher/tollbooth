@@ -365,14 +365,3 @@ func (l *Limiter) sweep(now int64) (removed int) {
 
 // Keys is the live key count across all rules.
 func (l *Limiter) Keys() int64 { return l.live.Load() }
-
-// Rules returns the rule set in force, nil before the first Apply.
-func (l *Limiter) Rules() *RuleSet { return l.rules.Load() }
-
-// Len is the number of rules in the set.
-func (rs *RuleSet) Len() int {
-	if rs == nil {
-		return 0
-	}
-	return len(rs.rules)
-}
