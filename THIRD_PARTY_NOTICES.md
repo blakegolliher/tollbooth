@@ -245,3 +245,15 @@ LICENSE (verbatim):
 
 | Module | License | URL |
 |---|---|---|
+| `github.com/beorn7/perks/quantile` | MIT | https://github.com/beorn7/perks/blob/v1.0.1/LICENSE |
+| `github.com/cespare/xxhash/v2` | MIT | https://github.com/cespare/xxhash/blob/v2.3.0/LICENSE.txt |
+| `github.com/munnerz/goautoneg` | BSD-3-Clause | https://github.com/munnerz/goautoneg/blob/a7dc8b61c822/LICENSE |
+| `github.com/pires/go-proxyproto` | Apache-2.0 | https://github.com/pires/go-proxyproto/blob/v0.16.0/LICENSE |
+| `github.com/prometheus/client_golang/internal/github.com/golang/gddo/httputil` | BSD-3-Clause | https://github.com/prometheus/client_golang/blob/v1.25.0/internal/github.com/golang/gddo/LICENSE |
+| `github.com/prometheus/client_golang/prometheus` | Apache-2.0 | https://github.com/prometheus/client_golang/blob/v1.25.0/LICENSE |
+| `github.com/prometheus/client_model/go` | Apache-2.0 | https://github.com/prometheus/client_model/blob/v0.6.3/LICENSE |
+| `github.com/prometheus/common` | Apache-2.0 | https://github.com/prometheus/common/blob/v0.72.0/LICENSE |
+| `github.com/prometheus/procfs` | Apache-2.0 | https://github.com/prometheus/procfs/blob/v0.22.0/LICENSE |
+| `golang.org/x/sys/unix` | BSD-3-Clause | https://cs.opensource.google/go/x/sys/+/v0.48.0:LICENSE |
+| `google.golang.org/protobuf` | BSD-3-Clause | https://github.com/protocolbuffers/protobuf-go/blob/v1.36.12/LICENSE |
+| `go.yaml.in/yaml/v4` | Apache-2.0 | https://github.com/yaml/go-yaml/blob/v4.0.0/LICENSE |
