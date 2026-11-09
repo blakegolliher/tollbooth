@@ -143,8 +143,8 @@ functions in `internal/` or `cmd/tollbooth`. Dependencies added: none (`go.mod`,
 (`bytes.Buffer`, `io.ReadAll` absent from the diff). Feature flags and kill switches: unchanged
 from Phase 4 (showback kill switch defaults to on). LOC this phase excluding `bench/results/`:
 +893 / −29 over 18 files (86 Go lines, the rest shell, YAML, Dockerfile, unit, Markdown);
-`bench/results/` adds 6,942 lines of recorded output; `test/bench/compare` adds 190 lines of code
-and 95 of tests after that count. Test-to-code ratio 8,083 / 12,446 = 0.649 before the compare
+`bench/results/` adds 6,942 lines of recorded output; `test/bench/compare` adds 202 lines of code
+and 101 of tests (license headers included) after that count. Test-to-code ratio 8,083 / 12,446 = 0.649 before the compare
 command (was 0.654): the Go added earlier in the phase is bench tooling with no unit tests, listed in
 section 5. Deletions
 made: none needed.

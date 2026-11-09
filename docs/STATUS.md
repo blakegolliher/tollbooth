@@ -1,8 +1,10 @@
 # STATUS
 
 Current phase: **5 (Hardening and v0.1.0), in progress** on `phase-5` (started 2026-11-09 on
-Blake's go after Gate 4 passed; `phase-4` tagged and in `main`). Branch `p5/release`: systemd unit,
-container image, `make release`, `CHANGELOG.md`, the soak harness, the runbook, ADR-0005.
+Blake's go after Gate 4 passed; `phase-4` tagged and in `main`). PR #24 (`p5/release`: systemd
+unit, container image, `make release`, `CHANGELOG.md`, the soak harness, the runbook, ADR-0005, the
+regression gate, the report draft) is merged; `p5/soak` carries the 24 h soak's results and the
+final Gate 5 report.
 
 ## Phases
 
@@ -18,7 +20,8 @@ container image, `make release`, `CHANGELOG.md`, the soak harness, the runbook, 
 
 ## Phase 5 record (in progress)
 
-Shipped so far (PR #24, `p5/release` → `phase-5`): `deploy/tollbooth.service`, `deploy/Dockerfile`
+Shipped (PR #24, `p5/release` → `phase-5`, merged 2026-11-09; the soak results and the final report
+follow on `p5/soak`): `deploy/tollbooth.service`, `deploy/Dockerfile`
 and `.dockerignore`, `make release` and `make image`, the CI `release` job (artifacts, unit verify,
 image), `CHANGELOG.md`, the null backend's fault-injection listener, `loadgen -rate`, the soak
 harness (`make soak`, D-056), `bench/crosscheck.sh` (elbencho, ADR-0005), the full
