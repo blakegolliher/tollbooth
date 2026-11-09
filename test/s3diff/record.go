@@ -76,7 +76,7 @@ func runRecord(sizes []int, styles []string, sigModes bool) int {
 		fmt.Fprintln(os.Stderr, err)
 		return 2
 	}
-	h := proxy.New(published, pool, metrics, nil, nil, slog.New(slog.NewTextHandler(os.Stderr, nil)))
+	h := proxy.New(published, pool, metrics, nil, nil, nil, slog.New(slog.NewTextHandler(os.Stderr, nil)))
 	front := httptest.NewUnstartedServer(h)
 	front.Config = proxy.NewServer(h, &cfg.Listen, metrics, nil)
 	front.Start()

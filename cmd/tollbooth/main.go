@@ -36,9 +36,10 @@ commands:
   serve         run the proxy (--config FILE)
   check-config  validate a config file without starting (exit 1 on any error)
   rules         list | show <id> | test | top: the rate-limit rules in force (via the admin API)
+  usage         query | top | verify: showback files (filter, group, sum; header checks)
   version       print version, commit, build date, and Go version
 
-  status, config, backends, usage, doctor, tui: arrive in Phases 3 and 4
+  status, config, backends, doctor, tui: arrive in Phase 4
 
 every verb that talks to the running proxy takes --admin, --token, --config, and
 --format table|json|csv; the endpoint and token fall back to TOLLBOOTH_ADMIN and
@@ -63,10 +64,12 @@ func run(args []string, stdout, stderr *os.File) int {
 		return runCheckConfig(args[1:], stdout, stderr)
 	case "rules":
 		return runRules(args[1:], stdout, stderr)
+	case "usage":
+		return runUsage(args[1:], stdout, stderr)
 	case "version":
 		_, _ = fmt.Fprintf(stdout, "tollbooth %s (commit %s, built %s, %s)\n", version, commit, date, runtime.Version())
 		return 0
-	case "status", "config", "backends", "usage", "doctor", "tui":
+	case "status", "config", "backends", "doctor", "tui":
 		_, _ = fmt.Fprintf(stderr, "tollbooth %s: not available yet (see docs/STATUS.md)\n", args[0])
 		return 2
 	case "-h", "--help", "help":

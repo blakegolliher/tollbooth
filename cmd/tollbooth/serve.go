@@ -33,6 +33,7 @@ import (
 	"github.com/blakegolliher/tollbooth/internal/config"
 	"github.com/blakegolliher/tollbooth/internal/limiter"
 	"github.com/blakegolliher/tollbooth/internal/proxy"
+	"github.com/blakegolliher/tollbooth/internal/showback"
 )
 
 // runServe runs the proxy until SIGTERM or SIGINT: load the config, open the listener, build the
@@ -89,21 +90,29 @@ func serve(ctx context.Context, path string, cfg *config.Config, log *slog.Logge
 	if err = lim.Apply(cfg); err != nil {
 		return fmt.Errorf("rules: %w", err)
 	}
-	sweepCtx, stopSweep := context.WithCancel(ctx)
-	defer stopSweep()
-	go lim.Run(sweepCtx)
+	bgCtx, stopBg := context.WithCancel(ctx)
+	defer stopBg()
+	go lim.Run(bgCtx)
+
+	agg := showback.NewAggregator(cfg, &metrics.Showback)
+	store := showback.NewStore(agg, cfg.Showback.Dir, cfg.NodeID, cfg.Showback.FlushInterval, cfg.Showback.Retention(), &metrics.Showback, log)
+	if err = store.Recover(); err != nil {
+		return fmt.Errorf("showback: %w", err)
+	}
+	storeDone := make(chan struct{})
+	go func() { defer close(storeDone); store.Run(bgCtx) }()
 
 	var access *proxy.AccessLogger
 	if cfg.Logging.Access {
 		access = proxy.NewAccessLogger(stdout)
 	}
-	h := proxy.New(published, pool, metrics, lim, access, log)
+	h := proxy.New(published, pool, metrics, lim, agg, access, log)
 	data := proxy.NewServer(h, &cfg.Listen, metrics, log)
 	data.BaseContext = func(net.Listener) context.Context { return ctx }
 
 	rl := &reloader{path: path, published: published, certs: certs, lim: lim, metrics: metrics, log: log, generation: 1, loadedAt: time.Now()}
 	adm := &admin.Server{Address: cfg.Admin.Address, Metrics: metrics, Ready: pool.Healthy, Token: cfg.AdminToken(), Pprof: cfg.Admin.Pprof,
-		Limiter: lim, Reload: rl.reload, Config: rl.view}
+		Limiter: lim, Reload: rl.reload, Config: rl.view, Usage: &admin.Usage{Dir: cfg.Showback.Dir}}
 	admSrv := adm.HTTPServer()
 	admLn, err := (&net.ListenConfig{}).Listen(ctx, "tcp", cfg.Admin.Address)
 	if err != nil {
@@ -130,7 +139,7 @@ func serve(ctx context.Context, path string, cfg *config.Config, log *slog.Logge
 	for {
 		select {
 		case <-ctx.Done():
-			return drain(data, admSrv, published.Load().Proxy.DrainTimeout, log)
+			return drain(data, admSrv, published.Load().Proxy.DrainTimeout, log, stopBg, storeDone)
 		case err := <-errc:
 			if errors.Is(err, http.ErrServerClosed) {
 				continue
@@ -142,7 +151,7 @@ func serve(ctx context.Context, path string, cfg *config.Config, log *slog.Logge
 				rl.reload()
 			default:
 				log.Info("signal received, draining", "signal", s.String())
-				return drain(data, admSrv, published.Load().Proxy.DrainTimeout, log)
+				return drain(data, admSrv, published.Load().Proxy.DrainTimeout, log, stopBg, storeDone)
 			}
 		}
 	}
@@ -213,15 +222,22 @@ func (r *reloader) view() admin.ConfigView {
 	return v
 }
 
-// drain stops accepting, waits for in-flight requests up to the drain timeout, then stops the
-// admin server. Phase 3 adds the showback flush here.
-func drain(data, adm *http.Server, timeout time.Duration, log *slog.Logger) error {
+// drain stops accepting, waits for in-flight requests up to the drain timeout, stops the
+// background goroutines (the showback writer takes its final snapshot on the way out), then
+// stops the admin server.
+func drain(data, adm *http.Server, timeout time.Duration, log *slog.Logger, stopBg func(), storeDone <-chan struct{}) error {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 	err := data.Shutdown(ctx)
 	if err != nil {
 		log.Warn("drain timed out; closing remaining connections", "err", err.Error())
 		_ = data.Close()
+	}
+	stopBg()
+	select {
+	case <-storeDone:
+	case <-ctx.Done():
+		log.Warn("showback final snapshot did not finish inside the drain timeout")
 	}
 	_ = adm.Shutdown(ctx)
 	log.Info("tollbooth stopped")
