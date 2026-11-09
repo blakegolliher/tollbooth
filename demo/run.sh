@@ -4,14 +4,18 @@
 # something to show. Ports are chosen not to collide with bench/soak runs on the same box.
 #
 #   demo/run.sh start          build if needed, start, print the environment to paste
-#   demo/run.sh load [RATE]    start bench/loadgen in sdk mode at RATE req/s (default 20) in the background
+#   demo/run.sh load [RATE]    start bench/loadgen in sdk mode at RATE req/s (default 20) in the background;
+#                              with a real backend set AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, and LOAD_BUCKET
+#                              (an existing bucket) and the generator uses them and seeds its objects first
 #   demo/run.sh chaos ARGS     fault-inject the null backend: fail=503 | stall_for=10s | reset=1 | clear=1
 #   demo/run.sh status         what is running
 #   demo/run.sh stop           stop everything, keep demo/state (showback files survive for `usage` verbs)
 #   demo/run.sh clean          stop and remove demo/state
 #
 # Knobs: PROXY_ADDR (127.0.0.1:28000), ADMIN_ADDR (127.0.0.1:29900), BACKEND (empty: the null backend on
-# 127.0.0.1:29000, control 127.0.0.1:29001), BACKEND_SCHEME (http), DEMO_DIR (demo/state).
+# 127.0.0.1:29000, control 127.0.0.1:29001; or host:port of a real S3 endpoint, e.g. a VAST VIP),
+# BACKEND_SCHEME (http; https for a cluster), BACKEND_INSECURE (false; true for a lab certificate),
+# DEMO_DIR (demo/state), LOAD_BUCKET (an existing bucket for `load` against a real backend).
 set -euo pipefail
 HERE=$(cd "$(dirname "$0")" && pwd)
 ROOT=$(cd "$HERE/.." && pwd)
@@ -22,6 +26,8 @@ NULL_ADDR=${NULL_ADDR:-127.0.0.1:29000}
 NULL_CTL=${NULL_CTL:-127.0.0.1:29001}
 BACKEND=${BACKEND:-}
 BACKEND_SCHEME=${BACKEND_SCHEME:-http}
+BACKEND_INSECURE=${BACKEND_INSECURE:-false}
+LOAD_BUCKET=${LOAD_BUCKET:-}
 export GOTOOLCHAIN=${GOTOOLCHAIN:-auto}
 cd "$ROOT"
 
@@ -49,7 +55,7 @@ start() {
     fi
   fi
   sed -e "s#@PROXY_ADDR@#$PROXY_ADDR#" -e "s#@ADMIN_ADDR@#$ADMIN_ADDR#" -e "s#@BACKEND_SCHEME@#$BACKEND_SCHEME#" \
-      -e "s#@BACKEND@#$backend#" -e "s#@SHOWBACK_DIR@#$DEMO_DIR/showback#" "$HERE/tollbooth.demo.yaml" > "$DEMO_DIR/tollbooth.yaml"
+      -e "s#@BACKEND@#$backend#" -e "s#@BACKEND_INSECURE@#$BACKEND_INSECURE#" -e "s#@SHOWBACK_DIR@#$DEMO_DIR/showback#" "$HERE/tollbooth.demo.yaml" > "$DEMO_DIR/tollbooth.yaml"
   bin/tollbooth check-config "$DEMO_DIR/tollbooth.yaml"
   bin/tollbooth serve --config "$DEMO_DIR/tollbooth.yaml" > "$DEMO_DIR/tollbooth.log" 2>&1 &
   echo $! > "$(pidfile tollbooth)"
@@ -73,10 +79,18 @@ BANNER
 load() {
   local rate=${1:-20}
   alive loadgen && stop_one loadgen
-  bin/loadgen -mode sdk -ops GET=70,PUT=20,HEAD=10 -proxied "http://$PROXY_ADDR" -concurrency 4 -keys 3 -buckets 3 -prefixes 2 \
+  local extra=(-keys 3 -buckets 3 -prefixes 2)
+  local what="3 synthetic keys and 3 buckets"
+  if [ -n "$LOAD_BUCKET" ]; then
+    # A real endpoint: one real credential pair (AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY, read by
+    # loadgen itself), one existing bucket, 200 objects seeded first so GET and HEAD find them.
+    extra=(-bucket "$LOAD_BUCKET" -prefixes 2 -objects 100 -seed)
+    what="bucket $LOAD_BUCKET as $AWS_ACCESS_KEY_ID (seeding 200 objects first)"
+  fi
+  bin/loadgen -mode sdk -ops GET=70,PUT=20,HEAD=10 -proxied "http://$PROXY_ADDR" -concurrency 4 "${extra[@]}" \
     -rate "$rate" -duration 24h -warmup 0s -runs 1 -out "$DEMO_DIR" -label demo > "$DEMO_DIR/loadgen.log" 2>&1 &
   echo $! > "$(pidfile loadgen)"
-  echo "background load: $rate req/s of GET/PUT/HEAD across 3 keys and 3 buckets (pid $(cat "$(pidfile loadgen)"))"
+  echo "background load: $rate req/s of GET/PUT/HEAD across $what (pid $(cat "$(pidfile loadgen)"); log $DEMO_DIR/loadgen.log)"
 }
 
 chaos() { curl -sf "http://$NULL_CTL/chaos?$*" || echo "demo: the null backend's control port $NULL_CTL did not answer" >&2; }
