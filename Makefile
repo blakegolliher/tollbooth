@@ -76,10 +76,10 @@ bench: ## run all benchmarks with -benchmem, write test/bench/new.txt
 bench-compare: bench ## compare test/bench/new.txt against test/bench/baseline.txt with benchstat (±10% gate, CLAUDE.md)
 	$(GO) run $(BENCHSTAT) test/bench/baseline.txt test/bench/new.txt
 
-backends: ## fetch and verify the pinned Garage, versitygw, and MinIO backends into test/integration/bin
+backends: ## fetch and verify the pinned Garage and versitygw backends into test/integration/bin
 	$(INTEGRATION_DIR)/backends.sh fetch
 
-compat: build backends ## client compatibility matrix against Garage, versitygw, and MinIO (Phase 1); writes docs/COMPAT.md
+compat: build backends ## client compatibility matrix against Garage and versitygw (Phase 1); writes docs/COMPAT.md
 	$(INTEGRATION_DIR)/compat.sh
 
 release: ## build release artifacts into ./dist (Phase 5: binary, systemd unit, container image)

@@ -28,16 +28,16 @@ containers (Gate 0 review). `test/integration/backends.sh` fetches pinned binari
 | --- | --- | --- | --- |
 | Garage | v2.5.0 (latest tag on git.deuxfleurs.fr) | `garagehq.deuxfleurs.fr/_releases/v2.5.0/x86_64-unknown-linux-musl/garage`, 69,426,824 bytes, static-pie ELF | sha256 `2ff66728…9a9dea8` computed from the download; Garage publishes no checksum file at the release path |
 | versitygw | v1.11.0 (released 2026-11-06) | GitHub release tarball `versitygw_v1.11.0_Linux_x86_64.tar.gz` | sha256 `1f075c9d…5b35b52`, identical to the release's `checksums.txt` |
-| MinIO server | `RELEASE.2025-09-07T16-13-09Z` | GitHub release asset `minio.linux-amd64.<tag>`, 110,989,496 bytes, static ELF | sha256 `7c5bd851…fb855f`, identical to the release's `.sha256sum`. `dl.min.io` returns HTTP 410 with a notice that the open-source server, `mc`, and KES are archived; the repository is archived; the final tag `RELEASE.2025-10-15T17-29-55Z` has **no** binary assets, so the pin is the last release that does. Fallback if GitHub assets disappear: `go install github.com/minio/minio@<tag>` builds it from source |
+| MinIO server | **not used** (D-022) | — | `dl.min.io` returns HTTP 410 with a notice that the open-source server, `mc`, and KES are archived; the repository is archived; the final tag `RELEASE.2025-10-15T17-29-55Z` has no binary assets (the last with assets is `RELEASE.2025-09-07T16-13-09Z`, sha256 `7c5bd851…fb855f`, verified, should anyone need it). Dropped at Gate 0: a frozen AGPL binary with no CVE fixes is a liability in a suite run for years |
 
-Consequences of MinIO's archival for the specification: MinIO remains a CI backend (a frozen
-binary, so it will never change), `mc` as a compatibility-matrix client is
-likewise frozen at its last release or built from source, and `warp` as the bench cross-check
-(ADR-0002) depends on its GitHub release assets still existing at Phase 5. The VAST lab cluster is
-the primary validation target; Garage and versitygw are the maintained open-source stand-ins.
+Consequences of MinIO's archival: MinIO and `mc` are out of CI and the compatibility matrix
+(D-022; the specification's rows are edited to match). `warp` as the bench cross-check (ADR-0002)
+depends on its GitHub release assets still existing at Phase 5 and is re-examined then. The VAST
+lab cluster is the primary validation target; Garage and versitygw are the maintained open-source
+stand-ins.
 
 Ports in the integration suite: Garage S3 `127.0.0.1:3900` (admin 3903, RPC 3901), versitygw
-`127.0.0.1:7070`, MinIO `127.0.0.1:9000` (console 9001). Credentials are lab constants in
+`127.0.0.1:7070`. Credentials are lab constants in
 `backends.sh` except Garage's, which it mints on first start and writes to
 `test/integration/data/garage.env`.
 

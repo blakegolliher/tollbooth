@@ -35,12 +35,12 @@ Dependencies). No database driver, ever.
 
 | Tool | License | Used as | Where |
 | --- | --- | --- | --- |
-| MinIO server | AGPL-3.0 | static binary `RELEASE.2025-09-07T16-13-09Z`, sha256-pinned (matches the release's `.sha256sum`); the last GitHub release with binary assets, since MinIO archived the project (docs/CONTEXT.md) | `test/integration/backends.sh` |
+| MinIO server | AGPL-3.0 | **not used**: archived upstream, dropped at Gate 0 (D-022, docs/CONTEXT.md) | — |
 | Garage | AGPL-3.0 | static binary v2.5.0, sha256-pinned | `test/integration/backends.sh` |
 | versitygw | Apache-2.0 | static binary v1.11.0, sha256-pinned (matches the release's checksums.txt) | `test/integration/backends.sh` |
 | MinIO `warp` | AGPL-3.0 | release binary if still published, bench cross-check (ADR-0002) | `bench/warp` |
 | elbencho | GPL-3.0 | system package or image, compatibility matrix | `test/integration` |
-| aws cli v2, boto3, s5cmd, rclone, mc, s3cmd | Apache-2.0 / MIT / GPL-2.0 (s3cmd) / AGPL-3.0 (mc) | compatibility matrix clients | `test/integration` |
+| aws cli v2, boto3, s5cmd, rclone, s3cmd | Apache-2.0 / MIT / GPL-2.0 (s3cmd) | compatibility matrix clients (`mc` dropped with MinIO, D-022) | `test/integration` |
 
 ## Lifted code (planned for Phase 1; filled in with the real commit and notice at the lift)
 

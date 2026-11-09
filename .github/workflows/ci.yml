@@ -1,7 +1,7 @@
 name: ci
 
 # Every PR: lint, unit with race, 60 s fuzz, govulncheck, go-licenses, CodeQL, Semgrep, and the
-# integration suite against MinIO and Garage (docs/SPEC.md, Engineering quality bar). Jobs whose
+# integration suite against Garage and versitygw (docs/SPEC.md, Engineering quality bar). Jobs whose
 # inputs do not exist yet (no Go code before Phase 1) succeed on an empty tree so the skeleton
 # is green from Phase 0; each one gains teeth in the phase that adds its inputs.
 
@@ -74,8 +74,8 @@ jobs:
           sarif_file: semgrep.sarif
 
   integration:
-    # Backends are pinned static binaries (Garage, versitygw) and a from-source MinIO build, fetched
-    # and verified by test/integration/backends.sh; no container runtime. Phase 1 adds the
+    # Backends are pinned static binaries (Garage, versitygw) fetched and verified by
+    # test/integration/backends.sh; no container runtime. MinIO is not used (D-022). Phase 1 adds the
     # byte-equivalence and compatibility runs behind `make compat`; until then the job only proves
     # the backends fetch and start.
     runs-on: ubuntu-latest
@@ -87,7 +87,7 @@ jobs:
           cache: true
       - name: fetch and start the pinned backends
         run: test/integration/backends.sh up
-      - name: compat matrix against Garage, versitygw, and MinIO
+      - name: compat matrix against Garage and versitygw
         if: ${{ hashFiles('docs/COMPAT.md') != '' }}
         run: make compat
       - name: stop the backends
