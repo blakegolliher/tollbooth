@@ -526,7 +526,11 @@ throttle decisions at `debug` sampled one in `logging.throttle_sample`, access l
 ## 8. Operator surface
 
 CLI verbs, TUI screens, and the parity matrix are specified in docs/SPEC.md (Operator surface) and
-tracked in `docs/OPERATOR_SURFACE.md`. Design points that matter here: one admin client; every
+tracked in `docs/OPERATOR_SURFACE.md`. As built in Phase 4: `GET /admin/status` assembles its
+summary from the parts the process already holds and a one-second sampler of two plain counters
+(D-050); `/admin/backends` renders per-endpoint atomics kept on the pool; `doctor` is a fixed
+list of checks (D-051); the TUI polls everything in one command per interval and shows the last
+state under a STALE banner when a poll fails (D-053). Design points that matter here: one admin client; every
 verb supports `--format table|json|csv` where `json` is the admin response unwrapped; neither the
 CLI nor the TUI writes the config file; the TUI is read-only, polls, and shows the last state under
 a staleness banner when the admin API is unreachable; Bubble Tea imports are fenced to
@@ -663,7 +667,7 @@ Every category in docs/SPEC.md (Test plan) maps to a package and a phase:
 | 9 | Chaos and resilience | `test/e2e` + null backend fault injection | 1–5 |
 | 10 | Performance regression | `make bench-compare` against `test/bench/baseline.txt` (committed at Gate 2 from the fixed CI runner) in the nightly job; `make bench-e2e` (`bench/run.sh`, `bench/loadgen`) for the end-to-end rows | 2–5 |
 | 11 | Static analysis | CI (`.golangci.yml`, `govulncheck`, `gosec`, Semgrep, CodeQL, `go-licenses`) | 0 skeleton, 1 on |
-| 12 | Operator surface | `internal/admin` parity test, CLI goldens, `teatest` goldens | 4 |
+| 12 | Operator surface | `internal/admin` `TestOperatorSurfaceParity` (route table × `docs/OPERATOR_SURFACE.md`, plus a registration probe), `cmd/tollbooth` `TestGoldens` (every verb × table, json, csv) and `TestDoctorGolden`, `cmd/tollbooth/tui` golden frames at 80×24 and 120×40 for every screen and the unreachable state plus a `teatest` smoke run (D-052); the two runbook tasks in `docs/OPERATIONS.md` | 4 |
 
 Coverage floor 85% of statements; every `Op` exercised; `-race` everywhere.
 
