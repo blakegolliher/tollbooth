@@ -24,6 +24,9 @@
 // reported with the added latency. Key distributions: -keys access keys, -buckets, -prefixes,
 // -sources bind addresses. Latencies go into HDR histograms, one per worker, merged at the end;
 // the report is printed and written as JSON under -out.
+//
+// math/rand/v2 shapes the workload (which URL, which operation); it is not security material, so
+// the crypto-randomness rule is suppressed on its import.
 package main
 
 import (
@@ -34,7 +37,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"math/rand/v2" // nosemgrep: workload shaping, not security; the crypto-randomness rule does not apply
+	"math/rand/v2" // nosemgrep
 	"net"
 	"net/http"
 	"os"
