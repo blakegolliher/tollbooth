@@ -34,7 +34,7 @@ internal/proxy/         data listener (TLS, PROXY protocol, trusted XFF), backen
 internal/config/        schema, loader, whole-file validation, atomic publish, features.go
 internal/admin/         admin HTTP server, metrics registry, and the client the CLI and TUI share
 bench/                  null backend, recording backend, load generator (ADR-0002), results/
-test/                   s3diff, e2e, integration compose (MinIO, Garage, versitygw), lab runner
+test/                   s3diff, e2e, integration backends (Garage, versitygw as pinned binaries), lab runner
 docs/                   this file, adr/, CONFIG.md, SHOWBACK_SCHEMA.md, OPERATIONS_TABLE.md, telemetry-catalog.md, …
 deploy/                 systemd unit, Dockerfile, example config
 ```
