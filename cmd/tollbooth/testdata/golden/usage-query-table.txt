@@ -1,0 +1,7 @@
+ACCESS_KEY  STATUS_CLASS  REQUESTS  BYTES_IN  BYTES_OUT  PARTIAL
+AKIA1       2xx           27        0         3700       false
+AKIA1       throttled     5         0         0          false
+AKIA2       2xx           10        300       0          false
+AKIA3       2xx           1         0         1          true
+
+4 files, 4 groups, 43 requests, 300 bytes in, 3701 bytes out; includes the open hour (partial)

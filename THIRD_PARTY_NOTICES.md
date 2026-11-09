@@ -245,8 +245,26 @@ LICENSE (verbatim):
 
 | Module | License | URL |
 |---|---|---|
+| `github.com/atotto/clipboard` | BSD-3-Clause | https://github.com/atotto/clipboard/blob/v0.1.4/LICENSE |
+| `github.com/aymanbagabas/go-osc52/v2` | MIT | https://github.com/aymanbagabas/go-osc52/blob/v2.0.1/LICENSE |
 | `github.com/beorn7/perks/quantile` | MIT | https://github.com/beorn7/perks/blob/v1.0.1/LICENSE |
 | `github.com/cespare/xxhash/v2` | MIT | https://github.com/cespare/xxhash/blob/v2.3.0/LICENSE.txt |
+| `github.com/charmbracelet/bubbles` | MIT | https://github.com/charmbracelet/bubbles/blob/v1.0.0/LICENSE |
+| `github.com/charmbracelet/bubbletea` | MIT | https://github.com/charmbracelet/bubbletea/blob/v1.3.10/LICENSE |
+| `github.com/charmbracelet/colorprofile` | MIT | https://github.com/charmbracelet/colorprofile/blob/v0.4.1/LICENSE |
+| `github.com/charmbracelet/lipgloss` | MIT | https://github.com/charmbracelet/lipgloss/blob/v1.1.0/LICENSE |
+| `github.com/charmbracelet/x/ansi` | MIT | https://github.com/charmbracelet/x/blob/ansi/v0.11.6/ansi/LICENSE |
+| `github.com/charmbracelet/x/cellbuf` | MIT | https://github.com/charmbracelet/x/blob/cellbuf/v0.0.15/cellbuf/LICENSE |
+| `github.com/charmbracelet/x/term` | MIT | https://github.com/charmbracelet/x/blob/term/v0.2.2/term/LICENSE |
+| `github.com/clipperhouse/displaywidth` | MIT | https://github.com/clipperhouse/displaywidth/blob/v0.9.0/LICENSE |
+| `github.com/clipperhouse/stringish` | MIT | https://github.com/clipperhouse/stringish/blob/v0.1.1/LICENSE |
+| `github.com/clipperhouse/uax29/v2/graphemes` | MIT | https://github.com/clipperhouse/uax29/blob/v2.5.0/LICENSE |
+| `github.com/lucasb-eyer/go-colorful` | MIT | https://github.com/lucasb-eyer/go-colorful/blob/v1.3.0/LICENSE |
+| `github.com/mattn/go-isatty` | MIT | https://github.com/mattn/go-isatty/blob/v0.0.20/LICENSE |
+| `github.com/mattn/go-runewidth` | MIT | https://github.com/mattn/go-runewidth/blob/v0.0.19/LICENSE |
+| `github.com/muesli/ansi` | MIT | https://github.com/muesli/ansi/blob/276c6243b2f6/LICENSE |
+| `github.com/muesli/cancelreader` | MIT | https://github.com/muesli/cancelreader/blob/v0.2.2/LICENSE |
+| `github.com/muesli/termenv` | MIT | https://github.com/muesli/termenv/blob/v0.16.0/LICENSE |
 | `github.com/munnerz/goautoneg` | BSD-3-Clause | https://github.com/munnerz/goautoneg/blob/a7dc8b61c822/LICENSE |
 | `github.com/pires/go-proxyproto` | Apache-2.0 | https://github.com/pires/go-proxyproto/blob/v0.16.0/LICENSE |
 | `github.com/prometheus/client_golang/internal/github.com/golang/gddo/httputil` | BSD-3-Clause | https://github.com/prometheus/client_golang/blob/v1.25.0/internal/github.com/golang/gddo/LICENSE |
@@ -254,6 +272,8 @@ LICENSE (verbatim):
 | `github.com/prometheus/client_model/go` | Apache-2.0 | https://github.com/prometheus/client_model/blob/v0.6.3/LICENSE |
 | `github.com/prometheus/common` | Apache-2.0 | https://github.com/prometheus/common/blob/v0.72.0/LICENSE |
 | `github.com/prometheus/procfs` | Apache-2.0 | https://github.com/prometheus/procfs/blob/v0.22.0/LICENSE |
+| `github.com/rivo/uniseg` | MIT | https://github.com/rivo/uniseg/blob/v0.4.7/LICENSE.txt |
+| `github.com/xo/terminfo` | MIT | https://github.com/xo/terminfo/blob/abceb7e1c41e/LICENSE |
 | `go.yaml.in/yaml/v4` | Apache-2.0 | https://github.com/yaml/go-yaml/blob/v4.0.0/LICENSE |
 | `golang.org/x/sys/unix` | BSD-3-Clause | https://cs.opensource.google/go/x/sys/+/v0.48.0:LICENSE |
 | `google.golang.org/protobuf` | BSD-3-Clause | https://github.com/protocolbuffers/protobuf-go/blob/v1.36.12/LICENSE |

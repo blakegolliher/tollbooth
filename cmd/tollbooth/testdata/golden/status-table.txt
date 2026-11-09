@@ -1,0 +1,15 @@
+FIELD            VALUE
+node_id          golden
+version          v0.0.0-golden
+uptime X
+state            ready
+in_flight        2
+requests         1200 total; 0.0/s (1s) 0.0/s (10s) 0.0/s (60s)
+throttled        3 total; 0.0/s (1s) 0.0/s (10s) 0.0/s (60s)
+rules            3 in force; 0 live keys; 3 denied since start
+showback         hour 2026-11-09T12:00:00Z; 17 tuples
+config           generation 2, loaded 2026-11-09T12:00:00Z
+last_reload      ok at 2026-11-09T12:00:00Z (3 rules, 0.5 ms)
+backends         1 of 2 up
+  10.0.0.1:9000  up; 1 in flight; 1100 requests; 0 errors; ttfb mean 1.2 ms
+  10.0.0.2:9000  down; 0 in flight; 100 requests; 4 errors; ttfb mean 0.0 ms

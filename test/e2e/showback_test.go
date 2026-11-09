@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -151,11 +152,13 @@ rate_limits:
 }
 
 // Showback costs under 2% of peak request rate on versus off (docs/SPEC.md, Performance targets):
-// the same GET loop with the aggregator attached and detached, interleaved, on the dev box. This
-// is an in-process A/B through httptest, so the absolute numbers are small; the ratio is the test.
+// the same GET loop with the aggregator attached and detached, interleaved. This is a throughput
+// A/B, not a unit test: on a shared 2 vCPU box with the race suite's packages running in parallel
+// the two numbers wander by more than 10% run to run (D-055), so it runs only with TOLLBOOTH_BIG=1
+// and is quoted in the gate reports; the 2% claim itself is checked on the reference node in Phase 5.
 func TestShowbackCostUnderTwoPercent(t *testing.T) {
-	if testing.Short() {
-		t.Skip("A/B needs a few seconds")
+	if os.Getenv("TOLLBOOTH_BIG") == "" {
+		t.Skip("set TOLLBOOTH_BIG=1 to run the showback on/off throughput A/B (a measurement, noisy on shared CPUs)")
 	}
 	r := start(t, "")
 	c := &http.Client{Transport: &http.Transport{MaxIdleConnsPerHost: 16}}

@@ -1,0 +1,13 @@
+FIELD,VALUE
+id,list-storm
+access_keys,any
+buckets,any
+prefixes,any
+source_cidrs,any
+ops,LIST
+group_by,source_ip
+rate,50 (25/node)
+burst,200 (100/node)
+on_limit,too_many_requests
+live_keys,0
+denied,0

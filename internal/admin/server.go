@@ -57,8 +57,8 @@ var Routes = []Route{
 	{Method: http.MethodGet, Path: "/admin/limits/top", Phase: 2},
 	{Method: http.MethodPost, Path: "/admin/limits/test", Phase: 2}, // moved from Phase 4: `rules test` is a Phase 2 verb (D-039)
 	{Method: http.MethodGet, Path: "/admin/usage", Phase: 3},        // served from Phase 3
-	{Method: http.MethodGet, Path: "/admin/status", Phase: 4},
-	{Method: http.MethodGet, Path: "/admin/backends", Phase: 4},
+	{Method: http.MethodGet, Path: "/admin/status", Phase: 4},       // served from Phase 4
+	{Method: http.MethodGet, Path: "/admin/backends", Phase: 4},     // served from Phase 4
 	{Method: http.MethodGet, Path: "/debug/pprof/", Phase: 1},
 }
 
@@ -101,12 +101,76 @@ type Server struct {
 	Config func() ConfigView
 	// Usage answers GET /admin/usage over this node's showback directory. nil: not served.
 	Usage *Usage
+	// Backends lists the pool's endpoints with their counters. nil: /admin/backends and the
+	// status summary's backend rows are not served.
+	Backends func() []BackendStatus
+	// Status facts the server does not own: node id, version, start time, the showback hour and
+	// tuple count. Showback may be nil.
+	NodeID    string
+	Version   string
+	StartedAt time.Time
+	Showback  func() (hour string, tuples int64)
+
+	sampler sampler
 }
 
 // Usage is the showback query surface: this node's directory only, the same code path as
 // `tollbooth usage query`.
 type Usage struct {
 	Dir string
+}
+
+// BackendStatus is one endpoint's row in GET /admin/backends and GET /admin/status, filled by the
+// backend pool (internal/proxy owns the counters; this package only renders them).
+type BackendStatus struct {
+	Endpoint   string  `json:"endpoint"`
+	Up         bool    `json:"up"`
+	Inflight   int64   `json:"inflight"`
+	Requests   int64   `json:"requests"`
+	Errors     int64   `json:"errors"`
+	ErrorsDial int64   `json:"errors_dial"`
+	ErrorsTLS  int64   `json:"errors_tls"`
+	ErrorsTime int64   `json:"errors_timeout"`
+	ErrorsRst  int64   `json:"errors_reset"`
+	ErrorsOth  int64   `json:"errors_other"`
+	TTFBMeanMS float64 `json:"ttfb_mean_ms"` // mean over every response since start
+	TTFBLastMS float64 `json:"ttfb_last_ms"`
+	LastError  string  `json:"last_error,omitempty"`
+	LastErrAt  string  `json:"last_error_at,omitempty"`
+}
+
+// Rates is per-second request and throttle rates over the last 1, 10, and 60 seconds, from the
+// sampler's one-second ring.
+type Rates struct {
+	Requests1s   float64 `json:"requests_1s"`
+	Requests10s  float64 `json:"requests_10s"`
+	Requests60s  float64 `json:"requests_60s"`
+	Throttled1s  float64 `json:"throttled_1s"`
+	Throttled10s float64 `json:"throttled_10s"`
+	Throttled60s float64 `json:"throttled_60s"`
+}
+
+// StatusView is GET /admin/status: the one-screen summary `tollbooth status` prints.
+type StatusView struct {
+	NodeID        string          `json:"node_id"`
+	Version       string          `json:"version"`
+	StartedAt     time.Time       `json:"started_at"`
+	UptimeSeconds float64         `json:"uptime_seconds"`
+	Ready         bool            `json:"ready"`
+	Inflight      int64           `json:"inflight"`
+	Requests      int64           `json:"requests_total"`
+	Throttled     int64           `json:"throttled_total"`
+	Rates         Rates           `json:"rates"`
+	Rules         int             `json:"rules"`
+	LiveKeys      int64           `json:"limiter_live_keys"`
+	Denied        int64           `json:"limiter_denied_total"`
+	ShowbackHour  string          `json:"showback_hour"`
+	Tuples        int64           `json:"showback_tuples"`
+	Generation    int             `json:"config_generation"`
+	LoadedAt      time.Time       `json:"config_loaded_at"`
+	LastReload    *ReloadResult   `json:"last_reload,omitempty"`
+	BackendsUp    int             `json:"backends_up"`
+	Backends      []BackendStatus `json:"backends"`
 }
 
 // Handler builds the mux. A mux is fine here: nothing on this port is an object key.
@@ -144,6 +208,16 @@ func (s *Server) Handler() http.Handler {
 	if s.Usage != nil {
 		mux.HandleFunc("GET /admin/usage", s.usage)
 	}
+	if s.Backends != nil {
+		mux.HandleFunc("GET /admin/backends", func(w http.ResponseWriter, _ *http.Request) {
+			writeJSON(w, http.StatusOK, map[string]any{"backends": s.Backends()})
+		})
+	}
+	if s.Config != nil && s.Backends != nil {
+		mux.HandleFunc("GET /admin/status", func(w http.ResponseWriter, _ *http.Request) {
+			writeJSON(w, http.StatusOK, s.status())
+		})
+	}
 	if s.Limiter != nil {
 		mux.HandleFunc("GET /admin/limits", s.limits)
 		mux.HandleFunc("GET /admin/limits/top", s.limitsTop)
@@ -157,6 +231,45 @@ func (s *Server) Handler() http.Handler {
 		mux.HandleFunc("/debug/pprof/trace", pprof.Trace)
 	}
 	return s.auth(mux)
+}
+
+// status assembles the summary from the parts the process already holds.
+func (s *Server) status() StatusView {
+	now := time.Now()
+	v := StatusView{NodeID: s.NodeID, Version: s.Version, StartedAt: s.StartedAt, UptimeSeconds: now.Sub(s.StartedAt).Seconds(), Backends: []BackendStatus{}}
+	if s.Ready != nil {
+		v.Ready = s.Ready()
+	}
+	if s.Metrics != nil {
+		v.Inflight = s.Metrics.InflightCount.Load()
+		v.Requests = s.Metrics.TotalRequests.Load()
+		v.Throttled = s.Metrics.TotalThrottled.Load()
+	}
+	v.Rates = s.sampler.rates()
+	if s.Limiter != nil {
+		st := s.Limiter.Status()
+		v.Rules = len(st)
+		for i := range st {
+			v.Denied += st[i].Denied
+		}
+		v.LiveKeys = s.Limiter.Keys()
+	}
+	if s.Showback != nil {
+		v.ShowbackHour, v.Tuples = s.Showback()
+	}
+	if s.Config != nil {
+		cv := s.Config()
+		v.Generation, v.LoadedAt, v.LastReload = cv.Generation, cv.LoadedAt, cv.LastReload
+	}
+	if s.Backends != nil {
+		v.Backends = s.Backends()
+		for i := range v.Backends {
+			if v.Backends[i].Up {
+				v.BackendsUp++
+			}
+		}
+	}
+	return v
 }
 
 // Limits is GET /admin/limits.

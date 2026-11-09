@@ -1,0 +1,24 @@
+ 1 Overview  2 Limits  3 Usage  4 Backends  5 Config  tui-node · v0.0.0-tui
+  generation 2, loaded 2026-11-09T11:30:00Z; last reload: ok at 2026-11-09T11:30
+
+  Running config versus /etc/tollbooth/tollbooth.yaml
+  KEY                                  RUNNING              FILE                
+  rate_limits.rules                    [{"group_by":["acce… [{"group_by":["acce…
+
+  Running config (redacted)
+  admin.address                            "127.0.0.1:9900"
+  admin.pprof                              false
+  admin.token                              "\u003credacted\u003e"
+  admin.token_file                         ""
+  backend.dial_timeout                     "2s"
+  backend.endpoints                        ["10.0.0.1:9000","10.0.0.2:9000"]
+  backend.health_check.interval            "5s"
+  backend.health_check.timeout             "2s"
+  backend.idle_body_timeout                "1m0s"
+  backend.max_idle_conns_per_host          1024
+  backend.response_header_timeout          "5m0s"
+  backend.scheme                           "http"
+  backend.tls.ca_bundle                    ""
+  backend.tls.insecure_skip_verify         false
+  base_domains                             []
+r reload · v validate the file on disk · ? help · q quit

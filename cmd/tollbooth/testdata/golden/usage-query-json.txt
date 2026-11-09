@@ -1,0 +1,55 @@
+{
+  "from_hour_utc": 0,
+  "to_hour_utc": 4611686018427387903,
+  "group_by": [
+    "access_key",
+    "status_class"
+  ],
+  "files": 4,
+  "groups": [
+    {
+      "keys": {
+        "access_key": "AKIA1",
+        "status_class": "2xx"
+      },
+      "requests": 27,
+      "bytes_in": 0,
+      "bytes_out": 3700,
+      "partial": false
+    },
+    {
+      "keys": {
+        "access_key": "AKIA1",
+        "status_class": "throttled"
+      },
+      "requests": 5,
+      "bytes_in": 0,
+      "bytes_out": 0,
+      "partial": false
+    },
+    {
+      "keys": {
+        "access_key": "AKIA2",
+        "status_class": "2xx"
+      },
+      "requests": 10,
+      "bytes_in": 300,
+      "bytes_out": 0,
+      "partial": false
+    },
+    {
+      "keys": {
+        "access_key": "AKIA3",
+        "status_class": "2xx"
+      },
+      "requests": 1,
+      "bytes_in": 0,
+      "bytes_out": 1,
+      "partial": true
+    }
+  ],
+  "requests": 43,
+  "bytes_in": 300,
+  "bytes_out": 3701,
+  "partial": true
+}

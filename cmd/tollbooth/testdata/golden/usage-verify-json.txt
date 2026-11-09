@@ -1,0 +1,30 @@
+{
+  "nodes": [
+    {
+      "node_id": "a",
+      "first_hour": "2026-11-09T11:00:00Z",
+      "last_hour": "2026-11-09T12:00:00Z",
+      "sealed_hours": 2,
+      "missing_hours": [],
+      "partial_hours": [],
+      "recovered_hours": [],
+      "header_mismatch": [],
+      "unreadable": []
+    },
+    {
+      "node_id": "b",
+      "first_hour": "2026-11-09T11:00:00Z",
+      "last_hour": "2026-11-09T11:00:00Z",
+      "sealed_hours": 1,
+      "missing_hours": [],
+      "partial_hours": [
+        "2026-11-09T13:00:00Z"
+      ],
+      "recovered_hours": [],
+      "header_mismatch": [],
+      "unreadable": []
+    }
+  ],
+  "files": 4,
+  "problems": 0
+}

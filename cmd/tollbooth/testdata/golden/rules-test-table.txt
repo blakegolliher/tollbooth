@@ -1,0 +1,3 @@
+ListObjectsV2 LIST (bucket level): allowed; 1 rules match
+RULE        KEY          LIVE_KEYS  VERDICT  RETRY_AFTER  MODE
+list-storm  ip=10.0.0.9  0          allow    -            too_many_requests

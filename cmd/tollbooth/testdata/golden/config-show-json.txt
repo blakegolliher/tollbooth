@@ -1,0 +1,160 @@
+{
+  "config": {
+    "admin": {
+      "address": "127.0.0.1:PORT",
+      "pprof": false,
+      "token": "\u003credacted\u003e",
+      "token_file": ""
+    },
+    "backend": {
+      "dial_timeout": "2s",
+      "endpoints": [
+        "127.0.0.1:PORT"
+      ],
+      "health_check": {
+        "interval": "5s",
+        "timeout": "2s"
+      },
+      "idle_body_timeout": "1m0s",
+      "max_idle_conns_per_host": 1024,
+      "response_header_timeout": "5m0s",
+      "scheme": "http",
+      "tls": {
+        "ca_bundle": "",
+        "insecure_skip_verify": false
+      }
+    },
+    "base_domains": [],
+    "cluster": {
+      "node_count": 2
+    },
+    "features": {},
+    "kill_switches": {
+      "limiter_disable": false,
+      "showback_disable": false
+    },
+    "limiter": {
+      "max_keys": 2000000,
+      "sweep_interval": "10s"
+    },
+    "listen": {
+      "address": ":8443",
+      "idle_timeout": "2m0s",
+      "max_header_bytes": 1048576,
+      "max_inflight": 4096,
+      "proxy_protocol": false,
+      "read_header_timeout": "10s",
+      "tls": {
+        "cert": "",
+        "key": "",
+        "min_version": "1.2"
+      },
+      "trusted_proxies": []
+    },
+    "logging": {
+      "access": false,
+      "level": "info",
+      "throttle_sample": 100
+    },
+    "node_id": "t",
+    "proxy": {
+      "copy_buffer_bytes": 131072,
+      "drain_timeout": "30s"
+    },
+    "rate_limits": {
+      "default_on_limit": "slowdown",
+      "rules": [
+        {
+          "group_by": [
+            "access_key",
+            "bucket"
+          ],
+          "id": "tenant-a-writes",
+          "limit": {
+            "burst": 4000,
+            "rate": 2000
+          },
+          "match": {
+            "access_keys": [
+              "AKIAEXAMPLE1",
+              "AKIAEXAMPLE2"
+            ],
+            "buckets": [
+              "training-data"
+            ],
+            "ops": [
+              "WRITE"
+            ],
+            "prefixes": [
+              "ckpt/"
+            ],
+            "source_cidrs": []
+          },
+          "on_limit": "slowdown"
+        },
+        {
+          "group_by": [
+            "source_ip"
+          ],
+          "id": "list-storm",
+          "limit": {
+            "burst": 200,
+            "rate": 50
+          },
+          "match": {
+            "access_keys": [],
+            "buckets": [],
+            "ops": [
+              "LIST"
+            ],
+            "prefixes": [],
+            "source_cidrs": []
+          },
+          "on_limit": "too_many_requests"
+        },
+        {
+          "group_by": [],
+          "id": "frozen",
+          "limit": {
+            "burst": 0,
+            "rate": 0
+          },
+          "match": {
+            "access_keys": [
+              "AKIAREVOKED"
+            ],
+            "buckets": [],
+            "ops": [],
+            "prefixes": [],
+            "source_cidrs": []
+          },
+          "on_limit": "slowdown"
+        }
+      ]
+    },
+    "showback": {
+      "dimensions": [
+        "access_key",
+        "bucket",
+        "prefix",
+        "operation",
+        "status_class"
+      ],
+      "dir": "/TMP",
+      "flush_interval": "1m0s",
+      "max_tuples_per_hour": 250000,
+      "prefixes": {},
+      "retention_days": 400
+    }
+  },
+  "generation": 2,
+  "loaded_at": "2026-11-09T12:00:00Z",
+  "last_reload": {
+    "ok": true,
+    "at": "2026-11-09T12:00:00Z",
+    "generation": 2,
+    "rules": 3,
+    "duration_ms": 0.5
+  }
+}
+

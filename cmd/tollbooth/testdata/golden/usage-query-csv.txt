@@ -1,0 +1,5 @@
+access_key,status_class,requests,bytes_in,bytes_out,partial
+AKIA1,2xx,27,0,3700,false
+AKIA1,throttled,5,0,0,false
+AKIA2,2xx,10,300,0,false
+AKIA3,2xx,1,0,1,true

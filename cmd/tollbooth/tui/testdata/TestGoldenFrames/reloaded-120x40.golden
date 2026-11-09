@@ -1,0 +1,40 @@
+ 1 Overview  2 Limits  3 Usage  4 Backends  5 Config  tui-node · v0.0.0-tui
+  state          ready
+  uptime         X
+  in flight      4
+  requests       0/s now, 0/s over 60 s, 12345 total
+  ▁  max 0/s over the last 0s
+  throttled      0/s now, 0/s over 60 s, 12 total
+  ▁  max 0/s over the last 0s
+  backends       1 of 2 up
+                 10.0.0.1:9000 up, 2 in flight, ttfb 1.3 ms
+                 10.0.0.2:9000 DOWN, 0 in flight, ttfb 0.0 ms
+  rules          3 in force, 0 live keys, 3 denied since start
+  showback       hour 2026-11-09T12:00:00Z, 2 tuples
+  config         generation 2, loaded 2026-11-09 11:30:00
+  last reload    ok at 11:30:00 (3 rules)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+reload REJECTED: rate_limits.rules[0].limit.rate: must be >= 0

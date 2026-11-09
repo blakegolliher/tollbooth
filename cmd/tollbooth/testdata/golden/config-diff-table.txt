@@ -1,0 +1,4 @@
+KEY                 RUNNING  FILE
+cluster.node_count  2        4
+
+1 keys differ; run `tollbooth config reload` to apply /TMP

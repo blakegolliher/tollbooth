@@ -23,6 +23,7 @@ package admin
 
 import (
 	"math"
+	"sync/atomic"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/collectors"
@@ -126,6 +127,13 @@ type Metrics struct {
 	Limiter limiter.Metrics
 	// Showback holds the five showback rows of the catalog (Phase 3); internal/showback observes.
 	Showback showback.Metrics
+
+	// Plain counters the status summary and its sampler read: every completed request, the
+	// throttled ones, and the in-flight count. Incremented by the handler next to the Prometheus
+	// counters; an atomic add each, nothing allocated.
+	TotalRequests  atomic.Int64
+	TotalThrottled atomic.Int64
+	InflightCount  atomic.Int64
 }
 
 // Side of a connection gauge.
