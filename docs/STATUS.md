@@ -1,9 +1,9 @@
 # STATUS
 
-Current phase: **2 (Rate limiting), gate report written** (`docs/reports/gate-2.md`), awaiting
-Fable's review and Blake's decision. Open, stacked on `phase-2`: #10 limiter, #11 handler and admin
-routes, #12 `rules` verbs, #13 e2e and client throttling rows, #14 bench harness and baseline. Phase 1
-passed (Blake, 2026-11-09: #7 and #8 merged, Phase 2 started; #9 brings `phase-1` to `main`).
+Current phase: **2 (Rate limiting), gate passed** (Fable, 2026-11-09; `docs/reports/gate-2.md`).
+Close-out in flight: the Gate 2 fix-ups, then #15 (`p2/e2e` → `phase-2`), then #16 (`phase-2` →
+`main`), then the `phase-1` and `phase-2` tags. Phase 3 (Showback) starts on `phase-3` when Blake
+says so.
 
 ## Phases
 
@@ -42,7 +42,13 @@ latency p50 2.1 ms and proxied throughput 2,194 req/s against direct 6,284 at co
 measure the box, not the proxy (44% of proxy CPU is socket syscalls, `limiter.Decide` 1.25%). The
 reference-node run is Phase 5.
 
-Gate result: pending.
+Gate result: **pass** (Fable, 2026-11-09). Answers: 1 yes (keep `x-amz-retry-after`); 2 yes, Fable
+amends the specification's category 7 wording; 3 yes; 4 yes; 5 Phase 5; 6 yes once the stack is
+in `phase-2`. Flags acted on: the reserved shaping histogram is deleted until shaping ships (D-045);
+the field evidence for shaping is in ADR-0004's stub; the runbook states the client retry-mode
+facts (`docs/OPERATIONS.md`). The stack had been merged top-down and collapsed into `p2/e2e`; #15
+brings it into `phase-2`, #16 brings `phase-2` into `main`; `phase-1` and `phase-2` are tagged at
+the close.
 
 ## Phase 1 record
 

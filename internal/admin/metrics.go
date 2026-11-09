@@ -120,8 +120,8 @@ type Metrics struct {
 	BackendRetries prometheus.Counter     // tollbooth_backend_retries_total
 	ConfigReload   *prometheus.CounterVec // tollbooth_config_reload_total{result}
 
-	// Limiter holds the six limiter rows of the catalog; internal/limiter observes them and never
-	// registers anything itself (Phase 2).
+	// Limiter holds the five limiter rows of the catalog; internal/limiter observes them and never
+	// registers anything itself (Phase 2). The shaping histogram arrives with shaping (ADR-0004).
 	Limiter limiter.Metrics
 }
 
@@ -202,17 +202,13 @@ func NewMetrics() *Metrics {
 		Denied: prometheus.NewCounterVec(prometheus.CounterOpts{
 			Name: "tollbooth_limiter_denied_total", Help: "Requests denied, by the rule that denied them.",
 		}, []string{"rule"}),
-		ShapedWait: prometheus.NewHistogramVec(prometheus.HistogramOpts{
-			Name: "tollbooth_limiter_shaped_wait_seconds", Help: "Reserved for the Phase 6 hold-and-forward mode; registered, never observed in v1.",
-			Buckets: logBuckets(1e-3, 60, 16),
-		}, []string{"rule"}),
 		Errors: prometheus.NewCounter(prometheus.CounterOpts{
 			Name: "tollbooth_limiter_errors_total", Help: "Panics or internal errors inside the limiter, each failed open.",
 		}),
 	}
 	reg.MustRegister(m.requestsTotal, m.requestDuration, m.proxyOverhead, m.backendTTFB, m.bytesTotal, m.connectionsOpen,
 		m.Inflight, m.BackendUp, m.BackendErrors, m.BackendRetries, m.ConfigReload,
-		m.Limiter.Decision.(prometheus.Collector), m.Limiter.Keys, m.Limiter.Overflow, m.Limiter.Denied, m.Limiter.ShapedWait, m.Limiter.Errors,
+		m.Limiter.Decision.(prometheus.Collector), m.Limiter.Keys, m.Limiter.Overflow, m.Limiter.Denied, m.Limiter.Errors,
 		collectors.NewGoCollector(), collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))
 
 	// Resolve every per-request handle once. The cardinality is fixed by construction:
