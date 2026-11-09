@@ -265,3 +265,37 @@ func BenchmarkClassifyGetObject(b *testing.B) {
 		}
 	}
 }
+
+// FuzzClassify: the classifier never panics and is deterministic for any method, level, raw
+// query, and copy-source header; a method the table does not know is Unknown; OPTIONS is always
+// Preflight.
+func FuzzClassify(f *testing.F) {
+	f.Add("GET", uint8(2), "uploadId=1&partNumber=2", "")
+	f.Add("PUT", uint8(2), "uploadId=1&partNumber=2", "b/k")
+	f.Add("POST", uint8(1), "delete", "")
+	f.Add("OPTIONS", uint8(0), "", "")
+	f.Add("GET", uint8(1), "list-type=2&prefix=a", "")
+	f.Add("PATCH", uint8(3), "frob", "")
+	f.Fuzz(func(t *testing.T, method string, level uint8, raw, copySource string) {
+		h := http.Header{}
+		if copySource != "" {
+			h.Set(hdrCopySource, copySource)
+		}
+		q := scanQuery(raw)
+		got := classify(method, Level(level), &q, h)
+		if again := classify(method, Level(level), &q, h); again != got {
+			t.Fatalf("not deterministic: %s vs %s", got, again)
+		}
+		if method == http.MethodOptions && got != OpPreflight {
+			t.Fatalf("OPTIONS classified as %s", got)
+		}
+		if methodIndex(method) < 0 && method != http.MethodOptions && got != OpUnknown {
+			t.Fatalf("method %q classified as %s", method, got)
+		}
+		if level > uint8(LevelObject) && got != OpUnknown && method != http.MethodOptions {
+			t.Fatalf("level %d classified as %s", level, got)
+		}
+		_ = got.String()
+		_ = got.Class().String()
+	})
+}

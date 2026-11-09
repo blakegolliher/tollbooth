@@ -802,3 +802,91 @@ func BenchmarkSmallGETEndToEnd(b *testing.B) {
 }
 
 var _ = context.Background
+
+// D-034: a backend that answers and closes before reading the request body. Go's transport
+// races the write error against the response; the proxy relays the response when it wins and
+// answers 503 when it does not. Either way the client gets a complete answer, promptly, and the
+// backend saw no body it did not ask for. With Expect: 100-continue the answer is always relayed.
+func TestBackendAnswersBeforeReadingBody(t *testing.T) {
+	r := rigFor(t, http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/xml")
+		w.Header().Set("Connection", "close")
+		w.WriteHeader(http.StatusForbidden)
+		_, _ = w.Write([]byte(`<Error><Code>AccessDenied</Code></Error>`))
+	}), time.Second)
+	body := bytes.Repeat([]byte("p"), 8<<20)
+	outcomes := map[string]int{}
+	for i := 0; i < 3; i++ {
+		req, _ := http.NewRequest(http.MethodPut, r.front.URL+"/b/k", bytes.NewReader(body))
+		start := time.Now()
+		resp, err := fresh().Do(req)
+		switch {
+		case err != nil:
+			// The same race one hop earlier: the proxy answered and closed while the client was
+			// still writing, and the client's transport reported the write error instead of the
+			// response, exactly as it would against a backend that closes early.
+			outcomes["transport error"]++
+		case resp.StatusCode == http.StatusForbidden || resp.StatusCode == http.StatusServiceUnavailable:
+			outcomes[resp.Status]++
+			io.Copy(io.Discard, resp.Body) //nolint:errcheck // test
+			resp.Body.Close()              //nolint:errcheck // test
+		default:
+			t.Fatalf("attempt %d: status %d", i, resp.StatusCode)
+		}
+		if d := time.Since(start); d > 5*time.Second {
+			t.Fatalf("attempt %d took %v", i, d)
+		}
+	}
+	t.Logf("without Expect: %v", outcomes)
+	// With Expect: 100-continue the 403 arrives before any body byte and is relayed every time.
+	for i := 0; i < 3; i++ {
+		req, _ := http.NewRequest(http.MethodPut, r.front.URL+"/b/k", bytes.NewReader(body))
+		req.Header.Set("Expect", "100-continue")
+		resp, err := (&http.Client{Transport: &http.Transport{ExpectContinueTimeout: time.Second, DisableKeepAlives: true}}).Do(req)
+		if err != nil {
+			t.Fatalf("expect attempt %d: %v", i, err)
+		}
+		io.Copy(io.Discard, resp.Body) //nolint:errcheck // test
+		resp.Body.Close()              //nolint:errcheck // test
+		if resp.StatusCode != http.StatusForbidden {
+			t.Fatalf("expect attempt %d: status %d, want 403 relayed", i, resp.StatusCode)
+		}
+	}
+}
+
+// A client's explicit "Content-Length: 0" on a bodiless request reaches the backend (aws cli v2
+// signs it on GET and DELETE); a POST with Content-Length: 0 carries exactly one such header.
+func TestExplicitZeroContentLengthIsPreserved(t *testing.T) {
+	r := newRig(t, 1, time.Second)
+	for _, method := range []string{"GET", "DELETE", "HEAD", "POST"} {
+		r.null.Clear()
+		conn := rawDial(t, r.front)
+		fmt.Fprintf(conn, "%s /b/k HTTP/1.1\r\nHost: h\r\nContent-Length: 0\r\nAuthorization: AWS4-HMAC-SHA256 Credential=AKIAX/20261109/us-east-1/s3/aws4_request, SignedHeaders=content-length;host, Signature=x\r\nConnection: close\r\n\r\n", method)
+		resp, err := http.ReadResponse(bufio.NewReader(conn), nil)
+		if err != nil {
+			t.Fatalf("%s: %v", method, err)
+		}
+		io.Copy(io.Discard, resp.Body) //nolint:errcheck // test
+		resp.Body.Close()              //nolint:errcheck // test
+		reqs := r.null.Requests()
+		if len(reqs) != 1 {
+			t.Fatalf("%s: backend saw %d requests", method, len(reqs))
+		}
+		if cl := reqs[0].Header.Values("Content-Length"); len(cl) != 1 || cl[0] != "0" {
+			t.Errorf("%s: backend saw Content-Length %v, want exactly [0]", method, cl)
+		}
+	}
+	// Without the header from the client, none is invented on a GET.
+	r.null.Clear()
+	conn := rawDial(t, r.front)
+	fmt.Fprintf(conn, "GET /b/k HTTP/1.1\r\nHost: h\r\nConnection: close\r\n\r\n")
+	resp, err := http.ReadResponse(bufio.NewReader(conn), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	io.Copy(io.Discard, resp.Body) //nolint:errcheck // test
+	resp.Body.Close()              //nolint:errcheck // test
+	if reqs := r.null.Requests(); len(reqs) != 1 || len(reqs[0].Header.Values("Content-Length")) != 0 {
+		t.Fatalf("GET without Content-Length: backend saw %v", reqs[0].Header)
+	}
+}

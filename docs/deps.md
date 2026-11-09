@@ -41,8 +41,12 @@ Dependencies). No database driver, ever.
 | Garage | AGPL-3.0 | static binary v2.5.0, sha256-pinned | `test/integration/backends.sh` |
 | versitygw | Apache-2.0 | static binary v1.11.0, sha256-pinned (matches the release's checksums.txt) | `test/integration/backends.sh` |
 | MinIO `warp` | AGPL-3.0 | release binary if still published, bench cross-check (ADR-0002) | `bench/warp` |
-| elbencho | GPL-3.0 | system package or image, compatibility matrix | `test/integration` |
-| aws cli v2, boto3, s5cmd, rclone, s3cmd | Apache-2.0 / MIT / GPL-2.0 (s3cmd) | compatibility matrix clients (`mc` dropped with MinIO, D-022) | `test/integration` |
+| elbencho | GPL-3.0 | static binary v3.3-3, sha256-pinned (computed; no published checksum), compatibility matrix | `test/integration/clients.sh` |
+| aws cli v2 | Apache-2.0 | the runner image's | `test/integration/clients.sh` |
+| boto3 1.43.126, s3cmd 2.4.0 | Apache-2.0, GPL-2.0 | pip into a venv | `test/integration/clients.sh` |
+| s5cmd 2.3.0 | MIT | static binary, sha256 matches `s5cmd_checksums.txt` | `test/integration/clients.sh` |
+| rclone v1.76.0 | MIT | static binary, sha256 matches `SHA256SUMS` | `test/integration/clients.sh` |
+| `mc` | AGPL-3.0 | **not used** (dropped with MinIO, D-022) | — |
 
 ## Lifted code
 

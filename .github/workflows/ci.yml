@@ -85,14 +85,23 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
-      - name: byte-equivalence (s3diff) against Garage and versitygw
+      - name: cache the pinned backends and client tools
+        uses: actions/cache@v6
+        with:
+          path: |
+            test/integration/bin
+            test/integration/.venv
+          key: integration-tools-${{ hashFiles('test/integration/backends.sh', 'test/integration/clients.sh') }}
+      - name: byte-equivalence (s3diff) and client matrix against Garage and versitygw
         run: make compat
       - name: compat logs
         if: always()
         uses: actions/upload-artifact@v7
         with:
           name: compat-logs
-          path: run/compat/
+          path: |
+            run/compat/
+            docs/COMPAT.md
           if-no-files-found: ignore
       - name: stop the backends
         if: always()

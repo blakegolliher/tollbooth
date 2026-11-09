@@ -30,21 +30,32 @@ fetch_verified() { # url sha256 dest
   tmp=$(mktemp "$dest.XXXXXX")
   # --retry-all-errors: plain --retry does not retry an HTTP 4xx/5xx, and release CDNs return
   # those transiently (seen on 2026-11-09 in CI).
-  if ! curl -sfL --retry 5 --retry-delay 3 --retry-all-errors --max-time 600 -o "$tmp" "$url"; then
-    echo "backends: download failed: $url" >&2; rm -f "$tmp"; exit 1
+  local code rc
+  code=$(curl -sfL --retry 8 --retry-delay 5 --retry-all-errors --max-time 600 -o "$tmp" -w '%{http_code}' "$url") || rc=$?
+  if [ "${rc:-0}" -ne 0 ]; then
+    echo "backends: download failed (curl exit $rc, last HTTP status ${code:-none}): $url" >&2; rm -f "$tmp"; return 1
   fi
-  echo "$sha  $tmp" | sha256sum -c --quiet - || { rm -f "$tmp"; echo "backends: checksum mismatch for $url" >&2; exit 1; }
+  echo "$sha  $tmp" | sha256sum -c --quiet - || { rm -f "$tmp"; echo "backends: checksum mismatch for $url" >&2; return 1; }
   mv "$tmp" "$dest"
 }
 
 fetch() {
   if [ ! -x "$BIN/garage" ]; then
-    fetch_verified "$GARAGE_URL" "$GARAGE_SHA256" "$BIN/garage"; chmod +x "$BIN/garage"
+    fetch_verified "$GARAGE_URL" "$GARAGE_SHA256" "$BIN/garage" || exit 1 # Garage has no second source
+    chmod +x "$BIN/garage"
   fi
   if [ ! -x "$BIN/versitygw" ]; then
-    fetch_verified "$VERSITYGW_URL" "$VERSITYGW_SHA256" "$BIN/versitygw.tar.gz"
-    tar -xzf "$BIN/versitygw.tar.gz" -C "$BIN" --strip-components=1 "versitygw_${VERSITYGW_VERSION}_Linux_x86_64/versitygw"
-    rm -f "$BIN/versitygw.tar.gz"
+    # GitHub's release CDN returns 504s for minutes at a time (seen three times on 2026-11-09).
+    # When the pinned tarball cannot be fetched, build the same tag from source through the Go
+    # module proxy, which the checksum database verifies; the binary differs byte-wise from the
+    # release but is the same code (versitygw is Apache-2.0).
+    if (set +e; fetch_verified "$VERSITYGW_URL" "$VERSITYGW_SHA256" "$BIN/versitygw.tar.gz"); then
+      tar -xzf "$BIN/versitygw.tar.gz" -C "$BIN" --strip-components=1 "versitygw_${VERSITYGW_VERSION}_Linux_x86_64/versitygw"
+      rm -f "$BIN/versitygw.tar.gz"
+    else
+      echo "backends: versitygw release download failed; building ${VERSITYGW_VERSION} from source with go install" >&2
+      GOTOOLCHAIN=auto GOFLAGS=-mod=mod GOBIN="$BIN" go install "github.com/versity/versitygw@${VERSITYGW_VERSION}"
+    fi
   fi
   echo "backends: garage ${GARAGE_VERSION}, versitygw ${VERSITYGW_VERSION} in $BIN"
 }
@@ -67,14 +78,16 @@ rpc_secret = "$(head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n')"
 [s3_api]
 s3_region = "garage"
 api_bind_addr = "127.0.0.1:3900"
-root_domain = ".s3.garage.localhost"
+# Passthrough preserves Host, so the backend must own the proxy's base domain (the vhost
+# deployment constraint, docs/OPERATIONS.md); the suite's base domain is tb.example.com.
+root_domain = ".tb.example.com"
 [admin]
 api_bind_addr = "127.0.0.1:3903"
 admin_token = "$(head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n')"
 TOML
   fi
   "$BIN/garage" -c "$DATA/garage/garage.toml" server > "$DATA/garage.log" 2>&1 & echo $! > "$DATA/garage.pid"
-  ROOT_ACCESS_KEY=$VGW_ACCESS ROOT_SECRET_KEY=$VGW_SECRET "$BIN/versitygw" --port 127.0.0.1:7070 posix "$DATA/versitygw" > "$DATA/versitygw.log" 2>&1 & echo $! > "$DATA/versitygw.pid"
+  ROOT_ACCESS_KEY=$VGW_ACCESS ROOT_SECRET_KEY=$VGW_SECRET "$BIN/versitygw" --port 127.0.0.1:7070 --virtual-domain tb.example.com posix "$DATA/versitygw" > "$DATA/versitygw.log" 2>&1 & echo $! > "$DATA/versitygw.pid"
   # Garage needs a layout and a key once; idempotent on a reused data dir.
   for _ in $(seq 1 50); do "$BIN/garage" -c "$DATA/garage/garage.toml" status > /dev/null 2>&1 && break; sleep 0.2; done
   node=$("$BIN/garage" -c "$DATA/garage/garage.toml" status | awk '/^[0-9a-f]{16}/ {print $1; exit}')

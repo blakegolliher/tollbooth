@@ -65,7 +65,7 @@ var headerAllow = map[string]bool{
 }
 
 // xmlNoise strips per-request values from XML bodies before comparing them.
-var xmlNoise = regexp.MustCompile(`<(UploadId|RequestId|HostId|LastModified|CreationDate|Initiated|Date|VersionId|DeleteMarkerVersionId)>[^<]*</`)
+var xmlNoise = regexp.MustCompile(`<(UploadId|NextUploadIdMarker|UploadIdMarker|RequestId|HostId|LastModified|CreationDate|Initiated|Date|VersionId|DeleteMarkerVersionId)>[^<]*</`)
 
 // locationPort strips the port from <Location>: backends echo the Host header into it, and the
 // proxy's listener port differs from the backend's. Passthrough preserves Host by design.
@@ -401,9 +401,13 @@ func runMatrix(direct, via *target, o matrixOptions) (results []result, failed, 
 		}
 		if strings.HasPrefix(name, "sig/") && len(r.diffs) == 0 && r.direct[len(r.direct)-1].status >= 400 {
 			// The backend refused this signing mode identically on both sides: a backend gap the
-			// proxy relayed faithfully, reported apart from passes so the gate counts it.
+			// proxy relayed faithfully, reported apart from passes so the gate counts it. The
+			// backend's own words are kept so a gap can be told from a malformed test request.
 			r.gap = true
 			gaps++
+			if last := r.direct[len(r.direct)-1]; len(last.body) > 0 {
+				r.diffs = append(r.diffs, "backend said: "+trunc(string(last.body)))
+			}
 		} else if len(r.diffs) > 0 {
 			failed++
 		}
@@ -419,8 +423,11 @@ func runMatrix(direct, via *target, o matrixOptions) (results []result, failed, 
 			}
 			return err
 		}); err != nil {
-			fmt.Fprintf(os.Stderr, "create bucket %s: %v\n", bkt, err)
-			os.Exit(2)
+			// The backend refused the bucket direct (a vhost domain it does not own, a name it
+			// rejects): every case of this style would be meaningless, so one result records it.
+			direct.rec.take()
+			results = append(results, result{name: o.style + "/setup", op: "CreateBucket(direct)", direct: []*probe{{err: err.Error()}}, via: []*probe{{err: "not run"}}, diffs: []string{"setup: " + err.Error()}})
+			return results, 1, 0
 		}
 		direct.rec.take() // setup, not a compared step
 	}

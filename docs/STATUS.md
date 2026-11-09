@@ -1,23 +1,41 @@
 # STATUS
 
-Current phase: **0 (Design) passed; Phase 1 cleared to start.** Fable's second review (2026-11-08)
-graded Gate 0 **pass** after reading the report, all decisions, DESIGN.md, the op-table
-reconciliation, the ADRs, CONFIG.md, the lint and CI config, the backend script, and the deps
-ledger. Five corrections (none blocking) are folded into the design below; the Phase 0 PR from
-`phase-0` into `main` is the phase-close step. Phase 1 begins on branch `phase-1` once the PR is
-merged.
+Current phase: **1 (Passthrough), gate report written** (`docs/reports/gate-1.md`), awaiting
+Fable's review and Blake's decision. Merged into `phase-1`: #2 identity and classifier, #4 config,
+#5 proxy, admin, null backend, #6 serve, check-config, version. Open: #7 byte-equivalence harness,
+#8 client compatibility matrix and this report. CI on the final commit: all five jobs green; Garage
+and versitygw byte-equivalence 293 cases, 0 diffs each; client matrix 122 cells, 0 failures.
 
 ## Phases
 
 | Phase | Deliverables | Gate | State |
 | --- | --- | --- | --- |
 | 0 Design | `docs/DESIGN.md`; ADR-0001, ADR-0002 (open decisions) and ADR-0003 (TUI in one binary); shunt's op table checked against the API reference (`docs/OPERATIONS_TABLE.md`); repo scaffold, `Makefile`, CI skeleton, `THIRD_PARTY_NOTICES.md`; `docs/CONFIG.md` | Fable approves the design and ADRs; every requirement maps to a `DESIGN.md` section or an explicit deferral | **pass, 2026-11-08** (first review: pass with fixes; fixes applied; second review: pass); tagged `phase-0` |
-| 1 Passthrough | transparent proxy lifted from shunt + TLS, PROXY protocol, trusted XFF; identity; classifier; backend pool; admin health/ready/metrics; null and recording backends | byte-equivalence green; compat matrix 100% on Garage and versitygw; fuzz 1 CPU-hour clean; `-race` clean | cleared to start |
+| 1 Passthrough | transparent proxy lifted from shunt + TLS, PROXY protocol, trusted XFF; identity; classifier; backend pool; admin health/ready/metrics; null and recording backends | byte-equivalence green; compat matrix 100% on Garage and versitygw; fuzz 1 CPU-hour clean; `-race` clean | **report written 2026-11-09**: byte-equivalence 0 diffs on Garage and versitygw; compat matrix 0 failures; fuzz 1 CPU-hour + 20 min clean; race clean; coverage 92.1% |
 | 2 Rate limiting | rules, matchers, GCRA, single pass, both modes, `Expect: 100-continue` measured, hot reload, limiter metrics, `/admin/limits`, `rules *` verbs | limiter suite green (fake clock); 10 µs p99; reload under load zero failures; SDKs complete work under 1 req/s | not started |
 | 3 Showback | aggregator, snapshot and seal, NDJSON, `usage` verbs, `/admin/usage`, dimensions and cap, restart, multi-node sum | reconciliation exact; rollover tests; kill between snapshots loses ≤ `flush_interval`; verify detects a removed hour | not started |
 | 4 Operator surface | remaining verbs, shared admin client, `/admin/status`, `/admin/limits/test`, `/admin/backends`, `tollbooth tui` | parity test; CLI goldens ×3 formats; `teatest` goldens; runbook tasks from the TUI and CLI alone | not started |
 | 5 Hardening and v0.1.0 | bench runs with profiles, tuning, 24 h soak, caps, `OPERATIONS.md`, systemd, container, `CHANGELOG.md`, tag | all performance targets met or ADR'd; soak flat | not started |
 | 6 Backlog | shaping, cluster limits, bandwidth, Parquet, OpenTelemetry, connection caps, rule editing, drain, web UI | each starts with an ADR | not scheduled |
+
+## Phase 1 record
+
+Shipped: everything in the Phase 1 row, plus the record mode of `test/s3diff` (in-process request
+and response diff on every PR), the chaos tests for the Phase 1 rows of the failure table, D-026
+through D-035, `docs/CONTEXT.md`, `docs/COMPAT.md` (generated).
+
+Cut: nothing. MinIO and `mc` were dropped at Gate 0 (D-022).
+
+Findings fixed on the way: `net.SplitHostPort` and `netip.ParseAddrPort` allocate on their failure
+paths (identity pass now zero-allocation); a trickle response needs a flush per chunk (Gate 0);
+aws cli v2 signs `Content-Length: 0` on GET and DELETE and Go's transport drops it (D-035). Known
+gap recorded, not fixed: D-034 (backend answers and closes before reading the body).
+
+Bench numbers (dev box, 2 vCPUs, indicative): classifier 98 ns, identity 310–607 ns, metrics
+observation 172 ns, handler alone 5.1 µs and 7 allocations per 4 KiB GetObject, all zero-allocation
+on the decision paths. The reference-node run is Phase 5.
+
+Gate result: pending.
 
 ## Phase 0 record
 
