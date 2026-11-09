@@ -110,7 +110,7 @@ licenses: $(GO_LICENSES) ## go-licenses check with the copyleft deny list and re
 
 tidy: ## go mod tidy and verify nothing changed
 	$(GO) mod tidy
-	git diff --exit-code go.mod go.sum
+	git diff --exit-code -- go.mod go.sum
 
 clean:
 	rm -rf $(BIN) $(RUN) test/bench/new.txt

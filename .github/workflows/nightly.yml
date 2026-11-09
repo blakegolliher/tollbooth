@@ -17,8 +17,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 300
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
           cache: true
@@ -27,7 +27,7 @@ jobs:
           n=$(go list ./... | xargs -n1 go test -list '^Fuzz' 2>/dev/null | grep -c '^Fuzz' || true)
           if [ "$n" = "0" ]; then echo "no fuzz targets yet"; exit 0; fi
           make fuzz FUZZ_TIME=$((3600 / n))s
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: fuzz-logs
@@ -37,8 +37,8 @@ jobs:
   bench-regression:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
           cache: true
@@ -46,7 +46,7 @@ jobs:
         run: |
           if [ ! -f test/bench/baseline.txt ]; then echo "no baseline yet (committed at Gate 2)"; exit 0; fi
           make bench-compare
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: bench
