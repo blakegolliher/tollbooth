@@ -16,7 +16,7 @@ fi
 # Deny list from docs/SPEC.md, Licensing and attribution.
 $GO_LICENSES check ./cmd/tollbooth --disallowed_types=forbidden,restricted \
   --ignore github.com/blakegolliher/tollbooth
-report=$($GO_LICENSES report ./cmd/tollbooth --ignore github.com/blakegolliher/tollbooth 2>/dev/null | sort)
+report=$($GO_LICENSES report ./cmd/tollbooth --ignore github.com/blakegolliher/tollbooth 2>/dev/null | LC_ALL=C sort)
 
 tmp=$(mktemp)
 sed "/^${MARKER//\//\\/}$/,\$d" "$NOTICES" > "$tmp"
