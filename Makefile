@@ -34,15 +34,17 @@ LDFLAGS    := -s -w -X main.version=$(VERSION) -X main.commit=$(COMMIT) -X main.
 # container runtime is needed (Gate 0 review).
 INTEGRATION_DIR := test/integration
 
-.PHONY: all build lint test race fuzz bench bench-compare backends compat release tools tidy vuln licenses clean help
+.PHONY: all build lint test race fuzz bench bench-compare s3diff-record backends compat release tools tidy vuln licenses clean help
 
-all: build lint test race ## build, lint, test, race — the PR gate (fuzz and compat run in their own CI jobs)
+all: build lint test race s3diff-record ## build, lint, test, race, in-process byte-equivalence — the PR gate (fuzz and compat run in their own CI jobs)
 
 build: ## compile ./cmd/tollbooth into ./bin/tollbooth; fails if the archived gopkg.in/yaml.v3 or charmbracelet-outside-tui is linked
 	@mkdir -p $(BIN)
 	$(GO) build -trimpath -ldflags '$(LDFLAGS)' -o $(BIN)/tollbooth ./cmd/tollbooth
 	@# go.yaml.in/yaml is the only YAML allowed in the binary (docs/SPEC.md, Decisions already made).
 	@if $(GO) version -m $(BIN)/tollbooth | grep -q 'gopkg.in/yaml.v3'; then echo 'bin/tollbooth links gopkg.in/yaml.v3; only go.yaml.in/yaml is allowed'; exit 1; fi
+	@# The AWS SDK and HDR histograms are test and bench tooling; they never enter the proxy binary.
+	@if $(GO) version -m $(BIN)/tollbooth | grep -qE 'aws-sdk-go|smithy-go|HdrHistogram'; then echo 'bin/tollbooth links test tooling (aws-sdk-go-v2, smithy-go, or hdrhistogram)'; exit 1; fi
 
 lint: $(GOLANGCI_LINT) ## golangci-lint with .golangci.yml (includes the depguard rule), then go vet
 	@mkdir -p $(RUN)
@@ -79,7 +81,11 @@ bench-compare: bench ## compare test/bench/new.txt against test/bench/baseline.t
 backends: ## fetch and verify the pinned Garage and versitygw backends into test/integration/bin
 	$(INTEGRATION_DIR)/backends.sh fetch
 
-compat: build backends ## client compatibility matrix against Garage and versitygw (Phase 1); writes docs/COMPAT.md
+s3diff-record: ## byte-equivalence matrix against the in-process recording backend and proxy (requests and responses); no external backend
+	@mkdir -p $(RUN)
+	$(GO) run ./test/s3diff -record > $(RUN)/s3diff-record.log 2>&1; rc=$$?; tail -3 $(RUN)/s3diff-record.log; exit $$rc
+
+compat: build backends ## byte-equivalence against Garage and versitygw, then (next PR) the client matrix that writes docs/COMPAT.md
 	$(INTEGRATION_DIR)/compat.sh
 
 release: ## build release artifacts into ./dist (Phase 5: binary, systemd unit, container image)

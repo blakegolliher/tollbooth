@@ -19,7 +19,7 @@ Rows marked **in go.mod** are present; the rest are planned for the phase named.
 | `github.com/charmbracelet/lipgloss` | v1.1.0 | MIT | `cmd/tollbooth/tui` only | Styling; honors `NO_COLOR`. | 4 |
 | `github.com/charmbracelet/x/exp/teatest` | v0.0.0-20261101151554-27ecf3e4d454 (untagged upstream; pseudo-version) | MIT | `cmd/tollbooth/tui` tests only | Golden-frame tests at 80×24 and 120×40. Test-only; never linked. | 4 |
 | `github.com/HdrHistogram/hdrhistogram-go` | v1.4.0 | MIT | `bench/` only (depguard) | Latency histograms with bounded relative error for the load generator (ADR-0002). Never linked into `bin/tollbooth`. | 2 |
-| `github.com/aws/aws-sdk-go-v2` (+ `credentials`, `service/s3`), `github.com/aws/smithy-go` | current at Phase 2 | Apache-2.0 | `bench/loadgen` SDK mode, `test/s3diff`, `test/e2e` only | Realistic SDK traffic for the throttle path and the compatibility matrix; typed S3 errors in tests. Never linked into `bin/tollbooth` (`make build` checks). | 2 |
+| `github.com/aws/aws-sdk-go-v2` v1.47.8 (+ `credentials` v1.20.16, `service/s3` v1.114.9, `aws/signer/v4`), `github.com/aws/smithy-go` v1.28.8 | as listed | Apache-2.0 | `test/s3diff` (Phase 1), `bench/loadgen` SDK mode (Phase 2) | The SDK client for the byte-equivalence matrix and its signer for the raw signing modes (presigned, streaming seed signatures); tollbooth itself never signs. Never linked into `bin/tollbooth` (`make build` greps `go version -m`). | **in go.mod** (1), test and bench only |
 
 Anything not in this table needs a one-line justification here before it is added (docs/SPEC.md,
 Dependencies). No database driver, ever.
