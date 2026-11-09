@@ -33,12 +33,11 @@ const numShards = 256
 // Metrics are the catalog metrics the limiter owns (docs/telemetry-catalog.md, Phase 2 rows).
 // internal/admin registers them; the limiter only observes. Any field may be nil in tests.
 type Metrics struct {
-	Decision   prometheus.Observer    // tollbooth_limiter_decision_seconds
-	Keys       prometheus.Gauge       // tollbooth_limiter_keys
-	Overflow   prometheus.Counter     // tollbooth_limiter_keys_overflow_total
-	Denied     *prometheus.CounterVec // tollbooth_limiter_denied_total{rule}
-	Errors     prometheus.Counter     // tollbooth_limiter_errors_total
-	ShapedWait *prometheus.HistogramVec
+	Decision prometheus.Observer    // tollbooth_limiter_decision_seconds
+	Keys     prometheus.Gauge       // tollbooth_limiter_keys
+	Overflow prometheus.Counter     // tollbooth_limiter_keys_overflow_total
+	Denied   *prometheus.CounterVec // tollbooth_limiter_denied_total{rule}
+	Errors   prometheus.Counter     // tollbooth_limiter_errors_total
 }
 
 // Limiter is the rule set in force and the GCRA key store (docs/DESIGN.md §5). One per process.

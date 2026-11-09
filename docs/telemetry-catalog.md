@@ -11,9 +11,11 @@ Bounded label values: `operation` (the 113 names in docs/OPERATIONS_TABLE.md), `
 (configured rule ids; bounded by the config), `endpoint` (configured backend endpoints), `kind`,
 `direction`, `side`.
 
-`shaped` as a `result` value and `limiter_shaped_wait_seconds` are reserved by the specification
-for the Phase 6 hold-and-forward mode; in v1 they are catalogued, registered with zero
-observations, and never incremented, so a dashboard built now does not change shape later.
+`shaped` as a `result` value is part of the specification's fixed label set for
+`requests_total` and exists (pre-resolved, zero) so that label set never changes shape; it is
+incremented only when the Phase 6 hold-and-forward mode ships. The shaping wait histogram the
+specification lists (`limiter_shaped_wait_seconds{rule}`) is **not** registered until then: a metric
+nothing observes is scaffolding (Gate 2 review, D-045). Its row below carries that phase.
 
 | Name | Type | Labels | Unit | Buckets | Description | Phase |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -32,7 +34,7 @@ observations, and never incremented, so a dashboard built now does not change sh
 | `tollbooth_limiter_keys` | gauge | — | keys | — | Live GCRA keys across all rules | 2 |
 | `tollbooth_limiter_keys_overflow_total` | counter | — | requests | — | Requests allowed without state because `limiter.max_keys` was reached (fail open) | 2 |
 | `tollbooth_limiter_denied_total` | counter | `rule` | requests | — | Requests denied, by the rule that denied them | 2 |
-| `tollbooth_limiter_shaped_wait_seconds` | histogram | `rule` | seconds | 1 ms … 60 s, log-spaced, 16 buckets | Reserved for Phase 6 shaping; registered, never observed in v1 | 6 (catalogued now) |
+| `tollbooth_limiter_shaped_wait_seconds` | histogram | `rule` | seconds | 1 ms … 60 s, log-spaced, 16 buckets | Time a shaped request waited before being forwarded; added with the hold-and-forward mode (ADR-0004), not registered before | 6 |
 | `tollbooth_limiter_errors_total` | counter | — | errors | — | Panics or internal errors inside the limiter, each failed open | 2 |
 | `tollbooth_showback_tuples` | gauge | — | tuples | — | Distinct tuples in the open hour | 3 |
 | `tollbooth_showback_flush_duration_seconds` | histogram | — | seconds | 1 ms … 60 s, log-spaced, 16 buckets | Time to snapshot or seal one hour file (encode, fsync, rename) | 3 |
@@ -46,9 +48,11 @@ listed individually.
 ## Logging fields
 
 `log/slog` JSON. Fields that may appear: `msg`, `level`, `time`, `node_id`, `request_id` (only on
-proxy-originated responses), `operation`, `op_class`, `status`, `rule` (throttle decisions, at
-`debug`, sampled), `endpoint`, `err`, `config_path`, `generation`. `access_key`, `bucket`, `key`,
-and `source_ip` appear only at `debug` (CLAUDE.md), and `TestLogRedaction` asserts it.
+proxy-originated responses), `operation`, `op_class`, `status`, `rule` and `retry_after` (throttle
+decisions, at `debug`, one in `logging.throttle_sample`), `endpoint`, `err`, `config`,
+`generation`, `rules`, `duration_ms` (reload results, at `info`). `bucket` and `source_ip` appear
+only at `debug` (CLAUDE.md); access keys and object keys never appear in logs at any level (D-042):
+`rules top` and showback carry them. `TestThrottleLogSampled` asserts the debug line's fields.
 
 ## Showback columns
 

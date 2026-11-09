@@ -1,0 +1,10 @@
+run 1/1 direct  warm-up 10s
+run 1/1 direct  measuring 20s … 108707 requests, 5435 req/s, p50 924 µs, p99 9118 µs, p99.9 20464 µs, errors 0
+run 1/1 proxied warm-up 10s
+run 1/1 proxied measuring 20s … 45087 requests, 2254 req/s, p50 2824 µs, p99 13746 µs, p99.9 29196 µs, errors 0
+
+median        req/s     p50 µs     p90 µs     p99 µs   p99.9 µs     max µs   errors   attempts  throttled
+direct         5435        924       3068       9118      20464      74121        0          0          0
+proxied        2254       2824       6910      13746      29196      84541        0          0          0
+added                     1901       3842       4628       8733
+wrote bench/results/2026-11-09-devbox-profile/20261109T143313Z-raw-get4k.json

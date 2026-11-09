@@ -42,13 +42,21 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
-      - name: benchmarks against the committed baseline
+      - name: benchmarks, compared against the committed baseline when one exists
         run: |
-          if [ ! -f test/bench/baseline.txt ]; then echo "no baseline yet (committed at Gate 2)"; exit 0; fi
+          if [ ! -f test/bench/baseline.txt ]; then
+            echo "no baseline yet: running the benchmarks so this run's new.txt can be committed as test/bench/baseline.txt (Gate 2)"
+            make bench
+            exit 0
+          fi
           make bench-compare
+      - name: gated limiter measurements (1,000,000 keys; 60 s unique-key flood)
+        run: TOLLBOOTH_BIG=1 go test -count=1 -run 'TestDecisionLatencyAtOneMillionKeys|TestUniqueKeyFlood' -v ./internal/limiter/ 2>&1 | tee test/bench/big.txt
       - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: bench
-          path: test/bench/new.txt
+          path: |
+            test/bench/new.txt
+            test/bench/big.txt
           if-no-files-found: ignore
