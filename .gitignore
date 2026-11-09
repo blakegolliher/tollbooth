@@ -11,3 +11,4 @@
 /test/bench/new.txt
 /run/
 /test/integration/bin/
+/test/integration/.venv/
