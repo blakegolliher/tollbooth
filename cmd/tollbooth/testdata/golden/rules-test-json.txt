@@ -1,0 +1,18 @@
+{
+  "operation": "ListObjectsV2",
+  "op_class": "LIST",
+  "level": "bucket",
+  "result": {
+    "allowed": true,
+    "matches": [
+      {
+        "rule": "list-storm",
+        "source_ip": "10.0.0.9",
+        "live_keys": 0,
+        "allowed": true,
+        "mode": "too_many_requests"
+      }
+    ]
+  }
+}
+

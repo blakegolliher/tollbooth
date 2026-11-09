@@ -112,7 +112,10 @@ func serve(ctx context.Context, path string, cfg *config.Config, log *slog.Logge
 
 	rl := &reloader{path: path, published: published, certs: certs, lim: lim, metrics: metrics, log: log, generation: 1, loadedAt: time.Now()}
 	adm := &admin.Server{Address: cfg.Admin.Address, Metrics: metrics, Ready: pool.Healthy, Token: cfg.AdminToken(), Pprof: cfg.Admin.Pprof,
-		Limiter: lim, Reload: rl.reload, Config: rl.view, Usage: &admin.Usage{Dir: cfg.Showback.Dir}}
+		Limiter: lim, Reload: rl.reload, Config: rl.view, Usage: &admin.Usage{Dir: cfg.Showback.Dir},
+		Backends: pool.Status, NodeID: cfg.NodeID, Version: version, StartedAt: time.Now(),
+		Showback: func() (string, int64) { return showback.HourString(agg.Hour()), agg.Tuples() }}
+	go adm.Run(bgCtx)
 	admSrv := adm.HTTPServer()
 	admLn, err := (&net.ListenConfig{}).Listen(ctx, "tcp", cfg.Admin.Address)
 	if err != nil {

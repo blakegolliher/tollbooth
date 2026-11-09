@@ -1,0 +1,5 @@
+NODE  FIRST_HOUR            LAST_HOUR             SEALED  MISSING  PARTIAL               RECOVERED  MISMATCH  UNREADABLE
+a     2026-11-09T11:00:00Z  2026-11-09T12:00:00Z  2       -        -                     -          0         0
+b     2026-11-09T11:00:00Z  2026-11-09T11:00:00Z  1       -        2026-11-09T13:00:00Z  -          0         0
+
+4 files, 2 nodes, 0 problems

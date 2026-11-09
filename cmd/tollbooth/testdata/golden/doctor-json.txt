@@ -1,0 +1,61 @@
+{
+  "checks": [
+    {
+      "name": "config",
+      "status": "X",
+      X
+    },
+    {
+      "name": "config warning",
+      "status": "X",
+      X
+    },
+    {
+      "name": "ulimit nofile",
+      "status": "X",
+      X
+    },
+    {
+      "name": "GOMAXPROCS",
+      "status": "X",
+      X
+    },
+    {
+      "name": "GOMEMLIMIT",
+      "status": "X",
+      X
+    },
+    {
+      "name": "tls",
+      "status": "X",
+      X
+    },
+    {
+      "name": "backend 127.0.0.1:PORT",
+      "status": "X",
+      X
+    },
+    {
+      "name": "backend 127.0.0.1:PORT",
+      "status": "fail",
+      X
+    },
+    {
+      "name": "clock",
+      "status": "X",
+      X
+    },
+    {
+      "name": "showback.dir",
+      "status": "X",
+      X
+    },
+    {
+      "name": "admin",
+      "status": "X",
+      X
+    }
+  ],
+  "config": "/TMP",
+  "fails": 1
+}

@@ -1,0 +1,11 @@
+{
+  "window_seconds": 60,
+  "top": [
+    {
+      "rule": "frozen",
+      "denied": 3,
+      "last_denied_seconds_ago": X
+    }
+  ]
+}
+

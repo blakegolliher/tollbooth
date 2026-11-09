@@ -1,0 +1,16 @@
+{
+  "id": "list-storm",
+  "ops": [
+    "LIST"
+  ],
+  "group_by": [
+    "source_ip"
+  ],
+  "rate": 50,
+  "burst": 200,
+  "effective_rate": 25,
+  "effective_burst": 100,
+  "on_limit": "too_many_requests",
+  "live_keys": 0,
+  "denied": 0
+}

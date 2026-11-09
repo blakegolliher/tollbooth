@@ -1,0 +1,10 @@
+{
+  "config_file": X,
+  "differences": [
+    {
+      "Key": "cluster.node_count",
+      "Running": "2",
+      "File": "4"
+    }
+  ]
+}

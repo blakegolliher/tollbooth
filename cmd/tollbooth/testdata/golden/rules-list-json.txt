@@ -1,0 +1,63 @@
+{
+  "rules": [
+    {
+      "id": "tenant-a-writes",
+      "access_keys": [
+        "AKIAEXAMPLE1",
+        "AKIAEXAMPLE2"
+      ],
+      "buckets": [
+        "training-data"
+      ],
+      "prefixes": [
+        "ckpt/"
+      ],
+      "ops": [
+        "WRITE"
+      ],
+      "group_by": [
+        "access_key",
+        "bucket"
+      ],
+      "rate": 2000,
+      "burst": 4000,
+      "effective_rate": 1000,
+      "effective_burst": 2000,
+      "on_limit": "slowdown",
+      "live_keys": 0,
+      "denied": 0
+    },
+    {
+      "id": "list-storm",
+      "ops": [
+        "LIST"
+      ],
+      "group_by": [
+        "source_ip"
+      ],
+      "rate": 50,
+      "burst": 200,
+      "effective_rate": 25,
+      "effective_burst": 100,
+      "on_limit": "too_many_requests",
+      "live_keys": 0,
+      "denied": 0
+    },
+    {
+      "id": "frozen",
+      "access_keys": [
+        "AKIAREVOKED"
+      ],
+      "group_by": [],
+      "rate": 0,
+      "burst": 0,
+      "effective_rate": 0,
+      "effective_burst": 0,
+      "on_limit": "slowdown",
+      "live_keys": 0,
+      "denied": 3
+    }
+  ],
+  "live_keys": 0
+}
+
