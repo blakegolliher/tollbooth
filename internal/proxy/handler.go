@@ -39,6 +39,7 @@ import (
 
 	"github.com/blakegolliher/tollbooth/internal/admin"
 	"github.com/blakegolliher/tollbooth/internal/config"
+	"github.com/blakegolliher/tollbooth/internal/limiter"
 	"github.com/blakegolliher/tollbooth/internal/s3id"
 )
 
@@ -48,20 +49,22 @@ type Handler struct {
 	Config  *atomic.Pointer[config.Config]
 	Backend *Pool
 	Metrics *admin.Metrics
-	Access  *AccessLogger // nil: access logging off (the default; showback is the record)
+	Limiter *limiter.Limiter // the rule set in force is read inside Decide; nil means no limiter (tests)
+	Access  *AccessLogger    // nil: access logging off (the default; showback is the record)
 	Log     *slog.Logger
 
-	pool     *bufPool
-	inflight atomic.Int64
+	pool        *bufPool
+	inflight    atomic.Int64
+	throttleSeq atomic.Uint64 // throttle decisions seen, for the 1-in-N debug log sample
 	// Errors counts handler panics that were failed open or aborted; it feeds the log, not a
 	// metric of its own (the request lands in requests_total as proxy_error).
 	Errors atomic.Int64
 }
 
 // New wires a Handler. copyBufferBytes is proxy.copy_buffer_bytes, fixed for the process.
-func New(cfg *atomic.Pointer[config.Config], backend *Pool, m *admin.Metrics, access *AccessLogger, log *slog.Logger) *Handler {
+func New(cfg *atomic.Pointer[config.Config], backend *Pool, m *admin.Metrics, lim *limiter.Limiter, access *AccessLogger, log *slog.Logger) *Handler {
 	c := cfg.Load()
-	return &Handler{Config: cfg, Backend: backend, Metrics: m, Access: access, Log: log, pool: newBufPool(c.Proxy.CopyBufferBytes)}
+	return &Handler{Config: cfg, Backend: backend, Metrics: m, Limiter: lim, Access: access, Log: log, pool: newBufPool(c.Proxy.CopyBufferBytes)}
 }
 
 // outcome is filled in as the request progresses and recorded exactly once by finish().
@@ -70,6 +73,8 @@ type outcome struct {
 	id          s3id.RequestIdentity
 	status      int    // backend status; 0 when none was produced
 	proxyError  bool   // the proxy answered for itself or produced nothing
+	throttled   bool   // the limiter denied; status holds the throttle status
+	rule        string // the denying rule, for the operator-facing logs only
 	endpoint    string // backend endpoint that served the request, "" when none
 	bytesIn     int64
 	bytesOut    int64
@@ -106,7 +111,14 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	defer h.inflight.Add(-1)
 
-	// Phase 2 inserts the limiter decision here, before any body byte is read.
+	// The limiter decision, before any body byte is read. A denial is answered here and the body
+	// is never touched (docs/SPEC.md, Request identity: the decision is made before the body).
+	if h.Limiter != nil && !cfg.Kill.LimiterDisable {
+		if d := h.Limiter.Decide(&o.id, h.Limiter.Now(o.start), true); !d.Allowed {
+			h.throttle(w, r, &o, &d, cfg)
+			return
+		}
+	}
 
 	ctx, cancel := context.WithCancel(r.Context())
 	defer cancel()
@@ -144,6 +156,30 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	o.ttfb = time.Since(o.tSent)
 	defer resp.Body.Close() //nolint:errcheck // drained or aborted below
 	h.relay(w, resp, &o, st, rc, idle)
+}
+
+// throttle answers a denied request with the denying rule's mode: 503 SlowDown or 429
+// TooManyRequests, the S3 error body, Retry-After, and a request id. Nothing of the body is read;
+// Go's server then discards up to 256 KiB of it to keep the connection, closes it past that or
+// when the client sent Expect: 100-continue (D-005). The decision is logged at debug, one in
+// logging.throttle_sample.
+func (h *Handler) throttle(w http.ResponseWriter, r *http.Request, o *outcome, d *limiter.Decision, cfg *config.Config) {
+	o.throttled = true
+	o.rule = d.Rule.ID
+	code := CodeSlowDown
+	if d.Mode == limiter.ModeTooManyRequests {
+		code = CodeTooManyRequests
+	}
+	rid := writeS3Error(w, code, o.id.RawPath, d.RetryAfter)
+	o.headersSent = true
+	o.status = errorTable[code].status
+	if h.Log != nil && h.Log.Enabled(r.Context(), slog.LevelDebug) {
+		if n := h.throttleSeq.Add(1); cfg.Logging.ThrottleSample <= 1 || n%uint64(cfg.Logging.ThrottleSample) == 1 {
+			h.Log.Debug("throttled", "rule", o.rule, "operation", o.id.Op.String(), "op_class", o.id.Class.String(),
+				"status", o.status, "retry_after", d.RetryAfter, "request_id", rid,
+				"access_key", o.id.AccessKey, "bucket", o.id.Bucket, "source_ip", o.id.SourceIP.String())
+		}
+	}
 }
 
 // build makes the outbound request: same method, raw path and query, Host preserved, the
@@ -312,7 +348,10 @@ func (h *Handler) finish(r *http.Request, o *outcome) {
 		overhead = total
 	}
 	sc, res := admin.StatusProxyError, admin.ResultError
-	if !o.proxyError && o.status != 0 {
+	switch {
+	case o.throttled:
+		sc, res = admin.StatusThrottled, admin.ResultThrottled
+	case !o.proxyError && o.status != 0:
 		sc, res = admin.ClassifyStatus(o.status), admin.ResultForwarded
 	}
 	h.Metrics.Request(o.id.Op, sc, res).Inc()
@@ -323,7 +362,7 @@ func (h *Handler) finish(r *http.Request, o *outcome) {
 			Client: o.id.SourceIP, Method: r.Method, Host: r.Host, Addressing: o.id.Addressing.String(),
 			Bucket: o.id.Bucket, Op: o.id.Op.String(), Class: o.id.Class.String(), Status: o.status,
 			StatusClass: sc.String(), Result: res.String(), BytesIn: o.bytesIn, BytesOut: o.bytesOut,
-			Duration: total, TTFB: o.ttfb, Endpoint: o.endpoint, TLS: tlsVersion(r), Error: o.err,
+			Duration: total, TTFB: o.ttfb, Endpoint: o.endpoint, TLS: tlsVersion(r), Error: o.err, Rule: o.rule,
 		})
 	}
 }

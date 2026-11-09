@@ -43,6 +43,7 @@ import (
 	"github.com/blakegolliher/tollbooth/bench/nullbackend"
 	"github.com/blakegolliher/tollbooth/internal/admin"
 	"github.com/blakegolliher/tollbooth/internal/config"
+	"github.com/blakegolliher/tollbooth/internal/limiter"
 	"github.com/blakegolliher/tollbooth/internal/s3id"
 )
 
@@ -62,6 +63,7 @@ type rig struct {
 	front    *httptest.Server
 	h        *Handler
 	pool     *Pool
+	lim      *limiter.Limiter
 	cfg      *atomic.Pointer[config.Config]
 	log      *syncBuf
 }
@@ -113,7 +115,11 @@ func (r *rig) start(t *testing.T, c *config.Config) *rig {
 		t.Fatal(err)
 	}
 	r.pool = pool
-	r.h = New(r.cfg, pool, m, NewAccessLogger(r.log), log)
+	r.lim = limiter.New(&m.Limiter)
+	if err := r.lim.Apply(c); err != nil {
+		t.Fatal(err)
+	}
+	r.h = New(r.cfg, pool, m, r.lim, NewAccessLogger(r.log), log)
 	r.front = httptest.NewUnstartedServer(r.h)
 	r.front.Config = NewServer(r.h, &c.Listen, m, log) // the real server settings: no mux, timeouts, connection gauge
 	r.front.Start()
@@ -710,7 +716,7 @@ func TestHandlerAllocations(t *testing.T) {
 	ft := &fakeTransport{data: data, body: &cannedBody{}}
 	ft.resp = &http.Response{StatusCode: 200, ContentLength: int64(len(data)), Header: http.Header{"Etag": {`"x"`}, "Content-Type": {"application/octet-stream"}, "Content-Length": {"4096"}}}
 	pool.Transport = ft
-	h := New(cfg, pool, m, nil, nil)
+	h := New(cfg, pool, m, nil, nil, nil)
 	req := httptest.NewRequest(http.MethodGet, "/b/k", nil)
 	req.RequestURI = "/b/k"
 	req.RemoteAddr = "192.0.2.1:1234"
@@ -766,7 +772,7 @@ func BenchmarkSmallGET(b *testing.B) {
 	ft := &fakeTransport{data: data, body: &cannedBody{}}
 	ft.resp = &http.Response{StatusCode: 200, ContentLength: 4096, Header: http.Header{"Content-Length": {"4096"}}}
 	pool.Transport = ft
-	h := New(cfg, pool, m, nil, nil)
+	h := New(cfg, pool, m, nil, nil, nil)
 	req := httptest.NewRequest(http.MethodGet, "/b/k", nil)
 	req.RequestURI = "/b/k"
 	w := &nopWriter{h: http.Header{}}
@@ -786,7 +792,7 @@ func BenchmarkSmallGETEndToEnd(b *testing.B) {
 	cfg.Store(c)
 	m := admin.NewMetrics()
 	pool, _ := NewPool(&c.Backend, m, nil)
-	h := New(cfg, pool, m, nil, nil)
+	h := New(cfg, pool, m, nil, nil, nil)
 	front := httptest.NewServer(h)
 	defer front.Close()
 	client := &http.Client{Transport: &http.Transport{MaxIdleConnsPerHost: 16}}
