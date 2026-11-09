@@ -20,7 +20,6 @@ BENCH_COUNT ?= 6
 GOLANGCI_LINT_VERSION ?= v2.15.0
 GO_LICENSES_VERSION   ?= v2.0.1
 GOVULNCHECK_VERSION   ?= v1.9.0
-BENCHSTAT             ?= golang.org/x/perf/cmd/benchstat@latest
 GOLANGCI_LINT         := $(BIN)/golangci-lint-$(GOLANGCI_LINT_VERSION)
 GO_LICENSES           := $(BIN)/go-licenses-$(GO_LICENSES_VERSION)
 GOVULNCHECK           := $(BIN)/govulncheck-$(GOVULNCHECK_VERSION)
@@ -81,8 +80,8 @@ bench: ## run all benchmarks with -benchmem, write test/bench/new.txt
 	@mkdir -p test/bench
 	$(GO) test -run '^$$' -bench . -benchmem -benchtime $(BENCH_TIME) -count $(BENCH_COUNT) $(PKGS) > test/bench/new.txt 2>&1; rc=$$?; cat test/bench/new.txt; exit $$rc
 
-bench-compare: bench ## compare test/bench/new.txt against test/bench/baseline.txt with benchstat (±10% gate, CLAUDE.md)
-	$(GO) run $(BENCHSTAT) test/bench/baseline.txt test/bench/new.txt
+bench-compare: bench ## compare test/bench/new.txt against test/bench/baseline.txt: fails on a median ns/op more than 10% slower or any allocs/op increase (test/bench/compare)
+	$(GO) run ./test/bench/compare -threshold 10 test/bench/baseline.txt test/bench/new.txt
 
 bench-e2e: build ## null backend + tollbooth (100 rules) + bench/loadgen, direct versus proxied, interleaved runs, profiles; results under bench/results/<date>/
 	bench/run.sh

@@ -37,7 +37,6 @@ Dependencies). No database driver, ever.
 | `golangci-lint` | v2.15.0 | GPL-3.0 (tool only, never linked) | The linter set in `.golangci.yml`, including `depguard`. |
 | `go-licenses` (`github.com/google/go-licenses/v2`) | v2.0.1 | Apache-2.0 | `make licenses`: which modules `bin/tollbooth` links and under what license; deny list for GPL, LGPL, AGPL, SSPL (G4). |
 | `govulncheck` (`golang.org/x/vuln`) | v1.9.0 | BSD-3 | `make vuln`: known vulnerabilities in the code paths actually called (G4). |
-| `benchstat` (`golang.org/x/perf`) | latest (untagged) | BSD-3 | `make bench-compare` against the committed baseline. |
 
 ## External processes (never code, never vendored)
 
