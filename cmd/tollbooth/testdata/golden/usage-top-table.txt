@@ -1,0 +1,5 @@
+BUCKET  REQUESTS  BYTES_IN  BYTES_OUT  PARTIAL
+b1      33        0         3701       true
+b2      10        300       0          false
+
+4 files, 2 groups, 43 requests, 300 bytes in, 3701 bytes out; includes the open hour (partial)

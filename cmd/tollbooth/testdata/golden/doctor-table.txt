@@ -1,0 +1,14 @@
+CHECK                    STATUS  DETAIL
+config                   ok      /TMP loads: 0 rules, 2 backend endpoints, 1 warnings
+config warning           warn    base_domains is empty: virtual-hosted-style requests will be treated as path-style; set it if clients use bucket.<domain> addressing
+ulimit nofile  X
+GOMAXPROCS               ok      X
+GOMEMLIMIT  X
+tls                      ok      plaintext listener (no listen.tls)
+backend 127.0.0.1:PORT  ok      X
+backend 127.0.0.1:PORT      fail    tcp: dial tcp 127.0.0.1:PORT: connect: connection refused
+clock  X
+showback.dir  X
+admin                    warn    127.0.0.1:PORT: connection refused (tollbooth not running, or bound elsewhere)
+
+11 checks, 1 fail

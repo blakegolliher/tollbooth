@@ -35,11 +35,15 @@ const usage = `usage: tollbooth <command> [flags]
 commands:
   serve         run the proxy (--config FILE)
   check-config  validate a config file without starting (exit 1 on any error)
+  status        one-screen summary of the running proxy (via the admin API)
   rules         list | show <id> | test | top: the rate-limit rules in force (via the admin API)
+  config        show | reload | diff: the running config, a reload, the diff against the file
+  backends      list: endpoint health, in-flight, errors, TTFB
   usage         query | top | verify: showback files (filter, group, sum; header checks)
+  doctor        environment checks against a config file (ulimits, limits, TLS, backends, clock, disk)
   version       print version, commit, build date, and Go version
 
-  status, config, backends, doctor, tui: arrive in Phase 4
+  tui: arrives with the TUI PR of Phase 4
 
 every verb that talks to the running proxy takes --admin, --token, --config, and
 --format table|json|csv; the endpoint and token fall back to TOLLBOOTH_ADMIN and
@@ -66,10 +70,18 @@ func run(args []string, stdout, stderr *os.File) int {
 		return runRules(args[1:], stdout, stderr)
 	case "usage":
 		return runUsage(args[1:], stdout, stderr)
+	case "status":
+		return runStatus(args[1:], stdout, stderr)
+	case "config":
+		return runConfig(args[1:], stdout, stderr)
+	case "backends":
+		return runBackends(args[1:], stdout, stderr)
+	case "doctor":
+		return runDoctor(args[1:], stdout, stderr)
 	case "version":
 		_, _ = fmt.Fprintf(stdout, "tollbooth %s (commit %s, built %s, %s)\n", version, commit, date, runtime.Version())
 		return 0
-	case "status", "config", "backends", "doctor", "tui":
+	case "tui":
 		_, _ = fmt.Fprintf(stderr, "tollbooth %s: not available yet (see docs/STATUS.md)\n", args[0])
 		return 2
 	case "-h", "--help", "help":

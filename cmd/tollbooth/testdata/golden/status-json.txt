@@ -1,0 +1,66 @@
+{
+  "node_id": "golden",
+  "version": "v0.0.0-golden",
+  "started_at": "2026-11-09T12:00:00Z",
+  "uptime_seconds": X,
+  "ready": true,
+  "inflight": 2,
+  "requests_total": 1200,
+  "throttled_total": 3,
+  "rates": {
+    "requests_1s": 0,
+    "requests_10s": 0,
+    "requests_60s": 0,
+    "throttled_1s": 0,
+    "throttled_10s": 0,
+    "throttled_60s": 0
+  },
+  "rules": 3,
+  "limiter_live_keys": 0,
+  "limiter_denied_total": 3,
+  "showback_hour": "2026-11-09T12:00:00Z",
+  "showback_tuples": 17,
+  "config_generation": 2,
+  "config_loaded_at": "2026-11-09T12:00:00Z",
+  "last_reload": {
+    "ok": true,
+    "at": "2026-11-09T12:00:00Z",
+    "generation": 2,
+    "rules": 3,
+    "duration_ms": 0.5
+  },
+  "backends_up": 1,
+  "backends": [
+    {
+      "endpoint": "10.0.0.1:9000",
+      "up": true,
+      "inflight": 1,
+      "requests": 1100,
+      "errors": 0,
+      "errors_dial": 0,
+      "errors_tls": 0,
+      "errors_timeout": 0,
+      "errors_reset": 0,
+      "errors_other": 0,
+      "ttfb_mean_ms": 1.25,
+      "ttfb_last_ms": 0.9
+    },
+    {
+      "endpoint": "10.0.0.2:9000",
+      "up": false,
+      "inflight": 0,
+      "requests": 100,
+      "errors": 4,
+      "errors_dial": 4,
+      "errors_tls": 0,
+      "errors_timeout": 0,
+      "errors_reset": 0,
+      "errors_other": 0,
+      "ttfb_mean_ms": 0,
+      "ttfb_last_ms": 0,
+      "last_error": "dial tcp 10.0.0.2:9000: connect: connection refused",
+      "last_error_at": "2026-11-09T11:58:00Z"
+    }
+  ]
+}
+

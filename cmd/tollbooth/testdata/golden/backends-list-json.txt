@@ -1,0 +1,35 @@
+{
+  "backends": [
+    {
+      "endpoint": "10.0.0.1:9000",
+      "up": true,
+      "inflight": 1,
+      "requests": 1100,
+      "errors": 0,
+      "errors_dial": 0,
+      "errors_tls": 0,
+      "errors_timeout": 0,
+      "errors_reset": 0,
+      "errors_other": 0,
+      "ttfb_mean_ms": 1.25,
+      "ttfb_last_ms": 0.9
+    },
+    {
+      "endpoint": "10.0.0.2:9000",
+      "up": false,
+      "inflight": 0,
+      "requests": 100,
+      "errors": 4,
+      "errors_dial": 4,
+      "errors_tls": 0,
+      "errors_timeout": 0,
+      "errors_reset": 0,
+      "errors_other": 0,
+      "ttfb_mean_ms": 0,
+      "ttfb_last_ms": 0,
+      "last_error": "dial tcp 10.0.0.2:9000: connect: connection refused",
+      "last_error_at": "2026-11-09T11:58:00Z"
+    }
+  ]
+}
+

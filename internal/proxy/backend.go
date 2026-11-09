@@ -40,14 +40,55 @@ import (
 	"github.com/blakegolliher/tollbooth/internal/config"
 )
 
-// Endpoint is one backend address and its health.
+// Endpoint is one backend address, its health, and the counters /admin/backends shows.
 type Endpoint struct {
 	Addr string // host:port
 	up   atomic.Bool
-	// lastErr is the most recent failure, for /admin/backends (Phase 4).
+	// lastErr is the most recent failure, for /admin/backends.
 	mu      sync.Mutex
 	lastErr string
 	lastAt  time.Time
+
+	inflight  atomic.Int64
+	requests  atomic.Int64    // responses received
+	errors    [5]atomic.Int64 // by errorKind: dial, tls, timeout, reset, other
+	ttfbSumNS atomic.Int64
+	ttfbLast  atomic.Int64
+}
+
+// errorKinds indexes Endpoint.errors; the names are the backend_errors_total kind label.
+var errorKinds = [...]string{"dial", "tls", "timeout", "reset", "other"}
+
+func (e *Endpoint) countError(kind string) {
+	for i, k := range errorKinds {
+		if k == kind {
+			e.errors[i].Add(1)
+			return
+		}
+	}
+	e.errors[4].Add(1)
+}
+
+// observe records one response's time to first header byte.
+func (e *Endpoint) observe(ttfb time.Duration) {
+	e.requests.Add(1)
+	e.ttfbSumNS.Add(int64(ttfb))
+	e.ttfbLast.Store(int64(ttfb))
+}
+
+// status is this endpoint's row.
+func (e *Endpoint) status() admin.BackendStatus {
+	st := admin.BackendStatus{Endpoint: e.Addr, Up: e.up.Load(), Inflight: e.inflight.Load(), Requests: e.requests.Load()}
+	st.ErrorsDial, st.ErrorsTLS, st.ErrorsTime, st.ErrorsRst, st.ErrorsOth = e.errors[0].Load(), e.errors[1].Load(), e.errors[2].Load(), e.errors[3].Load(), e.errors[4].Load()
+	st.Errors = st.ErrorsDial + st.ErrorsTLS + st.ErrorsTime + st.ErrorsRst + st.ErrorsOth
+	if st.Requests > 0 {
+		st.TTFBMeanMS = float64(e.ttfbSumNS.Load()) / float64(st.Requests) / 1e6
+		st.TTFBLastMS = float64(e.ttfbLast.Load()) / 1e6
+	}
+	if msg, at := e.LastError(); msg != "" {
+		st.LastError, st.LastErrAt = msg, at.UTC().Format(time.RFC3339)
+	}
+	return st
 }
 
 // Up reports the endpoint's last known health.
@@ -144,6 +185,15 @@ func (p *Pool) Next() *Endpoint {
 		}
 	}
 	return p.Endpoints[start%uint64(n)]
+}
+
+// Status lists every endpoint's row for /admin/backends and /admin/status.
+func (p *Pool) Status() []admin.BackendStatus {
+	out := make([]admin.BackendStatus, 0, len(p.Endpoints))
+	for _, e := range p.Endpoints {
+		out = append(out, e.status())
+	}
+	return out
 }
 
 // Healthy reports whether at least one endpoint is up (for /readyz).

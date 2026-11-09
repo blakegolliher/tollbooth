@@ -1,0 +1,8 @@
+{
+  "ok": true,
+  "at": "2026-11-09T12:00:00Z",
+  "generation": 3,
+  "rules": 3,
+  "duration_ms": 0.42
+}
+

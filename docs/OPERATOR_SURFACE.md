@@ -4,12 +4,11 @@ Every admin route has a CLI verb and a TUI screen; a test over the admin route t
 registered route is missing from this file (test plan category 12). Both the CLI and the TUI go
 through `internal/admin`'s client, so parity is structural. Neither writes the config file.
 
-Phase 3 state: `/healthz`, `/readyz`, `/metrics`, `/debug/pprof/`, `POST /admin/reload`,
-`GET /admin/config`, `GET /admin/limits`, `GET /admin/limits/top`, `POST /admin/limits/test`, and
-`GET /admin/usage` are served (`internal/admin`); the route table `admin.Routes` lists every planned
-route with its phase. The CLI verbs in place are `serve`, `check-config`, `version`, the `rules`
-verbs, and the `usage` verbs (`query`, `top`, `verify`); `status`, `config`, `backends`, `doctor`,
-and `tui` exit 2 with a pointer to STATUS.md until Phase 4.
+Phase 4 state: every route in the table is served (`internal/admin`), and every CLI verb exists:
+`serve`, `check-config`, `version`, `status`, `rules list|show|test|top`, `config show|reload|diff`,
+`backends list`, `usage query|top|verify`, `doctor`, `tui`. `TestOperatorSurfaceParity` reads this
+file and fails when a route in `admin.Routes` has no row, no CLI verb, or no TUI screen (the two
+exemptions below are marked `—` on purpose).
 
 | Admin route | CLI verb | TUI screen (key) | Phase |
 | --- | --- | --- | --- |

@@ -78,6 +78,7 @@ type outcome struct {
 	throttled   bool   // the limiter denied; status holds the throttle status
 	rule        string // the denying rule, for the operator-facing logs only
 	endpoint    string // backend endpoint that served the request, "" when none
+	ep          *Endpoint
 	bytesIn     int64
 	bytesOut    int64
 	tSent       time.Time // the moment RoundTrip was called
@@ -97,7 +98,9 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	cfg := h.Config.Load()
 	o := outcome{start: time.Now()}
 	h.Metrics.Inflight.Inc()
+	h.Metrics.InflightCount.Add(1)
 	defer h.Metrics.Inflight.Dec()
+	defer h.Metrics.InflightCount.Add(-1)
 	defer h.finish(r, &o)
 	defer h.guard(w, &o)
 
@@ -252,11 +255,17 @@ func (h *Handler) roundTrip(out *http.Request, inBody *progressReader, o *outcom
 		ep := h.Backend.Next()
 		out.URL.Host = ep.Addr
 		o.endpoint = ep.Addr
+		o.ep = ep
+		ep.inflight.Add(1)
+		t0 := time.Now()
 		resp, err := h.Backend.Transport.RoundTrip(out)
+		ep.inflight.Add(-1)
 		if err == nil {
+			ep.observe(time.Since(t0))
 			return resp, nil
 		}
 		kind := errorKind(err)
+		ep.countError(kind)
 		if IsConnectError(err) {
 			h.Backend.MarkDown(ep, err, kind)
 			if attempt < len(h.Backend.Endpoints) && (inBody == nil || inBody.count() == 0) {
@@ -362,6 +371,10 @@ func (h *Handler) finish(r *http.Request, o *outcome) {
 	h.Metrics.Request(o.id.Op, sc, res).Inc()
 	h.Metrics.Observe(o.id.Class, total.Seconds(), overhead.Seconds(), o.ttfb.Seconds())
 	h.Metrics.AddBytes(o.bytesIn, o.bytesOut)
+	h.Metrics.TotalRequests.Add(1)
+	if o.throttled {
+		h.Metrics.TotalThrottled.Add(1)
+	}
 	if h.Showback != nil && !h.Config.Load().Kill.ShowbackDisable {
 		// Once, at completion, with the bytes actually moved; the hour is read inside Record (D-025).
 		h.Showback.Record(&o.id, showback.Status(sc), o.bytesIn, o.bytesOut)

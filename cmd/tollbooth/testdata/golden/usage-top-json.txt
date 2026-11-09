@@ -1,0 +1,32 @@
+{
+  "from_hour_utc": 0,
+  "to_hour_utc": 4611686018427387903,
+  "group_by": [
+    "bucket"
+  ],
+  "files": 4,
+  "groups": [
+    {
+      "keys": {
+        "bucket": "b1"
+      },
+      "requests": 33,
+      "bytes_in": 0,
+      "bytes_out": 3701,
+      "partial": true
+    },
+    {
+      "keys": {
+        "bucket": "b2"
+      },
+      "requests": 10,
+      "bytes_in": 300,
+      "bytes_out": 0,
+      "partial": false
+    }
+  ],
+  "requests": 43,
+  "bytes_in": 300,
+  "bytes_out": 3701,
+  "partial": true
+}
