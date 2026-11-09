@@ -306,6 +306,10 @@ func (c *Config) ReloadCompatible(prev *Config) error {
 	fixed("admin.address", prev.Admin.Address, c.Admin.Address)
 	fixed("node_id", prev.NodeID, c.NodeID)
 	fixed("showback.dir", prev.Showback.Dir, c.Showback.Dir)
+	// The tuple shape and the prefix tables are fixed for the process: changing them mid-hour
+	// would mix two row shapes in one file (D-046).
+	fixed("showback.dimensions", strings.Join(prev.Showback.Dimensions, ","), strings.Join(c.Showback.Dimensions, ","))
+	fixed("showback.prefixes", fmt.Sprintf("%v", prev.Showback.Prefixes), fmt.Sprintf("%v", c.Showback.Prefixes))
 	fixed("listen.proxy_protocol", strconv.FormatBool(prev.Listen.ProxyProtocol), strconv.FormatBool(c.Listen.ProxyProtocol))
 	fixed("proxy.copy_buffer_bytes", strconv.Itoa(prev.Proxy.CopyBufferBytes), strconv.Itoa(c.Proxy.CopyBufferBytes))
 	// The backend pool and its transport are built once (D-029); rebuilding them under load with

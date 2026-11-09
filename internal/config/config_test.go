@@ -315,8 +315,12 @@ func TestReloadCompatible(t *testing.T) {
 	b.NodeID = "other"
 	b.Proxy.DrainTimeout = time.Minute // allowed to change
 	b.Backend.Endpoints = []string{"other:1"}
+	b.Showback.Dimensions = []string{"operation", "status_class"}
+	b.Showback.Prefixes = map[string][]string{"bkt": {"a/"}}
+	b.Showback.MaxTuplesPerHour = 10 // allowed to change
 	err = b.ReloadCompatible(a)
-	if err == nil || !strings.Contains(err.Error(), "listen.address: cannot change on reload") || !strings.Contains(err.Error(), "node_id: cannot change") || !strings.Contains(err.Error(), "backend: cannot change") || strings.Contains(err.Error(), "drain_timeout") {
+	if err == nil || !strings.Contains(err.Error(), "listen.address: cannot change on reload") || !strings.Contains(err.Error(), "node_id: cannot change") || !strings.Contains(err.Error(), "backend: cannot change") || strings.Contains(err.Error(), "drain_timeout") ||
+		!strings.Contains(err.Error(), "showback.dimensions: cannot change") || !strings.Contains(err.Error(), "showback.prefixes: cannot change") || strings.Contains(err.Error(), "max_tuples") {
 		t.Fatalf("reload compatibility: %v", err)
 	}
 }
