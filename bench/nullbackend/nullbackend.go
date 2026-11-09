@@ -96,6 +96,23 @@ func (s *Server) Clear() {
 	s.mu.Unlock()
 }
 
+// Recorded returns the number of recorded requests.
+func (s *Server) Recorded() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return len(s.reqs)
+}
+
+// Drop forgets the last n recorded requests (a harness's setup traffic).
+func (s *Server) Drop(n int) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if n > len(s.reqs) {
+		n = len(s.reqs)
+	}
+	s.reqs = s.reqs[:len(s.reqs)-n]
+}
+
 const xmlHeader = `<?xml version="1.0" encoding="UTF-8"?>` + "\n"
 
 // ServeHTTP answers with enough S3 for the proxy to be the only thing under test.
