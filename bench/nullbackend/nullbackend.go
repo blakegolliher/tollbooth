@@ -58,6 +58,9 @@ type Server struct {
 	Fail atomic.Int32
 	// Stall holds every request open until the client gives up.
 	Stall atomic.Bool
+	// StallFor, when > 0 (nanoseconds), holds every request for that long, then answers normally:
+	// a bounded stall for the soak's chaos rotation.
+	StallFor atomic.Int64
 	// Reset hijacks the connection and closes it without a response.
 	Reset atomic.Bool
 	// ResetAfter, when > 0, writes headers and this many body bytes, then closes the connection.
@@ -131,6 +134,13 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if s.Stall.Load() {
 		<-r.Context().Done()
 		return
+	}
+	if d := s.StallFor.Load(); d > 0 {
+		select {
+		case <-time.After(time.Duration(d)):
+		case <-r.Context().Done():
+			return
+		}
 	}
 	if s.Reset.Load() {
 		if conn, _, err := http.NewResponseController(w).Hijack(); err == nil {
