@@ -1,10 +1,8 @@
 # STATUS
 
-Current phase: **4 (Operator surface), gate report written** (`docs/reports/gate-4.md`), awaiting
-Fable's review and Blake's decision. Open, stacked on `phase-4`: #20 (`p4/admin`: status and
-backends routes, the remaining verbs, doctor, goldens, parity test) and #21 (`p4/tui`: the TUI,
-runbook tasks, the report). Started 2026-11-09 on Blake's go after Gate 3 passed; `phase-3`
-tagged, #19 brings it to `main`. Merge #20 first, then #21.
+Current phase: **5 (Hardening and v0.1.0), in progress** on `phase-5` (started 2026-11-09 on
+Blake's go after Gate 4 passed; `phase-4` tagged and in `main`). Branch `p5/release`: systemd unit,
+container image, `make release`, `CHANGELOG.md`, the soak harness, the runbook, ADR-0005.
 
 ## Phases
 
@@ -15,7 +13,7 @@ tagged, #19 brings it to `main`. Merge #20 first, then #21.
 | 2 Rate limiting | rules, matchers, GCRA, single pass, both modes, `Expect: 100-continue` measured, hot reload, limiter metrics, `/admin/limits`, `rules *` verbs | limiter suite green (fake clock); 10 µs p99; reload under load zero failures; SDKs complete work under 1 req/s | **report written 2026-11-09**: limiter suite 25 tests green; p99 4.7 µs at 1,000,000 keys; 20 reloads under load, slowest 0.60 ms, 0 failed; SDK completion by retry mode (D-044) |
 | 3 Showback | aggregator, snapshot and seal, NDJSON, `usage` verbs, `/admin/usage`, dimensions and cap, restart, multi-node sum | reconciliation exact; rollover tests; kill between snapshots loses ≤ `flush_interval`; verify detects a removed hour | **report written 2026-11-09**: reconciliation exact; 19 clock-injected tests green; Record 198 ns, 0 allocs; 257 B per tuple |
 | 4 Operator surface | remaining verbs, shared admin client, `/admin/status`, `/admin/limits/test`, `/admin/backends`, `tollbooth tui` | parity test; CLI goldens ×3 formats; `teatest` goldens; runbook tasks from the TUI and CLI alone | **report written 2026-11-09**: parity test green; 38 CLI goldens ×3 formats; 30 TUI frames at 80×24 and 120×40; two runbook tasks |
-| 5 Hardening and v0.1.0 | bench runs with profiles, tuning, 24 h soak, caps, `OPERATIONS.md`, systemd, container, `CHANGELOG.md`, tag | all performance targets met or ADR'd; soak flat | not started |
+| 5 Hardening and v0.1.0 | bench runs with profiles, tuning, 24 h soak, caps, `OPERATIONS.md`, systemd, container, `CHANGELOG.md`, tag | all performance targets met or ADR'd; soak flat | in progress |
 | 6 Backlog | shaping, cluster limits, bandwidth, Parquet, OpenTelemetry, connection caps, rule editing, drain, web UI | each starts with an ADR | not scheduled |
 
 ## Phase 4 record
@@ -34,7 +32,7 @@ CI throttle runs; the runbook says "completed every run measured but one".
 Numbers (dev box): `doctor` 17 ms for 10 checks; forwarded path still 7 allocations with the
 status counters and per-endpoint atomics on; the data path is otherwise untouched.
 
-Gate result: pending.
+Gate result: **pass** (Blake, 2026-11-09: #20 to #23 merged, `phase-4` tagged, "start phase 5").
 
 ## Phase 3 record
 
