@@ -1,14 +1,15 @@
 # STATUS
 
-Current phase: **0 (Design)**, gate report written (`docs/reports/gate-0.md`), awaiting Fable's
-review and Blake's decision on the open ADRs. No product code exists; the next phase starts only
-when told to.
+Current phase: **0 (Design), gate passed with fixes.** Fable's review (2026-11-08) answered all
+eight questions and named three blocking fixes; all are applied below and the branch is tagged
+`phase-0`. **Phase 1 has not started**: Fable asked to read `docs/DECISIONS.md` before it begins,
+and D-022 (MinIO frozen at its last binary release) is raised for Blake.
 
 ## Phases
 
 | Phase | Deliverables | Gate | State |
 | --- | --- | --- | --- |
-| 0 Design | `docs/DESIGN.md`; ADR-0001, ADR-0002 (open decisions) and ADR-0003 (TUI in one binary); shunt's op table checked against the API reference (`docs/OPERATIONS_TABLE.md`); repo scaffold, `Makefile`, CI skeleton, `THIRD_PARTY_NOTICES.md`; `docs/CONFIG.md` | Fable approves the design and ADRs; every requirement maps to a `DESIGN.md` section or an explicit deferral | **report written 2026-11-08**, branch `phase-0` |
+| 0 Design | `docs/DESIGN.md`; ADR-0001, ADR-0002 (open decisions) and ADR-0003 (TUI in one binary); shunt's op table checked against the API reference (`docs/OPERATIONS_TABLE.md`); repo scaffold, `Makefile`, CI skeleton, `THIRD_PARTY_NOTICES.md`; `docs/CONFIG.md` | Fable approves the design and ADRs; every requirement maps to a `DESIGN.md` section or an explicit deferral | **pass with fixes, 2026-11-08**; fixes applied the same day; tagged `phase-0` |
 | 1 Passthrough | transparent proxy lifted from shunt + TLS, PROXY protocol, trusted XFF; identity; classifier; backend pool; admin health/ready/metrics; null and recording backends | byte-equivalence green; compat matrix 100% on Garage, versitygw, MinIO; fuzz 1 CPU-hour clean; `-race` clean | not started |
 | 2 Rate limiting | rules, matchers, GCRA, single pass, both modes, `Expect: 100-continue` measured, hot reload, limiter metrics, `/admin/limits`, `rules *` verbs | limiter suite green (fake clock); 10 µs p99; reload under load zero failures; SDKs complete work under 1 req/s | not started |
 | 3 Showback | aggregator, snapshot and seal, NDJSON, `usage` verbs, `/admin/usage`, dimensions and cap, restart, multi-node sum | reconciliation exact; rollover tests; kill between snapshots loses ≤ `flush_interval`; verify detects a removed hour | not started |
@@ -27,11 +28,32 @@ Cut: nothing.
 
 Bench numbers: none (no code). Environment facts for later phases: Go 1.27.3 is current; the dev
 box packages 1.25.3 with `GOTOOLCHAIN=local`, and the Makefile's `GOTOOLCHAIN=auto` downloads
-1.27.3 (verified). No Docker on the dev box; integration runs need `podman compose` or CI.
+1.27.3 (verified). No Docker on the dev box; integration backends are static binaries (`docs/CONTEXT.md`).
 
-Gate result: pending.
+Gate result: **pass with fixes** (Fable, 2026-11-08). Answers: ADR-0001 (b) with a clarification;
+ADR-0002 (c); `map[key]int64`; additive showback header with `schema_version`; `base_domains` and
+`kill_switches.*` accepted, `admin.token_file` added as the preferred form; `Preflight` is an
+anonymous `BUCKET` op; a `//` request-target is forwarded byte-identical, never 400'd; Go 1.27.3.
 
-## Open ADRs
+Fixes applied:
 
-- ADR-0001 prefix rules and list operations — recommendation (b)
-- ADR-0002 bench load generator — recommendation (c)
+1. Op-table arithmetic: `docs/OPERATIONS_TABLE.md` now has a script-computed reconciliation of all
+   116 AWS names (92 kept, 18 added, 5 folded, 1 excluded) plus the 3 non-AWS entries (`Unknown`,
+   `Preflight`, `PostObject`) that make the 113, and a reference link per operation, with the
+   request line read from each added operation's page.
+2. No containers: `test/integration/backends.sh` downloads sha256-pinned static binaries for
+   Garage v2.5.0, versitygw v1.11.0, and MinIO `RELEASE.2025-09-07T16-13-09Z` (MinIO is archived;
+   `dl.min.io` is gone and the final tag has no assets; `docs/CONTEXT.md`). Makefile `backends`
+   and `compat` targets and the CI `integration` job use it.
+3. Decisions log: 23 entries, each with its Gate 0 disposition; the three new ones (D-021 static
+   binaries, D-022 MinIO pin, D-023 exact allocation bound) are at the end. Ready to read.
+
+Also: the seven allocations are named in `docs/DESIGN.md` §9 and `TestHandlerAllocations` will
+enforce the bound exactly (D-023); `docs/SPEC.md` wording changed to `map[key]int64`;
+`docs/CONTEXT.md` added.
+
+## ADRs
+
+- ADR-0001 prefix rules and list operations — **accepted (b)**, with the no-prefix clarification
+- ADR-0002 bench load generator — **accepted (c)**
+- ADR-0003 TUI in one binary — accepted

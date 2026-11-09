@@ -185,3 +185,43 @@ side is `internal/s3/op.go` and `classify.go` at `9b36d09` (`git clone https://g
 - Give the `Preflight` operation a class in the classifier table, or say it is `UNKNOWN`.
 - The request-identity table could say what happens to a request-target beginning with `//`
   (D-004), since it is the one case `URL.Opaque` cannot carry.
+
+## Gate 0 outcome (appended 2026-11-08)
+
+Fable graded the report **pass with fixes**. Answers, as applied:
+
+| Q | Answer | Applied |
+| --- | --- | --- |
+| 1 | ADR-0001 (b), plus: a list with no `prefix` or one shorter than every configured prefix matches bucket-level rules only | ADR-0001 accepted with a Clarification section |
+| 2 | ADR-0002 (c) | ADR-0002 accepted; note on warp's availability added |
+| 3 | (a) `map[key]int64`; the spec wording was Fable's and is updated | D-007 confirmed; `docs/SPEC.md` edited |
+| 4 | Showback header additive with `schema_version`; `base_domains` and `kill_switches.*` fine; inline `admin.token` accepted, `admin.token_file` added as preferred, `config show` must redact | `docs/SHOWBACK_SCHEMA.md`, `docs/CONFIG.md`, example config, D-002, D-010 |
+| 5 | `Preflight` → `BUCKET`, anonymous, counted like everything else | D-003 |
+| 6 | **No** 400. Forward `//` targets byte-identical; path-style `//key` is `Unknown` with an empty bucket; vhost `//key` is the key `/key`; the only self-generated 400 is a target that cannot be forwarded at all; both cases into s3diff | `docs/DESIGN.md` §4.4 rewritten with the `Path`/`RawPath` mechanism; D-004 revised |
+| 7 | Pin Go 1.27.3 with `go` and `toolchain` directives, CI identical; note the dev box's `GOTOOLCHAIN=auto` dependency in `docs/CONTEXT.md` | `go.mod` pins `go 1.27.3` (`go mod tidy` removes a `toolchain` line equal to the `go` line, so the `go` directive is the pin); CI uses `go-version-file`; `docs/CONTEXT.md` written |
+| 8 | Phase 1 yes, after the fixes, then tag `phase-0` | fixes below; tagged |
+
+Fixes required before Phase 1:
+
+1. **Op-table arithmetic.** The reconciliation is now computed by a script and shown in full in
+   `docs/OPERATIONS_TABLE.md`: 92 kept + 18 added + 5 folded + 1 excluded = 116 AWS names; the
+   table's 113 = 92 + 18 + 3 entries with no AWS counterpart (`Unknown`, `Preflight`,
+   `PostObject`), which the first version failed to separate out. Every AWS name links to its
+   reference page, and the 18 additions carry the request line read from that page.
+2. **No containers.** `test/integration/backends.sh` fetches sha256-pinned static binaries: Garage
+   v2.5.0, versitygw v1.11.0 (checksum matches the release's `checksums.txt`), MinIO
+   `RELEASE.2025-09-07T16-13-09Z` (checksum matches its `.sha256sum`). Finding on the way: MinIO
+   archived its open-source server; `dl.min.io` returns 410 and the final tag has no binaries, so
+   the pin is the last release that does, with `go install` from source as the fallback
+   (`docs/CONTEXT.md`, D-022, **raised for Blake**). The Makefile and the CI `integration` job use
+   the script; no compose file exists. The binaries were downloaded and checksummed but not executed
+   on the dev box (the session's policy blocked running downloaded code); first execution is in
+   Phase 1's `backends.sh up`.
+3. **Decisions log.** 23 entries with their Gate 0 disposition, at `docs/DECISIONS.md`.
+
+Smaller: the seven allocations are named in `docs/DESIGN.md` §9 and `TestHandlerAllocations`
+enforces the bound exactly (D-023).
+
+Re-validation after the fixes: `go vet ./...` clean on go 1.27.3; `bash -n` on both scripts; the
+CI workflow parses. Phase 1 waits on Fable reading `docs/DECISIONS.md` and on Blake's answer to
+D-022.
