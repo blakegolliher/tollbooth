@@ -74,18 +74,25 @@ jobs:
           sarif_file: semgrep.sarif
 
   integration:
-    # Phase 1 adds test/integration/docker-compose.yml (MinIO, Garage, versitygw) and the
-    # byte-equivalence and compatibility runs behind `make compat`.
+    # Backends are pinned static binaries (Garage, versitygw) and a from-source MinIO build, fetched
+    # and verified by test/integration/backends.sh; no container runtime. Phase 1 adds the
+    # byte-equivalence and compatibility runs behind `make compat`; until then the job only proves
+    # the backends fetch and start.
     runs-on: ubuntu-latest
-    if: ${{ hashFiles('test/integration/docker-compose.yml') != '' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
           cache: true
-      - name: compat matrix against MinIO and Garage
+      - name: fetch and start the pinned backends
+        run: test/integration/backends.sh up
+      - name: compat matrix against Garage, versitygw, and MinIO
+        if: ${{ hashFiles('docs/COMPAT.md') != '' }}
         run: make compat
+      - name: stop the backends
+        if: always()
+        run: test/integration/backends.sh down
       - name: compat results
         if: always()
         uses: actions/upload-artifact@v4

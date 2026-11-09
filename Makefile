@@ -30,12 +30,11 @@ COMMIT     ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo unknown)
 BUILD_DATE ?= $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
 LDFLAGS    := -s -w -X main.version=$(VERSION) -X main.commit=$(COMMIT) -X main.date=$(BUILD_DATE)
 
-# Integration backends. COMPOSE is detected: docker compose, then podman compose, then podman-compose.
-COMPOSE ?= $(shell docker compose version >/dev/null 2>&1 && echo "docker compose" || \
-             (podman compose version >/dev/null 2>&1 && echo "podman compose" || echo "podman-compose"))
+# Integration backends run as pinned static binaries fetched by test/integration/backends.sh; no
+# container runtime is needed (Gate 0 review).
 INTEGRATION_DIR := test/integration
 
-.PHONY: all build lint test race fuzz bench bench-compare compat release tools tidy vuln licenses clean help
+.PHONY: all build lint test race fuzz bench bench-compare backends compat release tools tidy vuln licenses clean help
 
 all: build lint test race ## build, lint, test, race — the PR gate (fuzz and compat run in their own CI jobs)
 
@@ -77,8 +76,11 @@ bench: ## run all benchmarks with -benchmem, write test/bench/new.txt
 bench-compare: bench ## compare test/bench/new.txt against test/bench/baseline.txt with benchstat (±10% gate, CLAUDE.md)
 	$(GO) run $(BENCHSTAT) test/bench/baseline.txt test/bench/new.txt
 
-compat: build ## client compatibility matrix against MinIO and Garage (Phase 1); writes docs/COMPAT.md
-	COMPOSE="$(COMPOSE)" $(INTEGRATION_DIR)/compat.sh
+backends: ## fetch and verify the pinned Garage, versitygw, and MinIO backends into test/integration/bin
+	$(INTEGRATION_DIR)/backends.sh fetch
+
+compat: build backends ## client compatibility matrix against Garage, versitygw, and MinIO (Phase 1); writes docs/COMPAT.md
+	$(INTEGRATION_DIR)/compat.sh
 
 release: ## build release artifacts into ./dist (Phase 5: binary, systemd unit, container image)
 	@echo "release: defined in Phase 5"; exit 1
