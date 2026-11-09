@@ -36,7 +36,7 @@ var testCfg = &Config{
 
 // req builds a server-side request the way net/http does: RequestURI carries the raw target.
 func req(method, host, target string) *http.Request {
-	r := httptest.NewRequest(method, "http://placeholder/", nil)
+	r := httptest.NewRequest(http.MethodGet, "http://placeholder/", nil) // NewRequest validates the method; set it after
 	r.Method = method
 	r.RequestURI = target
 	r.Host = host
@@ -316,8 +316,12 @@ func FuzzParse(f *testing.F) {
 	f.Add("GET", "tb.example.com", "/b/k?annotation&annotationName=n&versionId=v")
 	f.Add("GET", "tb.example.com", "http://tb.example.com/b/k")
 	f.Add("DELETE", "[::1]:9", "/b/%E6%97%A5/x?tagging")
+	f.Add("GET", "h", "")
+	f.Add("G\x00T", "h", "/b")
 	f.Fuzz(func(t *testing.T, method, host, target string) {
-		if strings.ContainsAny(target, " \r\n") || strings.ContainsAny(host, " /\r\n") {
+		// A server-side request always has a non-empty RequestURI with no whitespace; the test
+		// helper's URL fallback would otherwise stand in for the empty target.
+		if target == "" || strings.ContainsAny(target, " \r\n") || strings.ContainsAny(host, " /\r\n") {
 			return
 		}
 		r := req(method, host, target)
