@@ -35,6 +35,7 @@ import (
 	"math/big"
 	"net"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
@@ -43,6 +44,7 @@ import (
 
 	proxyproto "github.com/pires/go-proxyproto"
 
+	"github.com/blakegolliher/tollbooth/bench/nullbackend"
 	"github.com/blakegolliher/tollbooth/internal/config"
 )
 
@@ -263,4 +265,48 @@ func TestProxyProtocolSourceAddress(t *testing.T) {
 		resp.Body.Close()              //nolint:errcheck // test
 		nb.waitLog(t, `"client":"198.51.100.4"`)
 	})
+}
+
+// A request over the TLS listener flows through the handler end to end, and the access log
+// records the negotiated version.
+func TestTLSRequestEndToEnd(t *testing.T) {
+	dir := t.TempDir()
+	cert, key := writeCert(t, dir, "a", "tb.example.com", "*.tb.example.com")
+	nb := nullbackend.New(16)
+	nb.Record = true
+	be := httptest.NewServer(nb)
+	t.Cleanup(be.Close)
+	c := testConfig(t, []string{strings.TrimPrefix(be.URL, "http://")}, time.Second)
+	c.Listen.Address = "127.0.0.1:0"
+	c.Listen.TLS = config.TLS{Cert: cert, Key: key, MinVersion: "1.2"}
+	ln, cs, err := Listen(&c.Listen)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer ln.Close()
+	if cs == nil {
+		t.Fatal("no cert store")
+	}
+	r := (&rig{log: &syncBuf{}, null: nb}).start(t, c) // its own plaintext front is unused here
+	srv := NewServer(r.h, &c.Listen, r.h.Metrics, nil)
+	go srv.Serve(ln) //nolint:errcheck // test server
+	defer srv.Close()
+	client := &http.Client{Transport: &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true, ServerName: "b.tb.example.com"}, DisableKeepAlives: true}} //nolint:gosec // test
+	req, _ := http.NewRequest(http.MethodGet, "https://"+ln.Addr().String()+"/k", http.NoBody)
+	req.Host = "b.tb.example.com"
+	resp, err := client.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	io.Copy(io.Discard, resp.Body) //nolint:errcheck // test
+	resp.Body.Close()              //nolint:errcheck // test
+	if resp.StatusCode != 200 {
+		t.Fatalf("status %d", resp.StatusCode)
+	}
+	if reqs := nb.Requests(); len(reqs) != 1 || reqs[0].Host != "b.tb.example.com" || reqs[0].RequestURI != "/k" {
+		t.Fatalf("backend saw %+v", reqs)
+	}
+	if l := r.waitLog(t, `"addressing":"vhost"`); !strings.Contains(l, `"tls":"1.3"`) {
+		t.Fatalf("log: %s", l)
+	}
 }

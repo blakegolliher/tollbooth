@@ -273,3 +273,80 @@ func firstLines(s, prefix string) string {
 	}
 	return strings.Join(out, "\n")
 }
+
+// runServe: flag and config failures exit non-zero with one line; a real run stops on SIGTERM
+// with exit 0 after draining.
+func TestRunServe(t *testing.T) {
+	out, errOut := tempFiles(t)
+	if rc := runServe([]string{"-bogus"}, out, errOut); rc != 2 {
+		t.Fatalf("bad flag: rc %d", rc)
+	}
+	out, errOut = tempFiles(t)
+	if rc := runServe([]string{"--config", filepath.Join(t.TempDir(), "missing.yaml")}, out, errOut); rc != 1 || !strings.Contains(read(errOut), "tollbooth serve:") {
+		t.Fatalf("missing config: rc %d stderr %q", rc, read(errOut))
+	}
+	// A listener address already in use is a startup failure, not a hang.
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer ln.Close()
+	dir := t.TempDir()
+	busy := writeConfig(t, dir, "node_id: a\nlisten: {address: "+ln.Addr().String()+"}\nadmin: {address: "+freePort(t)+"}\nbackend: {scheme: http, endpoints: [127.0.0.1:1]}\nshowback: {dir: "+dir+"}\n")
+	out, errOut = tempFiles(t)
+	if rc := runServe([]string{"--config", busy}, out, errOut); rc != 1 {
+		t.Fatalf("busy listener: rc %d stdout %q", rc, read(out))
+	}
+	if !strings.Contains(read(out), `"msg":"serve failed"`) {
+		t.Fatalf("startup failure not logged: %q", read(out))
+	}
+
+	// The real thing: start, wait for /healthz, SIGTERM ourselves, expect exit 0.
+	nb := nullbackend.New(16)
+	be := httptest.NewServer(nb)
+	defer be.Close()
+	listen, adminAddr := freePort(t), freePort(t)
+	goodDir := filepath.Join(dir, "good")
+	if err := os.MkdirAll(goodDir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	good := writeConfig(t, goodDir, "node_id: a\nlisten: {address: "+listen+"}\nadmin: {address: "+adminAddr+"}\nbackend: {scheme: http, endpoints: ["+strings.TrimPrefix(be.URL, "http://")+"]}\nshowback: {dir: "+dir+"}\nlogging: {level: debug}\n")
+	out, errOut = tempFiles(t)
+	done := make(chan int, 1)
+	go func() { done <- runServe([]string{"--config", good}, out, errOut) }()
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		resp, err := http.Get("http://" + adminAddr + "/healthz") //nolint:noctx // test
+		if err == nil {
+			resp.Body.Close() //nolint:errcheck // test
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("serve never became healthy")
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	resp, err := http.Get("http://" + listen + "/b/k") //nolint:noctx // test
+	if err != nil {
+		t.Fatal(err)
+	}
+	io.Copy(io.Discard, resp.Body) //nolint:errcheck // test
+	resp.Body.Close()              //nolint:errcheck // test
+	_ = syscall.Kill(syscall.Getpid(), syscall.SIGTERM)
+	select {
+	case rc := <-done:
+		if rc != 0 {
+			t.Fatalf("serve exited %d after SIGTERM; stdout:\n%s", rc, read(out))
+		}
+	case <-time.After(10 * time.Second):
+		t.Fatal("serve did not exit after SIGTERM")
+	}
+	if s := read(out); !strings.Contains(s, `"msg":"tollbooth starting"`) || !strings.Contains(s, `"signal":"terminated"`) || !strings.Contains(s, `"msg":"tollbooth stopped"`) {
+		t.Fatalf("startup/stop lines missing:\n%s", s)
+	}
+	for _, lvl := range []string{"debug", "info", "warn", "error", "bogus"} {
+		if newLogger(out, lvl) == nil {
+			t.Fatalf("newLogger(%s) returned nil", lvl)
+		}
+	}
+}
