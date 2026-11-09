@@ -34,7 +34,7 @@ LDFLAGS    := -s -w -X main.version=$(VERSION) -X main.commit=$(COMMIT) -X main.
 # container runtime is needed (Gate 0 review).
 INTEGRATION_DIR := test/integration
 
-.PHONY: all build lint test race fuzz bench bench-compare bench-e2e s3diff-record backends compat release image tools tidy vuln licenses clean help
+.PHONY: all build lint test race fuzz bench bench-compare bench-e2e s3diff-record backends compat release image soak tools tidy vuln licenses clean help
 
 all: build lint test race s3diff-record ## build, lint, test, race, in-process byte-equivalence — the PR gate (fuzz and compat run in their own CI jobs)
 
@@ -144,6 +144,9 @@ licenses: $(GO_LICENSES) ## go-licenses check with the copyleft deny list and re
 tidy: ## go mod tidy and verify nothing changed
 	$(GO) mod tidy
 	git diff --exit-code -- go.mod go.sum
+
+soak: build ## the soak: null backend + tollbooth + loadgen at 50% of peak with chaos injections (SOAK_HOURS, default 24)
+	bench/soak.sh
 
 clean:
 	rm -rf $(BIN) $(RUN) $(DIST) test/bench/new.txt
