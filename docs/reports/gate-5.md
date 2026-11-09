@@ -54,7 +54,7 @@ pasted in the appendix). CI on PR #24 at 8d2a209: run 42674520784, six jobs, all
 | 10 Performance regression | nightly 42673827885 on the fixed runner versus the committed baseline (run 42629583831): **13 benchmarks compared, 0 failed**, deltas −6.2% to +6.4% (`SmallGET` +6.4% is the largest), allocations identical (7 on `SmallGET`, 161 end to end, 0 on `Decide` and `Record`). Finding: benchstat had never compared the two files (§5); replaced by `test/bench/compare` (6093653), which fails the build past 10% or on any extra allocation | `run/compare-nightly.txt`; `test/bench/compare` |
 
 Race: 9 packages ok under `-race -count=1`, 0 failures, coverage **90.2%** of statements (floor
-85%). Fuzz: 5 targets × 60 s, 0 crashers. Skipped: none. Not run this phase: the SDK e2e suite
+85%). Fuzz: 5 targets × 60 s locally and 5 × 720 s in the nightly, 0 crashers. Skipped: none. Not run this phase: the SDK e2e suite
 in `test/e2e` beyond CI's `unit` job (it ran there, green).
 
 ## 4. Performance
@@ -171,7 +171,9 @@ against Garage and versitygw, client matrix, throttle rows): all success. The fi
 (42672430358) failed in 51 s with GitHub's "workflow file issue" and no jobs; its re-run started
 four of six jobs and reported failure; the next push ran all six green. Nightly 42673827885
 on `p5/release`: `bench-regression` success (the comparison above, recomputed with `test/bench/compare`
-from the job log into `run/compare-nightly.txt`); `fuzz-1h` **pending** (one hour per target).
+from the job log into `run/compare-nightly.txt`); `fuzz-1h` success: the five targets (`FuzzParse`
+config, `FuzzClassify`, `FuzzParse`, `FuzzScanQuery` s3id, `FuzzRead` showback) at 720 s each, one
+CPU-hour, 0 crashers. Nightly conclusion: success.
 
 ### G3 Telemetry and docs
 
