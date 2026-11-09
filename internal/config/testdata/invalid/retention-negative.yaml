@@ -1,0 +1,3 @@
+node_id: a
+backend: {scheme: http, endpoints: [h:1]}
+showback: {dir: /d, retention_days: -1}

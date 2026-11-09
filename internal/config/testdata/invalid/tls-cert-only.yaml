@@ -1,0 +1,4 @@
+node_id: a
+listen: {tls: {cert: /nope.crt}}
+backend: {scheme: http, endpoints: [h:1]}
+showback: {dir: /d}

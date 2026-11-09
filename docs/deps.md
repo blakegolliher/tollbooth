@@ -5,11 +5,13 @@ in the Makefile and never enter `go.mod`. Versions below are the current release
 2026-11-08; the G4 audit at each gate re-checks them. **No module is in `go.mod` yet** (Phase 0 has
 no product code); each row below says which phase adds it.
 
-## go.mod (planned)
+## go.mod
+
+Rows marked **in go.mod** are present; the rest are planned for the phase named.
 
 | Module | Version | License | Where | Why | Phase |
 | --- | --- | --- | --- | --- | --- |
-| `go.yaml.in/yaml/v4` | v4.0.0 | Apache-2.0 (with MIT libyaml-derived files; ships LICENSE and NOTICE) | `internal/config` | Config is YAML; stdlib has no YAML. The YAML org's maintained fork; `gopkg.in/yaml.v3` is archived and must not appear in the binary (`make build` checks `go version -m`; depguard denies the import). v4 is GA as of 2026; shunt used the rc. `KnownFields(true)` gives the unknown-key rule and positional errors give key paths. | 1 |
+| `go.yaml.in/yaml/v4` | v4.0.0 | Apache-2.0 (with MIT libyaml-derived files; ships LICENSE and NOTICE) | `internal/config` | Config is YAML; stdlib has no YAML. The YAML org's maintained fork; `gopkg.in/yaml.v3` is archived and must not appear in the binary (`make build` checks `go version -m`; depguard denies the import). v4 is GA as of 2026; shunt used the rc. `KnownFields(true)` gives the unknown-key rule and positional errors give key paths. | **in go.mod** (1) |
 | `github.com/prometheus/client_golang` | v1.25.0 | Apache-2.0 (LICENSE and NOTICE) | `internal/admin`, metric handles in `proxy`, `limiter`, `showback` | Prometheus exposition; stdlib has none. Leanest hot path of the Go clients; handles are pre-resolved (DESIGN §9.3). Pulls `client_model`, `common`, `procfs`, `protobuf` (all Apache-2.0 or BSD-3). | 1 |
 | `github.com/pires/go-proxyproto` | v0.16.0 | Apache-2.0 | `internal/proxy` listener | PROXY protocol v1 and v2 parsing on the listener. A hand-written parser would be another fuzz target for no gain. | 1 |
 | `github.com/charmbracelet/bubbletea` | v1.3.10 | MIT | `cmd/tollbooth/tui` only (depguard, ADR-0003) | Terminal UI event loop and renderer. | 4 |
@@ -50,6 +52,7 @@ Status column: **lifted** rows are in the tree with their headers and modificati
 | --- | --- | --- | --- | --- | --- |
 | github.com/blakegolliher/shunt | `internal/s3/op.go`, `classify.go`, `classify_test.go` | `9b36d09ed109add4a2bedfe1dbfae6108038ee5b` | Apache-2.0 (LICENSE and NOTICE carried) | `internal/s3id/op.go`, `classify.go`, `classify_test.go` | 95-operation classifier table with precedence and tests; extended by 18 operations (docs/OPERATIONS_TABLE.md), given classes, rewritten to match a query bitmask instead of `url.Values`, and indexed by (method, level) | **lifted 2026-11-09** |
 | github.com/blakegolliher/shunt | `internal/s3/request.go`, `request_test.go`, `testdata/fuzz/FuzzParse/*` | same | Apache-2.0 | `internal/s3id/parse.go`, `parse_test.go`, `testdata/fuzz/FuzzParse/*` | Bucket and key extraction for both addressing styles with the fuzz corpus; extended with access key, source IP and trusted X-Forwarded-For, list prefix, flags; `net.SplitHostPort` replaced by a byte-level port strip (it allocated an error for a bare host) | **lifted 2026-11-09** |
+| github.com/blakegolliher/shunt | `internal/config/config.go` (`Load`, `Parse`, `KeyedDecodeError`, `keyPath`), `internal/s3/bucketname.go` (`ValidBucketName`) | same | Apache-2.0 | `internal/config/load.go`, `validate.go` | The YAML loader with unknown keys rejected and every error keyed by its dotted path; bucket name validation for `showback.prefixes` keys | **lifted 2026-11-09** |
 | github.com/blakegolliher/shunt | `internal/s3/errors.go` (+ test) | same | Apache-2.0 | `internal/proxy/s3error.go` | S3 error table and XML rendering; `TooManyRequests` and `Retry-After` added | planned |
 | github.com/blakegolliher/shunt | `internal/sigv4/canonical.go` (`RawPath` only) | same | Apache-2.0 | `internal/s3id/parse.go` (`RawTarget`) | Raw request-target preservation, returning path and query as two substrings; `RawQuery` (a `url.Values` decode) is not needed and not copied; nothing from signing or verification is copied | **lifted 2026-11-09** |
 | github.com/blakegolliher/shunt | `internal/proxy/handler.go` (passthrough path), `copy.go`, `headers.go` | same | Apache-2.0 | `internal/proxy/handler.go`, `copy.go`, `headers.go` | Streaming data path, pooled `io.CopyBuffer`, per-chunk deadlines, retry-before-bytes, `ErrAbortHandler` on short read; every resign, admission, directory, and `Via` path removed | planned |

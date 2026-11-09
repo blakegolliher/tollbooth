@@ -1,5 +1,6 @@
-// Package config holds the YAML schema, loader, whole-file validation, and the atomic publish of an immutable config value. Nothing here ever writes the operator's file. See docs/CONFIG.md.
-//
-// Phase 0 placeholder: the package exists so the layout in docs/SPEC.md is real; code arrives
-// in the phase that owns it (docs/STATUS.md).
+// Package config is the YAML schema, loader, whole-file validation, and the derived values the
+// data path needs (the identity configuration, the admin token). Unknown keys are errors with the
+// key path named; defaults are applied before validation; a Config is immutable once returned and
+// is published behind one atomic.Pointer by serve. Nothing here ever writes the operator's file
+// (docs/CONFIG.md, docs/DESIGN.md §7.1).
 package config
