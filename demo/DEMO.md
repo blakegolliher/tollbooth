@@ -15,7 +15,7 @@ source demo/env.sh             # TOLLBOOTH_ADMIN, AWS_* for tenant A, s3/s3api/t
 Second terminal, left open the whole time:
 
 ```
-tb tui                         # the five screens; 1-5 switch, q quits
+tb tui --config $TOLLBOOTH_DEMO_CONFIG   # the screens; 1-6 switch, ? help, q quits
 ```
 
 `demo/run.sh load 20` adds 20 req/s of background GET/PUT/HEAD across three keys and buckets so the
@@ -187,6 +187,23 @@ $ sed -i '/^bogus: 1$/d' $TOLLBOOTH_DEMO_CONFIG     # and put the rate back if y
 
 Say: unknown keys are errors, a rejected reload keeps the running config, the swap is one pointer
 (0.5 ms here, 0.6 ms measured under load), in-flight requests never notice.
+
+## 6b. The console: graphs, and the rule change without leaving the TUI (PR #27)
+
+In the TUI terminal, `6` is the Graphs screen: braille line charts of requests and throttles per
+second, backend time to first byte, denials per second by rule, requests in flight, heap and RSS,
+goroutines, over the last ten minutes of polls; `space` pauses, `r` resets. Run
+`demo/run.sh load 60` first so the lines move, then repeat the burst from step 3 and watch the
+throttle line and the `tenant-a-reads` denial line rise together.
+
+Then `5`, `e`: the config file opens in the TUI's editor. `i` to insert, change `rate: 2` under
+`tenant-a-reads` to `rate: 50`, `esc`; the line under the text says `valid: 4 rules` on every
+keystroke (type a stray word and it says `INVALID:` with the key and line instead). `ctrl+r` saves
+the file (a `tollbooth.yaml.<time>.bak` appears beside it) and reloads the proxy in one step; the
+bottom line reports the new generation. `esc` closes the editor.
+
+Say: the operator never leaves the console; the save is explicit, validated, atomic, backed up,
+and refused if someone else changed the file meanwhile. The CLI still never writes the file.
 
 ## 7. Showback: who used what, by the hour, as a file
 
