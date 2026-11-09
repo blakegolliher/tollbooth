@@ -91,7 +91,7 @@ s3diff-record: ## byte-equivalence matrix against the in-process recording backe
 	@mkdir -p $(RUN)
 	$(GO) run ./test/s3diff -record > $(RUN)/s3diff-record.log 2>&1; rc=$$?; tail -3 $(RUN)/s3diff-record.log; exit $$rc
 
-compat: build backends ## byte-equivalence against Garage and versitygw, then (next PR) the client matrix that writes docs/COMPAT.md
+compat: build backends ## byte-equivalence against Garage and versitygw, the client matrix (docs/COMPAT.md), and the client throttling rows (docs/THROTTLE.md)
 	$(INTEGRATION_DIR)/compat.sh
 
 release: ## build release artifacts into ./dist (Phase 5: binary, systemd unit, container image)

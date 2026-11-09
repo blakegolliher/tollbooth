@@ -102,6 +102,7 @@ jobs:
           path: |
             run/compat/
             docs/COMPAT.md
+            docs/THROTTLE.md
           if-no-files-found: ignore
       - name: stop the backends
         if: always()
@@ -116,5 +117,6 @@ jobs:
           name: compat
           path: |
             docs/COMPAT.md
+            docs/THROTTLE.md
             run/
           if-no-files-found: ignore

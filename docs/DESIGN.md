@@ -654,10 +654,10 @@ Every category in docs/SPEC.md (Test plan) maps to a package and a phase:
 | 4 | Fuzzing | `FuzzParse`, `FuzzClassify` (`internal/s3id`, shunt's corpus as seed), `FuzzConfig`, `FuzzNDJSON` | 1–3 |
 | 5 | Byte-equivalence | `test/s3diff` + `bench/recordbackend` | 1 |
 | 6 | Client compatibility | `test/integration` (Garage and versitygw run as pinned static binaries downloaded by `test/integration/backends.sh`, no container runtime; MinIO and `mc` dropped, D-022), `docs/COMPAT.md` | 1 |
-| 7 | Throttling behavior | `test/e2e` with each SDK | 2 |
+| 7 | Throttling behavior | `test/e2e` (aws-sdk-go-v2 in-process, every PR: body parsing, 1 req/s completion by retry mode, the 200-object sync at half concurrency in standard and adaptive modes, the Expect reconnect cost) and `test/integration/throttle.sh` (aws cli, boto3, s5cmd, rclone, s3cmd against Garage in the CI `integration` job, `docs/THROTTLE.md`) | 2 |
 | 8 | Showback correctness | `internal/showback` (injected clock) + reconciliation in `test/e2e` | 3 |
 | 9 | Chaos and resilience | `test/e2e` + null backend fault injection | 1–5 |
-| 10 | Performance regression | `make bench-compare`, baseline committed at Gate 2 | 2–5 |
+| 10 | Performance regression | `make bench-compare` against `test/bench/baseline.txt` (committed at Gate 2 from the fixed CI runner) in the nightly job; `make bench-e2e` (`bench/run.sh`, `bench/loadgen`) for the end-to-end rows | 2–5 |
 | 11 | Static analysis | CI (`.golangci.yml`, `govulncheck`, `gosec`, Semgrep, CodeQL, `go-licenses`) | 0 skeleton, 1 on |
 | 12 | Operator surface | `internal/admin` parity test, CLI goldens, `teatest` goldens | 4 |
 
