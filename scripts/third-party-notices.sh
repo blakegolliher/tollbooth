@@ -25,7 +25,7 @@ sed "/^${MARKER//\//\\/}$/,\$d" "$NOTICES" > "$tmp"
   echo
   echo "| Module | License | URL |"
   echo "|---|---|---|"
-  echo "$report" | awk -F, '{printf "| `%s` | %s | %s |\n", $1, $3, $2}'
+  echo "$report" | awk -F, 'NF {printf "| `%s` | %s | %s |\n", $1, $3, $2}'
 } >> "$tmp"
 mv "$tmp" "$NOTICES"
 echo "third-party-notices: regenerated $NOTICES"
