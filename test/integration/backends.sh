@@ -28,7 +28,11 @@ VERSITYGW_SHA256=1f075c9dc92fef232f5b3c7465711ddc5e1b062b2b6df4a3bd246a4be5b35b5
 fetch_verified() { # url sha256 dest
   local url=$1 sha=$2 dest=$3 tmp
   tmp=$(mktemp "$dest.XXXXXX")
-  curl -sfL --retry 3 --max-time 600 -o "$tmp" "$url"
+  # --retry-all-errors: plain --retry does not retry an HTTP 4xx/5xx, and release CDNs return
+  # those transiently (seen on 2026-11-09 in CI).
+  if ! curl -sfL --retry 5 --retry-delay 3 --retry-all-errors --max-time 600 -o "$tmp" "$url"; then
+    echo "backends: download failed: $url" >&2; rm -f "$tmp"; exit 1
+  fi
   echo "$sha  $tmp" | sha256sum -c --quiet - || { rm -f "$tmp"; echo "backends: checksum mismatch for $url" >&2; exit 1; }
   mv "$tmp" "$dest"
 }
