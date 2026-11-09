@@ -32,7 +32,7 @@ The example file `deploy/tollbooth.example.yaml` sets every key to its default.
 | `listen.read_header_timeout` | duration | `10s` | `http.Server.ReadHeaderTimeout`. |
 | `listen.idle_timeout` | duration | `120s` | Keep-alive idle timeout for client connections. |
 | `listen.max_header_bytes` | bytes | `1048576` | `http.Server.MaxHeaderBytes` (1 MiB). |
-| `listen.max_inflight` | int | `10000` | In-flight request cap. Excess requests get `503 SlowDown` and count as `proxy_error`. |
+| `listen.max_inflight` | int | `4096` | In-flight request cap. Excess requests get `503 SlowDown` and count as `proxy_error`. Together with `proxy.copy_buffer_bytes` it bounds copy-buffer memory (defaults: 4,096 × 128 KiB = 512 MiB). |
 
 ## `backend`
 
@@ -53,7 +53,7 @@ The example file `deploy/tollbooth.example.yaml` sets every key to its default.
 
 | Key | Type | Default | Meaning |
 | --- | --- | --- | --- |
-| `proxy.copy_buffer_bytes` | bytes | `262144` | Size of each pooled body-copy buffer (256 KiB). Streaming, not buffering. |
+| `proxy.copy_buffer_bytes` | bytes | `131072` | Size of each pooled body-copy buffer (128 KiB). Streaming, not buffering. |
 | `proxy.drain_timeout` | duration | `30s` | On `SIGTERM`: stop accepting, wait up to this long for in-flight requests, flush showback, exit 0. |
 
 ## `cluster`
@@ -141,7 +141,7 @@ document what breaks when flipped.
 - `admin.token` and `admin.token_file` are not both set; a `token_file` must exist and be non-empty.
 - `backend.tls.*` is rejected with `scheme: http`.
 - `showback.dimensions` contains `operation` and `status_class`; `showback.prefixes` keys are valid bucket names and prefixes are non-empty.
-- Warnings (exit 0, printed): a backend endpoint host not in `base_domains`; `insecure_skip_verify: true`; `showback.retention_days: 0`.
+- Warnings (exit 0, printed): a backend endpoint host not in `base_domains`; `insecure_skip_verify: true`; `showback.retention_days: 0`; `listen.max_inflight × proxy.copy_buffer_bytes` greater than half of `GOMEMLIMIT` when that variable is set in the checking environment (D-024).
 
 ## Reload semantics
 

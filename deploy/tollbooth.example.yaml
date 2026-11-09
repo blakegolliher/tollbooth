@@ -16,7 +16,7 @@ listen:
   read_header_timeout: 10s
   idle_timeout: 120s
   max_header_bytes: 1048576
-  max_inflight: 10000
+  max_inflight: 4096                # with copy_buffer_bytes bounds copy memory at 512 MiB
 
 backend:
   scheme: http                      # required: http | https
@@ -34,7 +34,7 @@ backend:
     timeout: 2s
 
 proxy:
-  copy_buffer_bytes: 262144
+  copy_buffer_bytes: 131072
   drain_timeout: 30s
 
 cluster:
