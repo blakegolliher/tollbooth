@@ -33,6 +33,12 @@ Decisions behind entries are in `docs/DECISIONS.md` (D-nnn) and `docs/adr/`.
   SDK e2e suite, load generator and `make bench-e2e`, nightly fuzz and benchmark regression.
 - Deployment: systemd unit with resource caps and hardening, distroless container image,
   `make release` artifacts (Phase 5).
+- TUI as the operator console (ADR-0006): a Graphs screen (`6`) with braille line charts of
+  request and throttle rates, in-flight, backend TTFB, denials per rule, heap, RSS, and goroutines
+  over the last `--history` polls; a Config editor (`e` on screen `5`) with NORMAL and INSERT modes,
+  validation on every keystroke, `$EDITOR` hand-off, and an explicit, atomic, backed-up save
+  (`ctrl+s`, `ctrl+r` saves and reloads). The TUI's save is the only write tollbooth makes to the
+  config file; the CLI never writes it (Phase 5).
 
 ### Known limitations
 
