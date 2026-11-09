@@ -16,6 +16,34 @@ container image, `make release`, `CHANGELOG.md`, the soak harness, the runbook, 
 | 5 Hardening and v0.1.0 | bench runs with profiles, tuning, 24 h soak, caps, `OPERATIONS.md`, systemd, container, `CHANGELOG.md`, tag | all performance targets met or ADR'd; soak flat | in progress |
 | 6 Backlog | shaping, cluster limits, bandwidth, Parquet, OpenTelemetry, connection caps, rule editing, drain, web UI | each starts with an ADR | not scheduled |
 
+## Phase 5 record (in progress)
+
+Shipped so far (PR #24, `p5/release` → `phase-5`): `deploy/tollbooth.service`, `deploy/Dockerfile`
+and `.dockerignore`, `make release` and `make image`, the CI `release` job (artifacts, unit verify,
+image), `CHANGELOG.md`, the null backend's fault-injection listener, `loadgen -rate`, the soak
+harness (`make soak`, D-056), `bench/crosscheck.sh` (elbencho, ADR-0005), the full
+`docs/OPERATIONS.md`, ADR-0005, the dev-box bench run with profiles
+(`bench/results/2026-11-09T181541Z/`), `docs/reports/gate-5.md` (draft; soak rows pending).
+
+Running: the 24 h soak, started 2026-11-09T18:40Z at 804 req/s (half of the calibrated 1,608 req/s
+peak at concurrency 16), chaos every 10 min, under `bench/results/soak-2026-11-09T183931Z/`; it
+ends 2026-11-10T18:40Z and its report fills in gate-5.md §3 row 9 and §4's memory row.
+
+Pending Blake: ADR-0005 (what v0.1.0 claims; stay on Go; elbencho as cross-check) and the tag.
+Cut: nothing; the reference-node measurements are deferred, not cut (ADR-0005).
+
+Findings: the first soak smoke was voided by a stale null backend from an interrupted `bench/run.sh`
+holding port 19000 and by a `bin/tollbooth` four commits old; the script now refuses taken ports
+and rebuilds the binary (D-056). A pid sentinel of 0 made `kill -0` always succeed and would have
+made `kill` address the whole process group; fixed before any run used it.
+
+Numbers (dev box, 2 vCPUs): G2 all green, race coverage 90.2%, fuzz 5 × 60 s clean, s3diff 293
+cases 0 diffs; bench raw 4 KiB GET direct 7,065 versus proxied 2,243 req/s at concurrency 32
+(contention, ADR-0005); soak smoke 223,770 requests, 11 chaos steps, 0 unexplained errors, RSS 23
+to 34 MiB.
+
+Gate result: pending (report draft written 2026-11-09; final after the soak).
+
 ## Phase 4 record
 
 Shipped: everything in the Phase 4 row: `GET /admin/status` (D-050) and `GET /admin/backends`;
