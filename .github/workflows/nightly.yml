@@ -42,9 +42,13 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
-      - name: benchmarks against the committed baseline
+      - name: benchmarks, compared against the committed baseline when one exists
         run: |
-          if [ ! -f test/bench/baseline.txt ]; then echo "no baseline yet (committed at Gate 2)"; exit 0; fi
+          if [ ! -f test/bench/baseline.txt ]; then
+            echo "no baseline yet: running the benchmarks so this run's new.txt can be committed as test/bench/baseline.txt (Gate 2)"
+            make bench
+            exit 0
+          fi
           make bench-compare
       - uses: actions/upload-artifact@v7
         if: always()
