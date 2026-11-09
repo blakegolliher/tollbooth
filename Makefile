@@ -34,7 +34,7 @@ LDFLAGS    := -s -w -X main.version=$(VERSION) -X main.commit=$(COMMIT) -X main.
 # container runtime is needed (Gate 0 review).
 INTEGRATION_DIR := test/integration
 
-.PHONY: all build lint test race fuzz bench bench-compare s3diff-record backends compat release tools tidy vuln licenses clean help
+.PHONY: all build lint test race fuzz bench bench-compare bench-e2e s3diff-record backends compat release tools tidy vuln licenses clean help
 
 all: build lint test race s3diff-record ## build, lint, test, race, in-process byte-equivalence — the PR gate (fuzz and compat run in their own CI jobs)
 
@@ -83,6 +83,9 @@ bench: ## run all benchmarks with -benchmem, write test/bench/new.txt
 
 bench-compare: bench ## compare test/bench/new.txt against test/bench/baseline.txt with benchstat (±10% gate, CLAUDE.md)
 	$(GO) run $(BENCHSTAT) test/bench/baseline.txt test/bench/new.txt
+
+bench-e2e: build ## null backend + tollbooth (100 rules) + bench/loadgen, direct versus proxied, interleaved runs, profiles; results under bench/results/<date>/
+	bench/run.sh
 
 backends: ## fetch and verify the pinned Garage and versitygw backends into test/integration/bin
 	$(INTEGRATION_DIR)/backends.sh fetch
