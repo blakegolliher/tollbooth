@@ -1,5 +1,11 @@
-// Package s3id holds identity extraction and the S3 operation classifier (shunt's op table, lifted). It yields one immutable RequestIdentity per request from headers and the request line, before any body byte is read. Zero allocations on the common path; see docs/DESIGN.md §4.
+// Package s3id computes one immutable RequestIdentity per request from headers and the request
+// line only, before a single body byte is read: access key (SigV4 and SigV2, header and
+// presigned), bucket and key in both addressing styles, the list prefix (ADR-0001), source
+// address (peer, PROXY protocol, trusted X-Forwarded-For), and the S3 operation with its class.
 //
-// Phase 0 placeholder: the package exists so the layout in docs/SPEC.md is real; code arrives
-// in the phase that owns it (docs/STATUS.md).
+// The classifier is shunt's table (internal/s3 at 9b36d09), lifted and extended by the 18
+// operations the API reference lists that shunt lacked; docs/OPERATIONS_TABLE.md is generated
+// from it by TestOperationsTableIsCurrent. The common path allocates nothing: the request-target
+// is split, not parsed; the query is scanned into a bitmask, not a map; every string in the
+// identity is a substring of the request unless it needed percent-decoding (docs/DESIGN.md §4.2).
 package s3id

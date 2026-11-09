@@ -1,0 +1,39 @@
+node_id: tb-a01
+base_domains: [s3.lab.example.com]
+backend:
+  scheme: https
+  endpoints: [s3.lab.example.com:443, 10.0.0.2:443]
+  tls:
+    insecure_skip_verify: true
+listen:
+  trusted_proxies: [10.20.0.0/16, 192.0.2.1, fd00::/8]
+rate_limits:
+  default_on_limit: slowdown
+  rules:
+    - id: tenant-a-writes
+      match:
+        access_keys: [AKIAEXAMPLE1, AKIAEXAMPLE2]
+        buckets: [training-data, checkpoints]
+        prefixes: [ckpt/, logs/]
+        source_cidrs: [10.20.0.0/16]
+        ops: [WRITE]
+      group_by: [access_key, bucket]
+      limit: { rate: 2000, burst: 4000 }
+    - id: list-storm-per-client
+      match: { ops: [LIST] }
+      group_by: [source_ip]
+      limit: { rate: 50, burst: 200 }
+      on_limit: too_many_requests
+    - id: frozen-key
+      match: { access_keys: [AKIAREVOKED] }
+      limit: { rate: 0 }
+    - id: slow-prefix
+      match: { ops: [GetObject, HeadObject], prefixes: [cold/] }
+      group_by: [prefix]
+      limit: { rate: 0.5 }
+showback:
+  dir: /var/lib/tollbooth/showback
+  dimensions: [access_key, bucket, prefix, source_ip, operation, status_class]
+  retention_days: 0
+  prefixes:
+    checkpoints: [ckpt/, logs/]

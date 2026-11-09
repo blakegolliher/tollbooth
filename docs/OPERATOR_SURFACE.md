@@ -4,8 +4,10 @@ Every admin route has a CLI verb and a TUI screen; a test over the admin route t
 registered route is missing from this file (test plan category 12). Both the CLI and the TUI go
 through `internal/admin`'s client, so parity is structural. Neither writes the config file.
 
-Phase 0 state: the matrix is the design. Columns fill with "done" as phases land (routes and verbs
-in Phases 1–4, screens in Phase 4).
+Phase 1 state: `/healthz`, `/readyz`, `/metrics`, and `/debug/pprof/` are served (`internal/admin`),
+and the route table `admin.Routes` lists every planned route with its phase. The CLI verbs in place
+are `serve`, `check-config`, `version`; `status`, `rules`, `config`, `backends`, `usage`, `doctor`,
+and `tui` exit 2 with a pointer to STATUS.md until their phase.
 
 | Admin route | CLI verb | TUI screen (key) | Phase |
 | --- | --- | --- | --- |

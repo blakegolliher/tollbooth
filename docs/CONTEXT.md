@@ -9,7 +9,9 @@ assumptions.
 - Target Go: **1.27.3** (current stable, go.dev `VERSION`, 2026-11-08). `go.mod` pins `go 1.27.3`;
   `go mod tidy` drops a `toolchain` line equal to the `go` line, so the `go` directive alone is the
   pin. CI uses `go-version-file: go.mod`, so CI and local builds are identical.
-- Dev box: RHEL 9 (`5.14.0-570.17.1.el9_6.x86_64`), packaged Go **1.25.3** with `GOTOOLCHAIN=local`
+- Dev box: RHEL 9 (`5.14.0-570.17.1.el9_6.x86_64`), **2 vCPUs** (`nproc` 2 on an AMD EPYC 7402P host; Go
+  sees `GOMAXPROCS=2`), so local benchmark numbers are indicative only and `-race` suites run slowly
+  while a fuzz run is going. Packaged Go **1.25.3** with `GOTOOLCHAIN=local`
   in the distribution's `go.env`. The Makefile exports `GOTOOLCHAIN=auto`, which downloads 1.27.3
   into the module cache on first use (verified 2026-11-08). Running `go` outside `make` needs
   `GOTOOLCHAIN=auto` in the environment.
@@ -40,6 +42,14 @@ Ports in the integration suite: Garage S3 `127.0.0.1:3900` (admin 3903, RPC 3901
 `127.0.0.1:7070`. Credentials are lab constants in
 `backends.sh` except Garage's, which it mints on first start and writes to
 `test/integration/data/garage.env`.
+
+## Client tools for the compatibility matrix
+
+`test/integration/clients.sh` pins (checked 2026-11-09): s5cmd 2.3.0 (sha256 matches the release's
+`s5cmd_checksums.txt`), rclone v1.76.0 (matches `SHA256SUMS`), elbencho v3.3-3 (no published
+checksum; sha256 `cd33b7dd…589cb2` computed from the download), boto3 1.43.126 and s3cmd 2.4.0 in a
+venv, aws cli v2 from the runner image. GitHub release downloads sometimes return a transient HTTP
+error; the fetchers retry on those (`--retry-all-errors`) and print the HTTP status on failure.
 
 ## Lab
 

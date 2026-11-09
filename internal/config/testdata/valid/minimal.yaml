@@ -1,0 +1,6 @@
+node_id: tb-a01
+backend:
+  scheme: http
+  endpoints: [127.0.0.1:9000]
+showback:
+  dir: /var/lib/tollbooth/showback
