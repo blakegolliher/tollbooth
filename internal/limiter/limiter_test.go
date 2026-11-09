@@ -726,9 +726,9 @@ rate_limits:
       match: {ops: [HeadBucket]}
       limit: {rate: 1}
 `)
-	rs := l.Rules()
-	if rs.Len() != 3 {
-		t.Fatal(rs.Len())
+	rs := l.rules.Load()
+	if len(rs.rules) != 3 {
+		t.Fatal(len(rs.rules))
 	}
 	for c := 0; c < s3id.NumClasses; c++ {
 		ids := []string{}
@@ -746,9 +746,6 @@ rate_limits:
 		if got != want {
 			t.Errorf("class %s candidates %q, want %q", s3id.Class(c), got, want)
 		}
-	}
-	if (*RuleSet)(nil).Len() != 0 {
-		t.Fatal("nil set")
 	}
 }
 
@@ -792,7 +789,7 @@ func BenchmarkDecideNoRules(b *testing.B) {
 func BenchmarkMatch100Rules(b *testing.B) {
 	l, _ := lim(b, hundredRules(false))
 	id := getObject("AKIA1", "b7", "ckpt/7/x")
-	rs := l.Rules()
+	rs := l.rules.Load()
 	b.ReportAllocs()
 	for b.Loop() {
 		for _, r := range rs.byClass[id.Class] {
@@ -804,7 +801,7 @@ func BenchmarkMatch100Rules(b *testing.B) {
 func BenchmarkGCRA(b *testing.B) {
 	l, _ := lim(b, oneRule)
 	id := getObject("AKIA1", "b", "k")
-	r := l.Rules().rules[0]
+	r := l.rules.Load().rules[0]
 	k := r.key(id, "")
 	l.Decide(id, 0, true)
 	b.ReportAllocs()
