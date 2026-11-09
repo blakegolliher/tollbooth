@@ -1,4 +1,4 @@
- 1 Overview  2 Limits  3 Usage  4 Backends  5 Config  tui-node · v0.0.0-tui
+ 1 Overview  2 Limits  3 Usage  4 Backends  5 Config  6 Graphs  tui-node · v0.0.
   generation 2, loaded 2026-11-09T11:30:00Z; last reload: ok at 2026-11-09T11:30
 
   Running config versus /etc/tollbooth/tollbooth.yaml
@@ -21,4 +21,4 @@
   backend.tls.ca_bundle                    ""
   backend.tls.insecure_skip_verify         false
   base_domains                             []
-r reload · v validate the file on disk · ? help · q quit
+e edit the file · r reload · v validate the file on disk · ? help · q quit

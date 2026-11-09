@@ -75,7 +75,7 @@ func (m Model) lastSeen() string {
 
 func (m Model) tabs() string {
 	var parts []string
-	for s := ScreenOverview; s <= ScreenConfig; s++ {
+	for s := ScreenOverview; s <= ScreenGraphs; s++ {
 		label := fmt.Sprintf(" %d %s ", int(s), screenNames[s])
 		if s == m.screen {
 			parts = append(parts, styleTab.Render(label))
@@ -98,6 +98,12 @@ func (m Model) footer() string {
 		return "? close help · q quit"
 	}
 	switch {
+	case m.ed.open && m.ed.prompt:
+		return "unsaved changes: y save · n discard · esc keep editing"
+	case m.ed.open && m.ed.insert:
+		return "INSERT · esc normal mode"
+	case m.ed.open:
+		return "NORMAL · i insert · ctrl+s save · ctrl+r save and reload · E $EDITOR · L reload buffer · esc close"
 	case m.testing:
 		return "tab next field · enter run · esc close"
 	case m.filtering, m.usageFiltOn:
@@ -115,7 +121,9 @@ func (m Model) footer() string {
 	case ScreenBackends:
 		return "read-only · 1-5 screens · ? help · q quit"
 	case ScreenConfig:
-		return "r reload · v validate the file on disk · ? help · q quit"
+		return "e edit the file · r reload · v validate the file on disk · ? help · q quit"
+	case ScreenGraphs:
+		return "space pause · r reset history · 1-6 screens · ? help · q quit"
 	}
 	return ""
 }
@@ -138,7 +146,12 @@ func (m Model) body() []string {
 	case ScreenBackends:
 		return m.backendsLines()
 	case ScreenConfig:
+		if m.ed.open {
+			return m.editorLines()
+		}
 		return m.configLines()
+	case ScreenGraphs:
+		return m.graphsLines()
 	}
 	return m.overviewLines()
 }
@@ -146,16 +159,18 @@ func (m Model) body() []string {
 func (m Model) helpLines() []string {
 	return []string{
 		styleTitle.Render("Keys"),
-		"  1 2 3 4 5   Overview, Limits, Usage, Backends, Config",
-		"  r           reload the config file on the proxy (Overview, Config)",
+		"  1 … 6       Overview, Limits, Usage, Backends, Config, Graphs",
+		"  r           reload the config file on the proxy (Overview, Config); reset the history (Graphs)",
 		"  v           validate the file on disk with check-config (Config)",
+		"  e           edit the file on disk: i insert, esc normal, ctrl+s save, ctrl+r save and reload, E $EDITOR (Config)",
+		"  space       pause the graphs (Graphs)",
 		"  ↑ ↓ enter   select a rule and open its detail (Limits); hourly bars for a row (Usage)",
 		"  t           dry-run a request against the rules (Limits)",
 		"  /           filter the table (Limits, Usage)",
 		"  g s f x     cycle group-by, sort, edit the hour range, export CSV (Usage)",
 		"  ?           this help · q quit",
 		"",
-		styleDim.Render("Read-only: nothing here writes the config file. Edit it, then press r."),
+		styleDim.Render("Nothing here writes the config file except an explicit save in the editor, which keeps a .bak beside it."),
 		styleDim.Render(fmt.Sprintf("Polling every %s; a STALE banner means the last poll failed and the screens show the last state.", m.opts.Interval)),
 	}
 }

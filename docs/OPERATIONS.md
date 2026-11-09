@@ -154,9 +154,16 @@ source: showback is the record.
 
 ## 7. Task: change a rule
 
-Nothing in tollbooth writes the config file. A rule change is an edit, a reload, and a check.
+The CLI never writes the config file; the TUI's editor writes it only when you press save. A rule
+change is an edit, a reload, and a check.
 
-1. Edit `tollbooth.yaml` (the `rate_limits.rules` list; keys and semantics in `docs/CONFIG.md`).
+1. Edit `tollbooth.yaml` (the `rate_limits.rules` list; keys and semantics in `docs/CONFIG.md`),
+   with your editor or in the TUI: screen `5` (Config), `e` opens the file; `i` inserts, `esc`
+   returns to NORMAL mode; every keystroke is validated and the verdict (or the first error with
+   its key and line) sits under the text; `ctrl+s` saves (atomically, with `tollbooth.yaml.<UTC
+   time>.bak` beside it; refused if the file changed on disk since it was opened, `L` reloads the
+   buffer), `ctrl+r` saves and reloads in one step, `E` opens `$EDITOR` on the buffer. Steps 2 to 4
+   are then already done; go to step 5.
 2. Validate the file before touching the running proxy: `tollbooth check-config tollbooth.yaml`
    prints every problem with its key path and exits 1 on any. In the TUI, screen `5` (Config), key
    `v` runs the same check on the file and shows the verdict on the bottom line.

@@ -1,4 +1,4 @@
- 1 Overview  2 Limits  3 Usage  4 Backends  5 Config  tui-node · v0.0.0-tui
+ 1 Overview  2 Limits  3 Usage  4 Backends  5 Config  6 Graphs  tui-node · v0.0.0-tui
  STALE: admin API unreachable (admin API at http://127.0.0.1:9900: dial tcp 127.0.0.1:9900: connect: connection refused)
   state          ready
   uptime         X

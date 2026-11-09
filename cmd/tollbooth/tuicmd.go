@@ -30,6 +30,7 @@ func runTUI(args []string, stdout, stderr *os.File) int {
 	af := &adminFlags{}
 	af.bind(fs)
 	interval := fs.Duration("interval", 2*time.Second, "poll interval")
+	history := fs.Int("history", 300, "polls the Graphs screen keeps (300 at 2 s is ten minutes)")
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
@@ -43,7 +44,7 @@ func runTUI(args []string, stdout, stderr *os.File) int {
 	if _, err := os.Stat(cfgPath); err != nil {
 		cfgPath = "" // the Config screen's diff and v need a file; without one they say so
 	}
-	if err := tui.Run(tui.Options{Client: c, Interval: *interval, ConfigPath: cfgPath}, os.Stdin, stdout); err != nil {
+	if err := tui.Run(tui.Options{Client: c, Interval: *interval, ConfigPath: cfgPath, History: *history}, os.Stdin, stdout); err != nil {
 		_, _ = fmt.Fprintf(stderr, "tollbooth tui: %v\n", err)
 		return 1
 	}

@@ -143,10 +143,25 @@ func drive(t *testing.T, m Model, msgs ...tea.Msg) Model {
 			return
 		}
 		// A batch holds the poll and the tick; frame tests run neither (the first poll is run
-		// explicitly below), so only direct results are applied.
-		switch msg := cmd().(type) {
-		case pollMsg, reloadMsg, testMsg, barsMsg, exportMsg, noticeMsg:
-			cur, _ = cur.Update(msg)
+		// explicitly below), so only direct results are applied. A bare tick (notice clearing,
+		// cursor blink) would block until it fires, so a command gets 250 ms to answer.
+		ch := make(chan tea.Msg, 1)
+		go func() { ch <- cmd() }()
+		var got tea.Msg
+		select {
+		case got = <-ch:
+		case <-time.After(250 * time.Millisecond):
+			return
+		}
+		switch msg := got.(type) {
+		case pollMsg, reloadMsg, testMsg, barsMsg, exportMsg, noticeMsg, editorSavedMsg, editorExternalMsg:
+			var next tea.Cmd
+			cur, next = cur.Update(msg)
+			if next != nil { // a save-and-reload chains the reload; follow one more step
+				if r, ok := next().(reloadMsg); ok {
+					cur, _ = cur.Update(r)
+				}
+			}
 		}
 	}
 	// First poll.
@@ -169,6 +184,10 @@ func key(s string) tea.KeyMsg {
 		return tea.KeyMsg{Type: tea.KeyTab}
 	case "down":
 		return tea.KeyMsg{Type: tea.KeyDown}
+	case "ctrl+s":
+		return tea.KeyMsg{Type: tea.KeyCtrlS}
+	case "ctrl+r":
+		return tea.KeyMsg{Type: tea.KeyCtrlR}
 	}
 	return tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(s)}
 }

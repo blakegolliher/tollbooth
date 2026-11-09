@@ -2,7 +2,8 @@
 
 Every admin route has a CLI verb and a TUI screen; a test over the admin route table fails when a
 registered route is missing from this file (test plan category 12). Both the CLI and the TUI go
-through `internal/admin`'s client, so parity is structural. Neither writes the config file.
+through `internal/admin`'s client, so parity is structural. The CLI never writes the config file;
+the TUI writes it only on an explicit save from its editor (ADR-0006).
 
 Phase 4 state: every route in the table is served (`internal/admin`), and every CLI verb exists:
 `serve`, `check-config`, `version`, `status`, `rules list|show|test|top`, `config show|reload|diff`,
@@ -14,20 +15,23 @@ exemptions below are marked `—` on purpose).
 | --- | --- | --- | --- |
 | `GET /healthz` | `status` (part of the summary) | Overview (`1`) | 1 |
 | `GET /readyz` | `status` | Overview (`1`) | 1 |
-| `GET /metrics` | — (Prometheus scrapes it; `status` shows the derived req/s and throttled/s) | Overview (`1`) sparklines | 1 |
-| `POST /admin/reload` | `config reload` | Overview (`1`) and Config (`5`), key `r` | 2 |
-| `GET /admin/config` | `config show`, `config diff` | Config (`5`) | 2 |
+| `GET /metrics` | — (Prometheus scrapes it; `status` shows the derived req/s and throttled/s) | Overview (`1`) sparklines; Graphs (`6`) heap, RSS, goroutines | 1, 5 |
+| `POST /admin/reload` | `config reload` | Overview (`1`) and Config (`5`), key `r`; the editor's `ctrl+r` saves and reloads | 2 |
+| `GET /admin/config` | `config show`, `config diff` | Config (`5`); `e` opens the editor (ADR-0006) | 2, 5 |
 | `GET /admin/limits` | `rules list`, `rules show <id>` | Limits (`2`) | 2 |
 | `GET /admin/limits/top?n=` | `rules top [--n] [--window]` | Limits (`2`) detail pane | 2 |
 | `POST /admin/limits/test` | `rules test --access-key --bucket --key --ip --op` | Limits (`2`), key `t` | 2 (D-039) |
 | `GET /admin/usage?from=&to=&group_by=&where=&format=` | `usage query`, `usage top` (files or this node; same code path) | Usage (`3`) | 3 |
-| `GET /admin/status` | `status` | Overview (`1`) | 4 |
-| `GET /admin/backends` | `backends list` | Backends (`4`) | 4 |
+| `GET /admin/status` | `status` | Overview (`1`); Graphs (`6`) rates and in-flight | 4 |
+| `GET /admin/backends` | `backends list` | Backends (`4`); Graphs (`6`) TTFB per endpoint | 4 |
 | `GET /debug/pprof/*` (only with `admin.pprof: true`) | — (operator uses `go tool pprof`; documented in OPERATIONS.md) | — (exempt: diagnostic, not an operator function) | 1 |
 
 Local verbs with no route (they read files or the environment, not the running proxy):
 `check-config`, `doctor`, `usage verify`, `version`, `serve`, `tui`. The TUI's Config screen key
-`v` runs `check-config` on the file on disk.
+`v` runs `check-config` on the file on disk; its editor (`e`) runs the same check on every keystroke
+and is the only place in tollbooth that writes the config file: on `ctrl+s` or `ctrl+r`, after the
+buffer validates, atomically, with a `<file>.<timestamp>.bak` beside it, refused when the file
+changed on disk since it was loaded.
 
 ## CLI conventions
 
@@ -39,7 +43,9 @@ Local verbs with no route (they read files or the environment, not the running p
 
 ## TUI conventions
 
-- Read-only; polls every 2 s (`--interval`); 80×24 minimum; keyboard only; honors `NO_COLOR` and
-  `TERM=dumb`; shows the last state under a staleness banner when the admin API is unreachable.
-- `?` help on every screen; `q` quits; `1`–`5` switch screens.
+- Polls every 2 s (`--interval`); 80×24 minimum; keyboard only; honors `NO_COLOR` and `TERM=dumb`;
+  shows the last state under a staleness banner when the admin API is unreachable. Read-only except
+  the Config editor's explicit save (ADR-0006).
+- `?` help on every screen; `q` quits; `1`–`6` switch screens. Graphs (`6`): braille line charts
+  over the last `--history` polls (300); `space` pauses, `r` resets.
 - `teatest` golden frames at 80×24 and 120×40, including the admin-unreachable state (Phase 4).

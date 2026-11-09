@@ -1,4 +1,4 @@
- 1 Overview  2 Limits  3 Usage  4 Backends  5 Config  tui-node · v0.0.0-tui
+ 1 Overview  2 Limits  3 Usage  4 Backends  5 Config  6 Graphs  tui-node · v0.0.0-tui
   generation 2, loaded 2026-11-09T11:30:00Z; last reload: ok at 2026-11-09T11:30:00Z (3 rules, 0.7 ms)
 
   Running config versus /etc/tollbooth/tollbooth.yaml
@@ -37,4 +37,4 @@
   listen.tls.min_version                   "1.2"
   listen.trusted_proxies                   []
   logging.access                           false
-r reload · v validate the file on disk · ? help · q quit
+e edit the file · r reload · v validate the file on disk · ? help · q quit

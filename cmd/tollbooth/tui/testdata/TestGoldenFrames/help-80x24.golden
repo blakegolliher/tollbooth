@@ -1,18 +1,18 @@
- 1 Overview  2 Limits  3 Usage  4 Backends  5 Config  tui-node · v0.0.0-tui
+ 1 Overview  2 Limits  3 Usage  4 Backends  5 Config  6 Graphs  tui-node · v0.0.
 Keys
-  1 2 3 4 5   Overview, Limits, Usage, Backends, Config
-  r           reload the config file on the proxy (Overview, Config)
+  1 … 6       Overview, Limits, Usage, Backends, Config, Graphs
+  r           reload the config file on the proxy (Overview, Config); reset the 
   v           validate the file on disk with check-config (Config)
+  e           edit the file on disk: i insert, esc normal, ctrl+s save, ctrl+r s
+  space       pause the graphs (Graphs)
   ↑ ↓ enter   select a rule and open its detail (Limits); hourly bars for a row 
   t           dry-run a request against the rules (Limits)
   /           filter the table (Limits, Usage)
   g s f x     cycle group-by, sort, edit the hour range, export CSV (Usage)
   ?           this help · q quit
 
-Read-only: nothing here writes the config file. Edit it, then press r.
+Nothing here writes the config file except an explicit save in the editor, which
 Polling every 2s; a STALE banner means the last poll failed and the screens show
-
-
 
 
 

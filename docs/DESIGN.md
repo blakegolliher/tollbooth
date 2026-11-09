@@ -531,10 +531,14 @@ summary from the parts the process already holds and a one-second sampler of two
 (D-050); `/admin/backends` renders per-endpoint atomics kept on the pool; `doctor` is a fixed
 list of checks (D-051); the TUI polls everything in one command per interval and shows the last
 state under a STALE banner when a poll fails (D-053). Design points that matter here: one admin client; every
-verb supports `--format table|json|csv` where `json` is the admin response unwrapped; neither the
-CLI nor the TUI writes the config file; the TUI is read-only, polls, and shows the last state under
-a staleness banner when the admin API is unreachable; Bubble Tea imports are fenced to
-`cmd/tollbooth/tui` (ADR-0003).
+verb supports `--format table|json|csv` where `json` is the admin response unwrapped; the CLI never
+writes the config file and the TUI writes it only on an explicit save from its editor (ADR-0006:
+validated with `config.Parse`, atomic temp-and-rename, a timestamped backup beside the file, refused
+when the file changed on disk since it was loaded); the TUI polls and shows the last state under a
+staleness banner when the admin API is unreachable; its Graphs screen draws braille line charts
+(about 150 lines of its own, no charting dependency) over the last `--history` polls of the rates,
+in-flight, backend TTFB, denials per rule, and the process gauges it reads from `/metrics`; Bubble
+Tea imports are fenced to `cmd/tollbooth/tui` (ADR-0003).
 
 ## 9. Hot-path walkthrough with allocation budget
 
@@ -681,7 +685,7 @@ Coverage floor 85% of statements; every `Op` exercised; `-race` everywhere.
 | Parquet export | 6, by ADR | NDJSON is enough for DuckDB and billing systems; a store seam is introduced then |
 | OpenTelemetry tracing | 6 | metrics and showback cover v1 needs |
 | Per-source connection caps | 6 | `ReadHeaderTimeout` and the in-flight cap bound slowloris in v1 |
-| Rule editing from CLI/TUI | 6 | nothing in tollbooth writes the config file |
+| Rule editing from CLI/TUI | TUI editor delivered in Phase 5 (ADR-0006, pulled forward by Blake); the CLI stays read-only | the file remains the source of truth; the TUI's save is explicit, validated, atomic, backed up |
 | Backend drain | 6 | passive marking and retry-before-bytes suffice for v1 |
 | Web UI | 6, only if the TUI proves insufficient | |
 | Go versus Rust | ADR-0005 (Gate 5): stay on Go; the dev-box profile is kernel-bound (44% socket syscalls, under 2% in the proxy's own code); reopened only by a reference-node profile that says otherwise | |
