@@ -77,6 +77,11 @@ func touchAll(m *Metrics) {
 	m.Limiter.Overflow.Inc()
 	m.Limiter.Denied.WithLabelValues("rule-a").Inc()
 	m.Limiter.Errors.Inc()
+	m.Showback.Tuples.Set(1)
+	m.Showback.FlushDuration.Observe(0.01)
+	m.Showback.FlushErrors.Inc()
+	m.Showback.Collapsed.Inc()
+	m.Showback.ClockSkew.Inc()
 }
 
 // TestEveryMetricIsInTheCatalog: a registered tollbooth_* metric without a catalog row fails.
@@ -105,10 +110,11 @@ func TestEveryMetricIsInTheCatalog(t *testing.T) {
 			t.Logf("catalog row %s has no registered metric yet", name)
 		}
 	}
-	// Phases 1 and 2 register exactly the eleven request-path, backend, and reload metrics plus
-	// the five limiter metrics. Nothing is registered ahead of the code that observes it (D-045).
-	if len(registered) != 16 {
-		t.Errorf("Phases 1 and 2 register exactly sixteen tollbooth_ metrics, got %d: %v", len(registered), registered)
+	// Phases 1 to 3 register exactly the eleven request-path, backend, and reload metrics, the five
+	// limiter metrics, and the five showback metrics. Nothing is registered ahead of the code that
+	// observes it (D-045).
+	if len(registered) != 21 {
+		t.Errorf("Phases 1 to 3 register exactly twenty-one tollbooth_ metrics, got %d: %v", len(registered), registered)
 	}
 }
 
