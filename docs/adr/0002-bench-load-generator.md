@@ -1,6 +1,6 @@
 # ADR-0002: Load generator for the bench harness
 
-Status: **proposed** (Phase 0, 2026-11-08). Open decision 2 in docs/SPEC.md. Awaiting Fable and Blake.
+Status: **accepted** (Gate 0 review, 2026-11-08): option (c). Open decision 2 in docs/SPEC.md. See the note on warp's availability under Consequences.
 
 ## Context
 
@@ -49,7 +49,7 @@ pinned image tag, nothing else (docs/SPEC.md, Licensing).
 - `bench/loadgen/` (Phase 2): `-mode raw|sdk`, `-target direct|proxied`, `-ops <mix>`,
   `-keys/-buckets/-prefixes/-sources <n>`, `-bind <ip,...>`, `-duration`, `-warmup 30s`,
   `-runs 3`, HDR output as text and as JSON under `bench/results/<date>/`.
-- `bench/warp/run.sh` (Phase 5): pinned `minio/warp` image tag, same operation mix where warp can
+- `bench/warp/run.sh` (Phase 5): pinned `warp` release binary (MinIO archived its open-source projects in 2025 and `dl.min.io` returns 410; the GitHub release assets are the pinned source, verified at Phase 5, and if they are gone the cross-check is dropped by amending this ADR), same operation mix where warp can
   express it, output saved next to the generator's.
 - `docs/deps.md` gains `hdrhistogram-go` (MIT, bench only) and, in Phase 2,
   `aws-sdk-go-v2` + `smithy-go` (Apache-2.0, bench and test only; never linked into `bin/tollbooth`,

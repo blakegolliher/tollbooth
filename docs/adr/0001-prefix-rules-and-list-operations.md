@@ -1,6 +1,6 @@
 # ADR-0001: What a prefix rule matches for list operations
 
-Status: **proposed** (Phase 0, 2026-11-08). Open decision 1 in docs/SPEC.md. Awaiting Fable and Blake.
+Status: **accepted** (Gate 0 review, 2026-11-08): option (b), with the clarification below. Open decision 1 in docs/SPEC.md.
 
 ## Context
 
@@ -50,6 +50,12 @@ so (b) costs nothing on requests that are not lists.
 **(b).** It is Fable's starting position and the field case decides it. The cost is one
 documented rule in `docs/CONFIG.md` (`match.prefixes` row) and `docs/SHOWBACK_SCHEMA.md`
 (`prefix` column), both already written assuming (b).
+
+## Clarification (Gate 0)
+
+A list with no `prefix` parameter, or with a prefix shorter than every configured prefix, matches
+**bucket-level rules only** (rules without `match.prefixes`). It never matches a prefix rule, and
+showback records it under `prefix: ""`.
 
 ## Consequences
 
