@@ -26,12 +26,12 @@ have their files copied into one) without collision.
 ## Header (line 1)
 
 ```json
-{"schema":1,"node_id":"tb-a01","hour_utc":498243,"rows":1842,"requests":9211034,"bytes_in":73108211422,"bytes_out":912034112233,"partial":false,"recovered":false,"written_at":1793494800}
+{"schema_version":1,"node_id":"tb-a01","hour_utc":498243,"rows":1842,"requests":9211034,"bytes_in":73108211422,"bytes_out":912034112233,"partial":false,"recovered":false,"written_at":1793494800}
 ```
 
 | Field | Type | Meaning |
 | --- | --- | --- |
-| `schema` | int | Schema version, `1`. Bumped only by an ADR. |
+| `schema_version` | int | Schema version, `1`. Bumped only by an ADR; additive fields do not bump it. |
 | `node_id` | string | The writing node. |
 | `hour_utc` | int64 | `floor(unix_seconds / 3600)` of the hour this file covers. |
 | `rows` | int64 | Number of row lines that follow. `verify` recomputes it. |
@@ -41,7 +41,7 @@ have their files copied into one) without collision.
 | `recovered` | bool | `true` when a sealed file was produced at startup from a `current/` snapshot of an earlier hour (the node was down when the hour ended, so up to `flush_interval` of that hour is missing). `verify` lists these hours as recovered. |
 | `written_at` | int64 | Unix seconds when the file was written. |
 
-The header has no `operation` key and rows have no `schema` key, so a reader can tell them apart
+The header has no `operation` key and rows have no `schema_version` key, so a reader can tell them apart
 by either. A sealed hour with no requests is a header with `rows: 0` and no further lines; a
 missing file means the node was not running, which `verify` reports as downtime.
 
