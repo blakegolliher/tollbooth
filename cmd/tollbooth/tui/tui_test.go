@@ -21,6 +21,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -65,6 +66,8 @@ rate_limits:
 `
 
 var fixedNow = time.Date(2026, 11, 9, 12, 30, 0, 0, time.UTC)
+
+var agoRE = regexp.MustCompile(`\(\d+s ago\)`)
 
 // fixture is a deterministic admin server with a showback directory of two sealed hours.
 func fixture(t *testing.T) (*admin.Client, string) {
@@ -179,6 +182,7 @@ func frame(m Model) []byte {
 	if m.opts.ConfigPath != "" {
 		v = strings.ReplaceAll(v, m.opts.ConfigPath, "/etc/tollbooth/tollbooth.yaml")
 	}
+	v = agoRE.ReplaceAllString(v, "(Xs ago)") // the deny ring's age reads the real clock
 	lines := strings.Split(v, "\n")
 	for i, l := range lines {
 		if strings.Contains(l, "uptime") {
