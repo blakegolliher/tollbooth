@@ -47,6 +47,7 @@ type Access struct {
 	Endpoint    string        // backend host:port, "" when none was reached
 	TLS         string        // "1.2", "1.3", "" for plaintext
 	Error       string        // "" on success
+	Rule        string        // the rule that denied a throttled request; "" otherwise (operator-facing only)
 }
 
 // AccessLogger writes JSON lines.
@@ -93,6 +94,7 @@ func (a *AccessLogger) Log(r *Access) {
 		slog.String("endpoint", r.Endpoint),
 		slog.String("tls", r.TLS),
 		slog.String("error", r.Error),
+		slog.String("rule", r.Rule),
 	)
 }
 

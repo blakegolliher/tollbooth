@@ -17,17 +17,20 @@
 // Modified by Blake Golliher for github.com/blakegolliher/tollbooth, 2026-11-09: the table is
 // reduced to the four codes tollbooth itself originates (it never answers for the backend);
 // TooManyRequests added; Retry-After and a generated x-amz-request-id on every response; the body
-// is built in a pooled buffer with one Write.
+// is built in a pooled buffer with one Write; headers are stored under canonical keys with shared
+// values; x-amz-retry-after carries the exact wait in milliseconds.
 
 package proxy
 
 import (
-	"crypto/rand"
-	"encoding/hex"
 	"encoding/xml"
+	// Request ids are opaque correlation ids, not secrets (D-041); the crypto-randomness rule
+	// does not apply.
+	"math/rand/v2" // nosemgrep
 	"net/http"
 	"strconv"
 	"sync"
+	"time"
 )
 
 // Code is an S3 error code as it appears in the <Code> element of an error response.
@@ -59,18 +62,40 @@ var errorTable = map[Code]s3Error{
 // per denial.
 var errorBodyPool = sync.Pool{New: func() any { b := make([]byte, 0, 512); return &b }}
 
-// newRequestID returns 16 random bytes as 32 hex characters, generated only on the paths where
-// tollbooth answers for itself.
+// newRequestID returns 128 random bits as 32 hex characters, generated only on the paths where
+// tollbooth answers for itself. It is a correlation id, not a secret, so math/rand/v2's
+// goroutine-safe generator serves: no interface call, no syscall, and exactly one allocation (the
+// string) in every build mode, which the denied-path allocation test pins.
 func newRequestID() string {
-	var b [16]byte
-	_, _ = rand.Read(b[:]) // crypto/rand never fails on Linux
-	return hex.EncodeToString(b[:])
+	var out [32]byte
+	hi, lo := rand.Uint64(), rand.Uint64() //nolint:gosec // an opaque correlation id, not a credential
+	for i := 15; i >= 0; i-- {
+		out[i], out[16+i] = hexDigits[hi&15], hexDigits[lo&15]
+		hi, lo = hi>>4, lo>>4
+	}
+	return string(out[:])
 }
 
+const hexDigits = "0123456789abcdef"
+
+// Shared header values and canonical keys for the error response, so writing it costs no
+// canonicalization and no allocation beyond the values that vary.
+var (
+	xmlContentType  = []string{"application/xml"}
+	hdrContentType  = "Content-Type"
+	hdrLength       = "Content-Length"
+	hdrRequestID    = "X-Amz-Request-Id" // the canonical form of x-amz-request-id, as net/http would store it
+	hdrRetryAfter   = "Retry-After"
+	hdrRetryAfterMS = "X-Amz-Retry-After" // milliseconds; the AWS SDKs' exact-wait header (D-043)
+	retryAfterCache = [...][]string{{"1"}, {"2"}, {"3"}, {"4"}, {"5"}, {"6"}, {"7"}, {"8"}, {"9"}, {"10"}}
+)
+
 // writeS3Error answers the client with an S3 error body for code. resource is the raw path, which
-// S3 itself echoes in <Resource>; retryAfter in seconds adds a Retry-After header when > 0. Rule
-// identifiers never appear here. Returns the request id written.
-func writeS3Error(w http.ResponseWriter, code Code, resource string, retryAfter int) string {
+// S3 itself echoes in <Resource>. A positive wait adds Retry-After (whole seconds, rounded up, at
+// least 1, which every SDK can read) and x-amz-retry-after (milliseconds, rounded up, which
+// aws-sdk-go-v2 and the clients built on it honor exactly; D-043). Rule identifiers never appear
+// here. Returns the request id written.
+func writeS3Error(w http.ResponseWriter, code Code, resource string, wait time.Duration) string {
 	e := errorTable[code]
 	rid := newRequestID()
 	bp := errorBodyPool.Get().(*[]byte) //nolint:errcheck // the pool holds only *[]byte
@@ -85,11 +110,18 @@ func writeS3Error(w http.ResponseWriter, code Code, resource string, retryAfter 
 	b = append(b, rid...)
 	b = append(b, `</RequestId><HostId>tollbooth</HostId></Error>`...)
 	h := w.Header()
-	h.Set("Content-Type", "application/xml")
-	h.Set("Content-Length", strconv.Itoa(len(b)))
-	h.Set("x-amz-request-id", rid)
-	if retryAfter > 0 {
-		h.Set("Retry-After", strconv.Itoa(retryAfter))
+	h[hdrContentType] = xmlContentType
+	h[hdrLength] = []string{strconv.Itoa(len(b))}
+	h[hdrRequestID] = []string{rid}
+	if wait > 0 {
+		secs := int((wait + time.Second - 1) / time.Second)
+		if secs <= len(retryAfterCache) {
+			h[hdrRetryAfter] = retryAfterCache[secs-1]
+		} else {
+			h[hdrRetryAfter] = []string{strconv.Itoa(secs)}
+		}
+		ms := int64((wait + time.Millisecond - 1) / time.Millisecond)
+		h[hdrRetryAfterMS] = []string{strconv.FormatInt(ms, 10)}
 	}
 	w.WriteHeader(e.status)
 	_, _ = w.Write(b)

@@ -72,6 +72,14 @@ func touchAll(m *Metrics) {
 	m.BackendErrors.WithLabelValues("127.0.0.1:9000", "dial").Inc()
 	m.BackendRetries.Inc()
 	m.ConfigReload.WithLabelValues("ok").Inc()
+	m.Limiter.Decision.Observe(1e-6)
+	m.Limiter.Keys.Set(1)
+	m.Limiter.Overflow.Inc()
+	m.Limiter.Denied.WithLabelValues("rule-a").Inc()
+	m.Limiter.Errors.Inc()
+	// Reserved for Phase 6 and never observed by product code; touched here only so the
+	// cardinality test sees its label set.
+	m.Limiter.ShapedWait.WithLabelValues("rule-a").Observe(0)
 }
 
 // TestEveryMetricIsInTheCatalog: a registered tollbooth_* metric without a catalog row fails.
@@ -100,9 +108,10 @@ func TestEveryMetricIsInTheCatalog(t *testing.T) {
 			t.Logf("catalog row %s has no registered metric yet", name)
 		}
 	}
-	// Phase 1 registers exactly the eleven request-path, backend, and reload metrics.
-	if len(registered) != 11 {
-		t.Errorf("Phase 1 registers exactly eleven tollbooth_ metrics, got %d: %v", len(registered), registered)
+	// Phases 1 and 2 register exactly the eleven request-path, backend, and reload metrics plus
+	// the six limiter metrics.
+	if len(registered) != 17 {
+		t.Errorf("Phases 1 and 2 register exactly seventeen tollbooth_ metrics, got %d: %v", len(registered), registered)
 	}
 }
 

@@ -46,9 +46,11 @@ listed individually.
 ## Logging fields
 
 `log/slog` JSON. Fields that may appear: `msg`, `level`, `time`, `node_id`, `request_id` (only on
-proxy-originated responses), `operation`, `op_class`, `status`, `rule` (throttle decisions, at
-`debug`, sampled), `endpoint`, `err`, `config_path`, `generation`. `access_key`, `bucket`, `key`,
-and `source_ip` appear only at `debug` (CLAUDE.md), and `TestLogRedaction` asserts it.
+proxy-originated responses), `operation`, `op_class`, `status`, `rule` and `retry_after` (throttle
+decisions, at `debug`, one in `logging.throttle_sample`), `endpoint`, `err`, `config`,
+`generation`, `rules`, `duration_ms` (reload results, at `info`). `bucket` and `source_ip` appear
+only at `debug` (CLAUDE.md); access keys and object keys never appear in logs at any level (D-042):
+`rules top` and showback carry them. `TestThrottleLogSampled` asserts the debug line's fields.
 
 ## Showback columns
 
