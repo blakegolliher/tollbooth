@@ -27,6 +27,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/collectors"
 
+	"github.com/blakegolliher/tollbooth/internal/limiter"
 	"github.com/blakegolliher/tollbooth/internal/s3id"
 )
 
@@ -118,6 +119,10 @@ type Metrics struct {
 	BackendErrors  *prometheus.CounterVec // tollbooth_backend_errors_total{endpoint,kind}
 	BackendRetries prometheus.Counter     // tollbooth_backend_retries_total
 	ConfigReload   *prometheus.CounterVec // tollbooth_config_reload_total{result}
+
+	// Limiter holds the six limiter rows of the catalog; internal/limiter observes them and never
+	// registers anything itself (Phase 2).
+	Limiter limiter.Metrics
 }
 
 // Side of a connection gauge.
@@ -140,8 +145,8 @@ func logBuckets(lo, hi float64, n int) []float64 {
 	return out
 }
 
-// NewMetrics registers the Phase 1 catalog metrics plus the Go and process collectors on a
-// private registry and resolves every per-request handle.
+// NewMetrics registers the request-path, backend, reload, and limiter catalog metrics plus the Go
+// and process collectors on a private registry and resolves every per-request handle.
 func NewMetrics() *Metrics {
 	reg := prometheus.NewRegistry()
 	m := &Metrics{
@@ -183,8 +188,31 @@ func NewMetrics() *Metrics {
 			Name: "tollbooth_config_reload_total", Help: "Reload attempts via SIGHUP or POST /admin/reload, by result (ok, error).",
 		}, []string{"result"}),
 	}
+	m.Limiter = limiter.Metrics{
+		Decision: prometheus.NewHistogram(prometheus.HistogramOpts{
+			Name: "tollbooth_limiter_decision_seconds", Help: "Time for the whole rule pass (match plus GCRA for every matching rule).",
+			Buckets: logBuckets(100e-9, 1e-3, 14),
+		}),
+		Keys: prometheus.NewGauge(prometheus.GaugeOpts{
+			Name: "tollbooth_limiter_keys", Help: "Live GCRA keys across all rules.",
+		}),
+		Overflow: prometheus.NewCounter(prometheus.CounterOpts{
+			Name: "tollbooth_limiter_keys_overflow_total", Help: "Requests allowed without state because limiter.max_keys was reached (fail open).",
+		}),
+		Denied: prometheus.NewCounterVec(prometheus.CounterOpts{
+			Name: "tollbooth_limiter_denied_total", Help: "Requests denied, by the rule that denied them.",
+		}, []string{"rule"}),
+		ShapedWait: prometheus.NewHistogramVec(prometheus.HistogramOpts{
+			Name: "tollbooth_limiter_shaped_wait_seconds", Help: "Reserved for the Phase 6 hold-and-forward mode; registered, never observed in v1.",
+			Buckets: logBuckets(1e-3, 60, 16),
+		}, []string{"rule"}),
+		Errors: prometheus.NewCounter(prometheus.CounterOpts{
+			Name: "tollbooth_limiter_errors_total", Help: "Panics or internal errors inside the limiter, each failed open.",
+		}),
+	}
 	reg.MustRegister(m.requestsTotal, m.requestDuration, m.proxyOverhead, m.backendTTFB, m.bytesTotal, m.connectionsOpen,
 		m.Inflight, m.BackendUp, m.BackendErrors, m.BackendRetries, m.ConfigReload,
+		m.Limiter.Decision.(prometheus.Collector), m.Limiter.Keys, m.Limiter.Overflow, m.Limiter.Denied, m.Limiter.ShapedWait, m.Limiter.Errors,
 		collectors.NewGoCollector(), collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))
 
 	// Resolve every per-request handle once. The cardinality is fixed by construction:
