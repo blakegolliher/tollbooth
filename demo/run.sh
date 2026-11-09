@@ -15,6 +15,7 @@
 # Knobs: PROXY_ADDR (127.0.0.1:28000), ADMIN_ADDR (127.0.0.1:29900), BACKEND (empty: the null backend on
 # 127.0.0.1:29000, control 127.0.0.1:29001; or host:port of a real S3 endpoint, e.g. a VAST VIP),
 # BACKEND_SCHEME (http; https for a cluster), BACKEND_INSECURE (false; true for a lab certificate),
+# HEALTH_INTERVAL and HEALTH_TIMEOUT (1s/1s for the null backend, 5s/5s for a real BACKEND),
 # DEMO_DIR (demo/state), LOAD_BUCKET (an existing bucket for `load` against a real backend).
 set -euo pipefail
 HERE=$(cd "$(dirname "$0")" && pwd)
@@ -27,6 +28,9 @@ NULL_CTL=${NULL_CTL:-127.0.0.1:29001}
 BACKEND=${BACKEND:-}
 BACKEND_SCHEME=${BACKEND_SCHEME:-http}
 BACKEND_INSECURE=${BACKEND_INSECURE:-false}
+# The active health check is restart-only. The null backend answers HEAD / in microseconds, so 1 s
+# makes the backend-down step visible at once; a real cluster can take about 2 s, so 5 s by default.
+if [ -n "$BACKEND" ]; then HEALTH_INTERVAL=${HEALTH_INTERVAL:-5s}; HEALTH_TIMEOUT=${HEALTH_TIMEOUT:-5s}; else HEALTH_INTERVAL=${HEALTH_INTERVAL:-1s}; HEALTH_TIMEOUT=${HEALTH_TIMEOUT:-1s}; fi
 LOAD_BUCKET=${LOAD_BUCKET:-}
 export GOTOOLCHAIN=${GOTOOLCHAIN:-auto}
 cd "$ROOT"
@@ -55,7 +59,8 @@ start() {
     fi
   fi
   sed -e "s#@PROXY_ADDR@#$PROXY_ADDR#" -e "s#@ADMIN_ADDR@#$ADMIN_ADDR#" -e "s#@BACKEND_SCHEME@#$BACKEND_SCHEME#" \
-      -e "s#@BACKEND@#$backend#" -e "s#@BACKEND_INSECURE@#$BACKEND_INSECURE#" -e "s#@SHOWBACK_DIR@#$DEMO_DIR/showback#" "$HERE/tollbooth.demo.yaml" > "$DEMO_DIR/tollbooth.yaml"
+      -e "s#@BACKEND@#$backend#" -e "s#@BACKEND_INSECURE@#$BACKEND_INSECURE#" -e "s#@HEALTH_INTERVAL@#$HEALTH_INTERVAL#" -e "s#@HEALTH_TIMEOUT@#$HEALTH_TIMEOUT#" \
+      -e "s#@SHOWBACK_DIR@#$DEMO_DIR/showback#" "$HERE/tollbooth.demo.yaml" > "$DEMO_DIR/tollbooth.yaml"
   bin/tollbooth check-config "$DEMO_DIR/tollbooth.yaml"
   bin/tollbooth serve --config "$DEMO_DIR/tollbooth.yaml" > "$DEMO_DIR/tollbooth.log" 2>&1 &
   echo $! > "$(pidfile tollbooth)"

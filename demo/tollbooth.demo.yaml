@@ -11,7 +11,7 @@ backend:
   scheme: @BACKEND_SCHEME@
   endpoints: [@BACKEND@]
   tls: {insecure_skip_verify: @BACKEND_INSECURE@}   # lab certificates; false in production
-  health_check: {interval: 1s, timeout: 1s}
+  health_check: {interval: @HEALTH_INTERVAL@, timeout: @HEALTH_TIMEOUT@}   # restart-only; a cluster can take 2 s to answer HEAD /
 
 rate_limits:
   default_on_limit: slowdown
