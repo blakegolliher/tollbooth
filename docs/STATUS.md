@@ -1,8 +1,10 @@
 # STATUS
 
-Current phase: **4 (Operator surface), in progress** on `phase-4` (started 2026-11-09 on Blake's go
-after Gate 3 passed; `phase-3` tagged, #19 brings it to `main`). Open: #20 (`p4/admin`: status and
-backends routes, the remaining verbs, doctor, goldens, parity test) and #21 (`p4/tui`: the TUI).
+Current phase: **4 (Operator surface), gate report written** (`docs/reports/gate-4.md`), awaiting
+Fable's review and Blake's decision. Open, stacked on `phase-4`: #20 (`p4/admin`: status and
+backends routes, the remaining verbs, doctor, goldens, parity test) and #21 (`p4/tui`: the TUI,
+runbook tasks, the report). Started 2026-11-09 on Blake's go after Gate 3 passed; `phase-3`
+tagged, #19 brings it to `main`. Merge #20 first, then #21.
 
 ## Phases
 
@@ -12,9 +14,27 @@ backends routes, the remaining verbs, doctor, goldens, parity test) and #21 (`p4
 | 1 Passthrough | transparent proxy lifted from shunt + TLS, PROXY protocol, trusted XFF; identity; classifier; backend pool; admin health/ready/metrics; null and recording backends | byte-equivalence green; compat matrix 100% on Garage and versitygw; fuzz 1 CPU-hour clean; `-race` clean | **report written 2026-11-09**: byte-equivalence 0 diffs on Garage and versitygw; compat matrix 0 failures; fuzz 1 CPU-hour + 20 min clean; race clean; coverage 92.1% |
 | 2 Rate limiting | rules, matchers, GCRA, single pass, both modes, `Expect: 100-continue` measured, hot reload, limiter metrics, `/admin/limits`, `rules *` verbs | limiter suite green (fake clock); 10 µs p99; reload under load zero failures; SDKs complete work under 1 req/s | **report written 2026-11-09**: limiter suite 25 tests green; p99 4.7 µs at 1,000,000 keys; 20 reloads under load, slowest 0.60 ms, 0 failed; SDK completion by retry mode (D-044) |
 | 3 Showback | aggregator, snapshot and seal, NDJSON, `usage` verbs, `/admin/usage`, dimensions and cap, restart, multi-node sum | reconciliation exact; rollover tests; kill between snapshots loses ≤ `flush_interval`; verify detects a removed hour | **report written 2026-11-09**: reconciliation exact; 19 clock-injected tests green; Record 198 ns, 0 allocs; 257 B per tuple |
-| 4 Operator surface | remaining verbs, shared admin client, `/admin/status`, `/admin/limits/test`, `/admin/backends`, `tollbooth tui` | parity test; CLI goldens ×3 formats; `teatest` goldens; runbook tasks from the TUI and CLI alone | in progress |
+| 4 Operator surface | remaining verbs, shared admin client, `/admin/status`, `/admin/limits/test`, `/admin/backends`, `tollbooth tui` | parity test; CLI goldens ×3 formats; `teatest` goldens; runbook tasks from the TUI and CLI alone | **report written 2026-11-09**: parity test green; 38 CLI goldens ×3 formats; 30 TUI frames at 80×24 and 120×40; two runbook tasks |
 | 5 Hardening and v0.1.0 | bench runs with profiles, tuning, 24 h soak, caps, `OPERATIONS.md`, systemd, container, `CHANGELOG.md`, tag | all performance targets met or ADR'd; soak flat | not started |
 | 6 Backlog | shaping, cluster limits, bandwidth, Parquet, OpenTelemetry, connection caps, rule editing, drain, web UI | each starts with an ADR | not scheduled |
+
+## Phase 4 record
+
+Shipped: everything in the Phase 4 row: `GET /admin/status` (D-050) and `GET /admin/backends`;
+`status`, `config show|reload|diff`, `backends list`, `doctor` (D-051); `tollbooth tui` with the
+five screens (D-052, D-053); `TestOperatorSurfaceParity`; CLI goldens for every verb in three
+formats; TUI golden frames at both sizes including the unreachable state; the two runbook tasks in
+`docs/OPERATIONS.md`. Cut: nothing (the full runbook is Phase 5 as planned).
+
+Findings: a context-driven stop could take showback's final snapshot before the last request's
+completion, because the background context derived from serve's context; fixed (D-054), found by
+the race suite under load. boto3 in adaptive retry mode landed 199 of 200 objects in one of three
+CI throttle runs; the runbook says "completed every run measured but one".
+
+Numbers (dev box): `doctor` 17 ms for 10 checks; forwarded path still 7 allocations with the
+status counters and per-endpoint atomics on; the data path is otherwise untouched.
+
+Gate result: pending.
 
 ## Phase 3 record
 

@@ -65,7 +65,7 @@ concurrency and whose burst equals it (`docs/THROTTLE.md`, test plan category 7)
 | Client | Default retry mode | Adaptive retry mode |
 | --- | --- | --- |
 | aws cli v2 | **fails**: 80 of 200 objects landed, exit 1 | completes |
-| boto3 | **fails**: 190 of 200 landed | completes |
+| boto3 | **fails**: 190 of 200 landed | completes (199 of 200 in one of three CI runs) |
 | aws-sdk-go-v2 | completes under 1 req/s sequentially most runs; a sync at 2× the rate loses objects (17 of 200); with `AWS_NEW_RETRIES_2026=true` it honors `x-amz-retry-after` and completes | completes |
 | s5cmd, rclone, s3cmd | complete | — |
 
@@ -79,7 +79,9 @@ standard retry mode gives up after three to five attempts with random backoff an
    the steady state.
 2. Tell clients that will be throttled to use adaptive retry mode (`AWS_RETRY_MODE=adaptive`, or
    `retry_mode = adaptive` in `~/.aws/config`; aws cli and every AWS SDK support it) or to raise
-   `AWS_MAX_ATTEMPTS`. Adaptive mode paces itself to the rule and completed every run measured.
+   `AWS_MAX_ATTEMPTS`. Adaptive mode paces itself to the rule and completed every run measured but
+   one (boto3, 199 of 200 objects); it is the right default for clients that will be throttled, not
+   a guarantee.
 3. Wait for hold-and-forward (Phase 6), which queues a denied request up to a bound instead of
    answering 503.
 

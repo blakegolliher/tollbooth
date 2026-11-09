@@ -6,12 +6,12 @@ Each client tool, with its default retry settings (and, for aws cli and boto3, a
 
 | Backend | Tool | Retry mode | Objects | Concurrency | Rule rate / burst | Landed | Completed | Denied attempts | Seconds (floor) | Last line |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| garage | awscli | default | 200 | 20 | 10 / 20 | 80 | no (exit 1) | 273 | 7.2 (18.0) | Completed 12.4 MiB/12.5 MiB (810.9 KiB/s) with 1 file(s) remaining |
-| garage | awscli | adaptive | 200 | 20 | 10 / 20 | 200 | yes | 19 | 20.1 (18.0) | Completed 12.4 MiB/12.5 MiB (658.9 KiB/s) with 1 file(s) remaining |
-| garage | boto3 | default | 200 | 20 | 10 / 20 | 190 | no (exit 1) | 320 | 22.1 (18.0) | objects 200 ok 190 failed 10 seconds 21.7 |
-| garage | boto3 | adaptive | 200 | 20 | 10 / 20 | 200 | yes | 26 | 19.0 (18.0) | objects 200 ok 200 failed 0 seconds 18.6 |
-| garage | s5cmd | default | 200 | 20 | 10 / 20 | 200 | yes | 157 | 19.4 (18.0) | cp /tmp/tmp.yk8dlKH1Rh/sync/00154.bin s3://thr-s5cmd/sync/00154.bin |
-| garage | rclone | default | 200 | 20 | 10 / 20 | 200 | yes | 356 | 54.5 (18.0) | 2026/11/09 14:01:48 NOTICE: Config file "/home/runner/.config/rclone/rclone.conf" not found - using defaults |
-| garage | s3cmd | default | 40 | 1 | 1 / 1 | 40 | yes | 40 | 120.7 (39.0) | Done. Uploaded 2621440 bytes in 120.6 seconds, 21.23 KB/s. |
+| garage | awscli | default | 200 | 20 | 10 / 20 | 78 | no (exit 1) | 274 | 7.0 (18.0) | Completed 12.4 MiB/12.5 MiB (832.4 KiB/s) with 1 file(s) remaining |
+| garage | awscli | adaptive | 200 | 20 | 10 / 20 | 200 | yes | 26 | 20.1 (18.0) | Completed 12.4 MiB/12.5 MiB (660.5 KiB/s) with 1 file(s) remaining |
+| garage | boto3 | default | 200 | 20 | 10 / 20 | 191 | no (exit 1) | 310 | 22.3 (18.0) | objects 200 ok 191 failed 9 seconds 21.9 |
+| garage | boto3 | adaptive | 200 | 20 | 10 / 20 | 199 | no (exit 1) | 25 | 19.6 (18.0) | objects 200 ok 199 failed 1 seconds 19.2 |
+| garage | s5cmd | default | 200 | 20 | 10 / 20 | 200 | yes | 164 | 22.3 (18.0) | cp /tmp/tmp.pIHEdLBHaJ/sync/00113.bin s3://thr-s5cmd/sync/00113.bin |
+| garage | rclone | default | 200 | 20 | 10 / 20 | 200 | yes | 417 | 55.5 (18.0) | 2026/11/09 17:02:00 NOTICE: Config file "/home/runner/.config/rclone/rclone.conf" not found - using defaults |
+| garage | s3cmd | default | 40 | 1 | 1 / 1 | 40 | yes | 40 | 120.7 (39.0) | Done. Uploaded 2621440 bytes in 120.6 seconds, 21.24 KB/s. |
 
-7 rows, 5 completed.
+7 rows, 4 completed.
