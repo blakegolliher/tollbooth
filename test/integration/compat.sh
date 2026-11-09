@@ -83,8 +83,7 @@ cells = {}  # (tool, op) -> {backend: (status, detail)}
 for b in backends:
     for f in glob.glob(os.path.join(run, f"results-*-{b}.tsv")):
         for line in open(f):
-            parts = line.rstrip("
-").split("	")
+            parts = line.rstrip("\n").split("\t")
             if len(parts) < 3:
                 continue
             tool, op, status = parts[0], parts[1], parts[2]
@@ -117,8 +116,7 @@ for tool in tools:
             row.append("PASS" if st == "PASS" else (f"{st}: {detail}" if st in ("FAIL", "GAP") else st))
         lines.append(f"| {tool} | {op} | " + " | ".join(row) + " |")
 lines += ["", f"{total} cells, {fails} failures, {gaps} backend gaps.", ""]
-open(out, "w").write("
-".join(lines))
+open(out, "w").write("\n".join(lines))
 print(f"compat: wrote {out} ({total} cells, {fails} failures)")
 PY
 exit $rc

@@ -28,7 +28,7 @@ CI artifact named in section 7.
 ## 2. Decisions and assumptions
 
 No ADR was written this phase; nothing in "Decisions already made" was challenged. `docs/DECISIONS.md`
-gained D-026 through D-034:
+gained D-026 through D-035:
 
 - D-026 raw query keys matched byte-wise (percent-encoded key names not recognized, as in S3).
 - D-027 `docs/OPERATIONS_TABLE.md` generated; Phase 0 check moved to `docs/reports/`.
@@ -39,6 +39,7 @@ gained D-026 through D-034:
 - D-032 record mode diffs requests as well as responses, in-process, on every PR.
 - D-033 the test tool signs (SDK signer for SigV4 forms; own framings for chunked modes and SigV2); the proxy never does.
 - D-034 known gap: a backend that answers and closes before reading the request body can make Go's transport surface the write error; 503 results; `Expect: 100-continue` avoids it. Pinned by `TestBackendAnswersBeforeReadingBody`.
+- D-035 a client's explicit `Content-Length: 0` on a bodiless request is forwarded (aws cli v2 signs it; Go's transport would drop it). Found by the Garage client matrix; pinned by `TestExplicitZeroContentLengthIsPreserved`.
 
 Gate 0 corrections carried in: flush every chunk (D-006, `TestTrickleResponseReachesClient`),
 copy-buffer budget 4,096 × 128 KiB (D-024), hour read inside `Record` (D-025, Phase 3 code),
@@ -67,7 +68,7 @@ Per test-plan category:
 | 2 | Identity unit tests | pass: 24 style/encoding cases, 13 access-key cases, 12 source-IP/XFF cases, flags and list prefix, PROXY protocol v1 and v2 end to end |
 | 3 | Limiter unit tests | skipped: Phase 2 |
 | 4 | Fuzzing | pass: 4 targets, 1 CPU-hour + 20 CPU-minutes on the dev box; 60 s per target in CI; corpus committed (`internal/s3id/testdata/fuzz/FuzzParse`, 3 entries) |
-| 5 | Byte-equivalence | record mode 285 cases, 0 diffs; Garage and versitygw: TODO_S3DIFF_NUMBERS |
+| 5 | Byte-equivalence | record mode 285 cases, 0 diffs; Garage 293 cases, 0 diffs, 28 backend gaps (SigV2 header and presigned, and the five signed-chunk-trailer modes, refused identically direct and via); versitygw 293 cases, 0 diffs, 8 backend gaps (SigV2 header and presigned) |
 | 6 | Client compatibility matrix | TODO_CLIENTS_NUMBERS; `docs/COMPAT.md` |
 | 7 | Throttling behavior | skipped: Phase 2 |
 | 8 | Showback correctness | skipped: Phase 3 |
@@ -126,7 +127,7 @@ CI runs: TODO_CI_LINKS
 
 ## Guardrail passes
 
-- **G1 Simplicity**: exported identifiers added this phase and their second callers: `s3id.Parse`/`RequestIdentity` (proxy, nullbackend, tests), `s3id.RawTarget` (proxy, tests), `s3id.NewDomains` (config, nullbackend), `s3id.ParseOp`/`ParseClass` (config), `s3id.Ops`/`NumOps`/`NumClasses` (admin), `config.Load`/`Parse` (cmd, tests, s3diff), `config.Config` methods `Identity`/`AdminToken`/`Redacted`/`Warnings`/`ReloadCompatible` (cmd), `admin.NewMetrics`/`Metrics` methods (proxy, cmd), `admin.Server`/`Routes` (cmd, Phase 4 parity test), `proxy.New`/`NewServer`/`NewPool`/`Listen`/`CertStore`/`NewAccessLogger` (cmd, s3diff record mode), `nullbackend.New`/`Server` (proxy tests, s3diff). `config.ValidBucketName` has one caller (validation) and is exported for the Phase 4 `rules test` verb; flagged. No interfaces added; `Pool.Transport` is the stdlib `http.RoundTripper` so tests can substitute a fake. Dependencies added: `go.yaml.in/yaml/v4`, `prometheus/client_golang`, `pires/go-proxyproto` (binary), `aws-sdk-go-v2` + `smithy-go` (test only); each has a `docs/deps.md` line. Body buffering: none (`grep -rn 'io.ReadAll\|bytes.Buffer' internal/` hits only test files and the error-body builder's pooled slice). Feature flags: none; kill switches: two, default off. LOC: TODO_LOC.
+- **G1 Simplicity**: exported identifiers added this phase and their second callers: `s3id.Parse`/`RequestIdentity` (proxy, nullbackend, tests), `s3id.RawTarget` (proxy, tests), `s3id.NewDomains` (config, nullbackend), `s3id.ParseOp`/`ParseClass` (config), `s3id.Ops`/`NumOps`/`NumClasses` (admin), `config.Load`/`Parse` (cmd, tests, s3diff), `config.Config` methods `Identity`/`AdminToken`/`Redacted`/`Warnings`/`ReloadCompatible` (cmd), `admin.NewMetrics`/`Metrics` methods (proxy, cmd), `admin.Server`/`Routes` (cmd, Phase 4 parity test), `proxy.New`/`NewServer`/`NewPool`/`Listen`/`CertStore`/`NewAccessLogger` (cmd, s3diff record mode), `nullbackend.New`/`Server` (proxy tests, s3diff). `config.ValidBucketName` has one caller (validation) and is exported for the Phase 4 `rules test` verb; flagged. No interfaces added; `Pool.Transport` is the stdlib `http.RoundTripper` so tests can substitute a fake. Dependencies added: `go.yaml.in/yaml/v4`, `prometheus/client_golang`, `pires/go-proxyproto` (binary), `aws-sdk-go-v2` + `smithy-go` (test only); each has a `docs/deps.md` line. Body buffering: none (`grep -rn 'io.ReadAll\|bytes.Buffer' internal/` hits only test files and the error-body builder's pooled slice). Feature flags: none; kill switches: two, default off. LOC over the phase (main..p1/compat): 94 files, 10,653 insertions, 394 deletions; product code 4,054 lines, tests 3,315 lines (ratio 0.82, the first phase so no previous ratio), test and bench tooling 1,758 lines.
 - **G2 Validation**: section 3. No benchmark baseline exists yet to compare against (Gate 2).
 - **G3 Telemetry and docs**: every Phase 1 code path is observed: requests, durations, overhead, TTFB, bytes, in-flight, connections, backend up/errors/retries, config reloads; `TestEveryMetricIsInTheCatalog` and `TestLabelSetsMatchTheCatalog` pass. `docs/CONFIG.md` covers every key (`admin.token_file` added at Gate 0). `docs/STATUS.md` and `docs/CONTEXT.md` updated. Contradictions with the specification: none implemented differently; D-034 is a gap the specification's failure table does not list and should (section 5).
 - **G4 Dependency and license audit**: `govulncheck` none; `go-licenses check` clean; `THIRD_PARTY_NOTICES.md` regenerated (12 linked modules, all Apache-2.0 or BSD-3); every lifted file carries the shunt header and a `Modified by` line and is in `docs/deps.md` (9 rows lifted, 1 planned for Phase 2: `test/bench/s3bench`); no code from MinIO, Garage, or warp; YAML is `go.yaml.in/yaml/v4` (`go version -m bin/tollbooth` shows no `gopkg.in`); the AWS SDK is not linked into the binary (`make build` checks).

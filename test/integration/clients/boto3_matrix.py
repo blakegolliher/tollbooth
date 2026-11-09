@@ -39,6 +39,7 @@ s3 = boto3.client(
     endpoint_url=ENDPOINT,
     region_name=REGION,
     config=Config(
+        signature_version="s3v4",  # botocore may presign with the legacy S3 signature for a custom endpoint otherwise
         s3={"addressing_style": ADDRESSING},
         retries={"max_attempts": 1},
         request_checksum_calculation="when_required",
