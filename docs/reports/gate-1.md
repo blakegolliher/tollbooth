@@ -57,7 +57,9 @@ go test -race ./internal/proxy         10.5 s (was 307 s before the in-flight ca
 go run ./test/s3diff -record           run/s3diff-record.log   285 cases, 0 diffs, 0 gaps (requests and responses, both styles, every signing mode)
 fuzz (2 workers, 10 min each)          run/fuzz-1h/fuzz.log    FuzzParse, FuzzScanQuery (s3id), FuzzParse (config): PASS; 1 CPU-hour total
 fuzz FuzzClassify 10 min               run/fuzz-1h/fuzz-classify.log  PASS (a further 20 CPU-minutes)
-make compat (CI integration job)       CI artifact compat-logs  TODO_COMPAT_NUMBERS
+make compat (CI integration job)       CI artifact compat-logs  Garage: s3diff 293 cases, 0 diffs, 28 backend gaps; clients 60 cells, 0 failures, 2 backend gaps
+                                                                versitygw: s3diff 293 cases, 0 diffs, 8 backend gaps; clients 60 cells, 0 failures, 0 backend gaps
+                                                                docs/COMPAT.md: 122 cells, 0 failures, 2 backend gaps (committed from the artifact)
 ```
 
 Per test-plan category:
@@ -69,7 +71,7 @@ Per test-plan category:
 | 3 | Limiter unit tests | skipped: Phase 2 |
 | 4 | Fuzzing | pass: 4 targets, 1 CPU-hour + 20 CPU-minutes on the dev box; 60 s per target in CI; corpus committed (`internal/s3id/testdata/fuzz/FuzzParse`, 3 entries) |
 | 5 | Byte-equivalence | record mode 285 cases, 0 diffs; Garage 293 cases, 0 diffs, 28 backend gaps (SigV2 header and presigned, and the five signed-chunk-trailer modes, refused identically direct and via); versitygw 293 cases, 0 diffs, 8 backend gaps (SigV2 header and presigned) |
-| 6 | Client compatibility matrix | TODO_CLIENTS_NUMBERS; `docs/COMPAT.md` |
+| 6 | Client compatibility matrix | pass: aws cli v2.39.3, boto3 1.43.126, aws-sdk-go-v2 (s3diff), s5cmd 2.3.0, rclone 1.76.0, s3cmd 2.4.0, elbencho 3.3-3 against Garage 2.5.0 and versitygw 1.11.0: 122 cells, **0 failures**, 2 backend gaps (Garage answers `GetObjectAttributes` 500 direct and via). Each operation ran direct and via; `docs/COMPAT.md` is the generated matrix |
 | 7 | Throttling behavior | skipped: Phase 2 |
 | 8 | Showback correctness | skipped: Phase 3 |
 | 9 | Chaos and resilience | pass for the Phase 1 rows: all backends down, one backend down (retry before bytes), backend reset mid-body (Content-Length and chunked), stalled backend (idle timeout), slow headers not idle, slowloris, 1 MiB headers, in-flight cap under concurrency, invalid reload, restart-only reload, SIGTERM drain, handler panic fails open, early backend answer (D-034) |
@@ -101,9 +103,10 @@ Not a Phase 1 gate. Numbers recorded for the Gate 2 baseline, dev box (2 vCPUs, 
 | D-034: a backend that answers and closes before reading the request body can turn into a 503 for a client that does not send `Expect: 100-continue`. | A custom transport that prefers an early response over a write error, if the field hits it; every SDK uses `Expect` above its threshold. | 5 or 6 |
 | GitHub's release CDN returned 504s in three CI runs; the backends and tools are now cached across runs and versitygw/s5cmd fall back to `go install` of the same tag. | Cache warm after one green run. | — |
 | Header order is not compared in record mode (net/http parses both sides into maps); S3 signatures do not depend on it. | None needed; noted in D-032. | — |
-| SigV2 and signed-chunk-trailer modes are refused by Garage; SigV2 by versitygw. They show as GAP cells, relayed byte-identically. | None; the VAST lab run (Phase 5) exercises them against a backend that supports them. | 5 |
+| Garage 2.5.0 refuses SigV2 ("Unsupported authorization method") and the five signed-chunk-trailer modes ("Invalid payload signature"; versitygw accepts the same bytes, so the encoding is right); versitygw refuses SigV2. 28 and 8 GAP cells, each relayed byte-identically. | None; the VAST lab run (Phase 5) exercises them against a backend that supports them. | 5 |
 | `GetObjectAttributes` returns 500 from Garage 2.5.0 direct and via. | GAP cell; Garage limitation. | — |
-| TODO_GAPS_FROM_CI |  |  |
+| The tools cache missed on every run until the first green one (the key is the scripts' hash and the save step runs only on success); it is saved now. | None. | — |
+| boto3 presigned with the legacy S3 signature for a custom endpoint until `signature_version="s3v4"` was set; versitygw refused it both ways. Harness, not proxy; fixed. | None. | — |
 
 ## 6. Questions
 
@@ -123,7 +126,7 @@ make compat                                # Garage and versitygw: s3diff + clie
 go test -run '^$' -bench . -benchmem ./internal/...
 ```
 
-CI runs: TODO_CI_LINKS
+CI runs (repo blakegolliher/tollbooth): #2 run 42562546260, #4 run 42563822018, #5 run 42565687087, #6 run 42566167139 (unit, integration green; audit red on a notices sort locale fixed in #7), #7/#8 final run 42576399162 (all five jobs green; artifact `compat-logs` holds every log under `run/compat/` and `docs/COMPAT.md`). Fuzz and race logs: `run/fuzz-1h/`, `run/race-lint.log` on the dev box (sts-workshop).
 
 ## Guardrail passes
 
