@@ -150,7 +150,7 @@ func doctor(cfgPath string, timeout time.Duration) []check {
 		}
 		_ = conn.Close()
 		dial := time.Since(t0)
-		client := &http.Client{Timeout: timeout, Transport: &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: cfg.Backend.TLS.InsecureSkipVerify}}} //nolint:gosec // the operator's own setting
+		client := &http.Client{Timeout: timeout, Transport: &http.Transport{TLSClientConfig: &tls.Config{MinVersion: tls.VersionTLS12, InsecureSkipVerify: cfg.Backend.TLS.InsecureSkipVerify}}} //nolint:gosec // the operator's own setting
 		req, _ := http.NewRequestWithContext(context.Background(), http.MethodHead, cfg.Backend.Scheme+"://"+ep+"/", http.NoBody)
 		t1 := time.Now()
 		resp, err := client.Do(req)
