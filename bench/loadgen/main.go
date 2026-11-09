@@ -64,6 +64,7 @@ type options struct {
 	concurrency, keys, buckets, prefixes, objects, size, runs        int
 	duration, warmup                                                 time.Duration
 	adaptive                                                         bool
+	rate                                                             float64 // requests per second across all workers; 0 = as fast as possible
 }
 
 func main() {
@@ -93,6 +94,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 	fs.DurationVar(&o.duration, "duration", 30*time.Second, "length of one measured run")
 	fs.DurationVar(&o.warmup, "warmup", 30*time.Second, "unmeasured warm-up before each run")
 	fs.BoolVar(&o.adaptive, "adaptive", false, "sdk mode: use the SDK's adaptive retry mode instead of standard")
+	fs.Float64Var(&o.rate, "rate", 0, "pace the whole run to this many requests per second (0: as fast as possible); the soak uses it")
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
@@ -379,7 +381,19 @@ func (w *workload) measure(d time.Duration, concurrency int) Run {
 			rng := rand.New(rand.NewPCG(uint64(i), uint64(start.UnixNano()))) //nolint:gosec // workload shaping, not security
 			client := &http.Client{Transport: w.transports[i%len(w.transports)]}
 			body := bytes.Repeat([]byte("x"), w.o.size)
+			// Pacing: each worker owns rate/concurrency requests per second, spaced evenly.
+			var interval time.Duration
+			if w.o.rate > 0 {
+				interval = time.Duration(float64(time.Second) * float64(concurrency) / w.o.rate)
+			}
+			next := time.Now()
 			for time.Now().Before(deadline) {
+				if interval > 0 {
+					if d := time.Until(next); d > 0 {
+						time.Sleep(d)
+					}
+					next = next.Add(interval)
+				}
 				t0 := time.Now()
 				var status int
 				var n int64

@@ -1,10 +1,8 @@
 # STATUS
 
-Current phase: **4 (Operator surface), gate report written** (`docs/reports/gate-4.md`), awaiting
-Fable's review and Blake's decision. Open, stacked on `phase-4`: #20 (`p4/admin`: status and
-backends routes, the remaining verbs, doctor, goldens, parity test) and #21 (`p4/tui`: the TUI,
-runbook tasks, the report). Started 2026-11-09 on Blake's go after Gate 3 passed; `phase-3`
-tagged, #19 brings it to `main`. Merge #20 first, then #21.
+Current phase: **5 (Hardening and v0.1.0), in progress** on `phase-5` (started 2026-11-09 on
+Blake's go after Gate 4 passed; `phase-4` tagged and in `main`). Branch `p5/release`: systemd unit,
+container image, `make release`, `CHANGELOG.md`, the soak harness, the runbook, ADR-0005.
 
 ## Phases
 
@@ -15,8 +13,36 @@ tagged, #19 brings it to `main`. Merge #20 first, then #21.
 | 2 Rate limiting | rules, matchers, GCRA, single pass, both modes, `Expect: 100-continue` measured, hot reload, limiter metrics, `/admin/limits`, `rules *` verbs | limiter suite green (fake clock); 10 µs p99; reload under load zero failures; SDKs complete work under 1 req/s | **report written 2026-11-09**: limiter suite 25 tests green; p99 4.7 µs at 1,000,000 keys; 20 reloads under load, slowest 0.60 ms, 0 failed; SDK completion by retry mode (D-044) |
 | 3 Showback | aggregator, snapshot and seal, NDJSON, `usage` verbs, `/admin/usage`, dimensions and cap, restart, multi-node sum | reconciliation exact; rollover tests; kill between snapshots loses ≤ `flush_interval`; verify detects a removed hour | **report written 2026-11-09**: reconciliation exact; 19 clock-injected tests green; Record 198 ns, 0 allocs; 257 B per tuple |
 | 4 Operator surface | remaining verbs, shared admin client, `/admin/status`, `/admin/limits/test`, `/admin/backends`, `tollbooth tui` | parity test; CLI goldens ×3 formats; `teatest` goldens; runbook tasks from the TUI and CLI alone | **report written 2026-11-09**: parity test green; 38 CLI goldens ×3 formats; 30 TUI frames at 80×24 and 120×40; two runbook tasks |
-| 5 Hardening and v0.1.0 | bench runs with profiles, tuning, 24 h soak, caps, `OPERATIONS.md`, systemd, container, `CHANGELOG.md`, tag | all performance targets met or ADR'd; soak flat | not started |
+| 5 Hardening and v0.1.0 | bench runs with profiles, tuning, 24 h soak, caps, `OPERATIONS.md`, systemd, container, `CHANGELOG.md`, tag | all performance targets met or ADR'd; soak flat | in progress |
 | 6 Backlog | shaping, cluster limits, bandwidth, Parquet, OpenTelemetry, connection caps, rule editing, drain, web UI | each starts with an ADR | not scheduled |
+
+## Phase 5 record (in progress)
+
+Shipped so far (PR #24, `p5/release` → `phase-5`): `deploy/tollbooth.service`, `deploy/Dockerfile`
+and `.dockerignore`, `make release` and `make image`, the CI `release` job (artifacts, unit verify,
+image), `CHANGELOG.md`, the null backend's fault-injection listener, `loadgen -rate`, the soak
+harness (`make soak`, D-056), `bench/crosscheck.sh` (elbencho, ADR-0005), the full
+`docs/OPERATIONS.md`, ADR-0005, the dev-box bench run with profiles
+(`bench/results/2026-11-09T181541Z/`), `docs/reports/gate-5.md` (draft; soak rows pending).
+
+Running: the 24 h soak, started 2026-11-09T18:40Z at 804 req/s (half of the calibrated 1,608 req/s
+peak at concurrency 16), chaos every 10 min, under `bench/results/soak-2026-11-09T183931Z/`; it
+ends 2026-11-10T18:40Z and its report fills in gate-5.md §3 row 9 and §4's memory row.
+
+Pending Blake: ADR-0005 (what v0.1.0 claims; stay on Go; elbencho as cross-check) and the tag.
+Cut: nothing; the reference-node measurements are deferred, not cut (ADR-0005).
+
+Findings: the first soak smoke was voided by a stale null backend from an interrupted `bench/run.sh`
+holding port 19000 and by a `bin/tollbooth` four commits old; the script now refuses taken ports
+and rebuilds the binary (D-056). A pid sentinel of 0 made `kill -0` always succeed and would have
+made `kill` address the whole process group; fixed before any run used it.
+
+Numbers (dev box, 2 vCPUs): G2 all green, race coverage 90.2%, fuzz 5 × 60 s clean, s3diff 293
+cases 0 diffs; bench raw 4 KiB GET direct 7,065 versus proxied 2,243 req/s at concurrency 32
+(contention, ADR-0005); soak smoke 223,770 requests, 11 chaos steps, 0 unexplained errors, RSS 23
+to 34 MiB.
+
+Gate result: pending (report draft written 2026-11-09; final after the soak).
 
 ## Phase 4 record
 
@@ -34,7 +60,7 @@ CI throttle runs; the runbook says "completed every run measured but one".
 Numbers (dev box): `doctor` 17 ms for 10 checks; forwarded path still 7 allocations with the
 status counters and per-endpoint atomics on; the data path is otherwise untouched.
 
-Gate result: pending.
+Gate result: **pass** (Blake, 2026-11-09: #20 to #23 merged, `phase-4` tagged, "start phase 5").
 
 ## Phase 3 record
 

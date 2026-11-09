@@ -1,0 +1,18 @@
+run 1/3 direct  warm-up 30s
+run 1/3 direct  measuring 30s … 211949 requests, 7065 req/s, p50 3174 µs, p99 21840 µs, p99.9 34013 µs, errors 0
+run 1/3 proxied warm-up 30s
+run 1/3 proxied measuring 30s … 67303 requests, 2243 req/s, p50 13509 µs, p99 39191 µs, p99.9 59802 µs, errors 0
+run 2/3 direct  warm-up 30s
+run 2/3 direct  measuring 30s … 210428 requests, 7014 req/s, p50 3068 µs, p99 21283 µs, p99.9 33456 µs, errors 0
+run 2/3 proxied warm-up 30s
+run 2/3 proxied measuring 30s … 64662 requests, 2153 req/s, p50 13787 µs, p99 44368 µs, p99.9 63406 µs, errors 0
+run 3/3 direct  warm-up 30s
+run 3/3 direct  measuring 30s … 192808 requests, 6427 req/s, p50 3383 µs, p99 22151 µs, p99.9 36930 µs, errors 0
+run 3/3 proxied warm-up 30s
+run 3/3 proxied measuring 30s … 67880 requests, 2262 req/s, p50 12935 µs, p99 42893 µs, p99.9 66945 µs, errors 0
+
+median        req/s     p50 µs     p90 µs     p99 µs   p99.9 µs     max µs   errors   attempts  throttled
+direct         7065       3174      10502      21840      34013      68878        0          0          0
+proxied        2243      13509      23855      39191      59802     119276        0          0          0
+added                    10334      13353      17351      25788
+wrote /home/vastdata/projects/tollbooth/bench/results/2026-11-09T181541Z/20261109T182150Z-raw-get4k.json

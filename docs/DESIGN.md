@@ -684,7 +684,7 @@ Coverage floor 85% of statements; every `Op` exercised; `-race` everywhere.
 | Rule editing from CLI/TUI | 6 | nothing in tollbooth writes the config file |
 | Backend drain | 6 | passive marking and retry-before-bytes suffice for v1 |
 | Web UI | 6, only if the TUI proves insufficient | |
-| Go versus Rust | decided by ADR at Gate 5 only if p99 targets are missed | |
+| Go versus Rust | ADR-0005 (Gate 5): stay on Go; the dev-box profile is kernel-bound (44% socket syscalls, under 2% in the proxy's own code); reopened only by a reference-node profile that says otherwise | |
 | Nothing else from the specification is deferred. | | |
 
 ## 14. Requirement map

@@ -1,0 +1,9 @@
+# deploy/Dockerfile copies the repository into the build stage; keep the tool binaries, run
+# artifacts, release output, fetched test backends, and git history out of the build context.
+.git
+bin
+run
+dist
+test/integration/bin
+test/integration/.venv
+bench/results
