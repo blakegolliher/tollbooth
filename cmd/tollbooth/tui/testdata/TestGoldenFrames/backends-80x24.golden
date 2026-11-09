@@ -1,0 +1,24 @@
+ 1 Overview  2 Limits  3 Usage  4 Backends  5 Config  tui-node · v0.0.0-tui
+  ENDPOINT               STATE IN_FLIGHT  REQUESTS  ERRORS   DIAL    TLS  TIMEOU
+  10.0.0.1:9000          up            2     12000       0      0      0        
+  10.0.0.2:9000          DOWN          0       345       6      6      0        
+    last error 2026-11-09T12:28:00Z: dial tcp 10.0.0.2:9000: connect: connec…
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+read-only · 1-5 screens · ? help · q quit

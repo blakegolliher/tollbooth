@@ -1,0 +1,40 @@
+ 1 Overview  2 Limits  3 Usage  4 Backends  5 Config  tui-node · v0.0.0-tui
+  ID                       MATCH                        GROUP_BY             RATE/BURST     MODE                   KEYS 
+  tenant-a-writes          key=AKIAEXAMPLE1 bucket=tra… access_key,bucket    2000/4000      slowdown                  0 
+  list-storm               ops=LIST                     source_ip            50/200         too_many_requests         0 
+  frozen                   key=AKIAREVOKED                                   0 (block)      slowdown                  0 
+
+  Top denied keys, last 60 s, for frozen
+         3  (shared)  (Xs ago)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+↑↓ select · enter detail · t test request · / filter · ? help · q quit

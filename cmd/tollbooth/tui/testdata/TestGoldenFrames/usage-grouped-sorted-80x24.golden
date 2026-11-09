@@ -1,0 +1,24 @@
+ 1 Overview  2 Limits  3 Usage  4 Backends  5 Config  tui-node · v0.0.0-tui
+  range > 2026-11-08T12:00:00Z    → > 2026-11-09T13:00:00Z      group by access_
+  ACCESS_KEY / BUCKET               REQUESTS      BYTES_IN     BYTES_OUT PARTIAL
+  AKIAEXAMPLE1 / training-data           650         65000             0        
+  AKIAEXAMPLE2 / logs                    100             0          9000        
+  AKIAREVOKED / b                          3             0             0        
+  2 files, 3 groups, 753 requests, 65000 bytes in, 9000 bytes out
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+g group-by · s sort · f range · / filter · enter hourly bars · x export CSV · ? 
