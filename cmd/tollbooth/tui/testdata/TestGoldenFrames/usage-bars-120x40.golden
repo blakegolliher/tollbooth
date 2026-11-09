@@ -1,0 +1,40 @@
+ 1 Overview  2 Limits  3 Usage  4 Backends  5 Config  tui-node · v0.0.0-tui
+  range > 2026-11-08T12:00:00Z    → > 2026-11-09T13:00:00Z      group by access_key   sort keys
+  ACCESS_KEY                                                                REQUESTS      BYTES_IN     BYTES_OUT PARTIAL
+  AKIAEXAMPLE1                                                                   650         65000             0        
+  AKIAEXAMPLE2                                                                   100             0          9000        
+  AKIAREVOKED                                                                      3             0             0        
+  2 files, 3 groups, 753 requests, 65000 bytes in, 9000 bytes out
+
+  Requests per hour for the selected row
+  2026-11-09T10:00:00Z        400 ████████████████████████████████████████████████████████████████████████████
+  2026-11-09T11:00:00Z        250 ███████████████████████████████████████████████
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+g group-by · s sort · f range · / filter · enter hourly bars · x export CSV · ? help

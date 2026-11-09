@@ -90,7 +90,10 @@ func serve(ctx context.Context, path string, cfg *config.Config, log *slog.Logge
 	if err = lim.Apply(cfg); err != nil {
 		return fmt.Errorf("rules: %w", err)
 	}
-	bgCtx, stopBg := context.WithCancel(ctx)
+	// Background work (sweeper, showback writer, status sampler) stops from drain, after the data
+	// server has finished its in-flight requests, never from the serve context: deriving it from
+	// ctx made the writer's final snapshot race the last request's completion (D-054).
+	bgCtx, stopBg := context.WithCancel(context.Background())
 	defer stopBg()
 	go lim.Run(bgCtx)
 
@@ -108,7 +111,9 @@ func serve(ctx context.Context, path string, cfg *config.Config, log *slog.Logge
 	}
 	h := proxy.New(published, pool, metrics, lim, agg, access, log)
 	data := proxy.NewServer(h, &cfg.Listen, metrics, log)
-	data.BaseContext = func(net.Listener) context.Context { return ctx }
+	// Requests are not canceled when serve's context ends: Shutdown lets them finish inside the
+	// drain timeout, the same as the SIGTERM path (D-054).
+	data.BaseContext = func(net.Listener) context.Context { return context.Background() }
 
 	rl := &reloader{path: path, published: published, certs: certs, lim: lim, metrics: metrics, log: log, generation: 1, loadedAt: time.Now()}
 	adm := &admin.Server{Address: cfg.Admin.Address, Metrics: metrics, Ready: pool.Healthy, Token: cfg.AdminToken(), Pprof: cfg.Admin.Pprof,

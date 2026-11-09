@@ -1,0 +1,24 @@
+ 1 Overview  2 Limits  3 Usage  4 Backends  5 Config  tui-node · v0.0.0-tui
+  Test a request against the rules in force (nothing is consumed)
+  access key  > AKIAREVOKED                      
+  bucket      > bucket                        
+  key         > key                           
+  source ip   > source ip                     
+  operation   > GetObject                        
+
+  GetObject READ (service level): DENIED by frozen (slowdown, Retry-After 1s); 1
+    frozen                   (shared)                                 keys 0  de
+
+
+
+
+
+
+
+
+
+
+
+
+
+tab next field · enter run · esc close

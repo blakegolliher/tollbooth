@@ -43,7 +43,7 @@ commands:
   doctor        environment checks against a config file (ulimits, limits, TLS, backends, clock, disk)
   version       print version, commit, build date, and Go version
 
-  tui: arrives with the TUI PR of Phase 4
+  tui           the terminal UI: five screens over the admin API (--admin --token --config --interval)
 
 every verb that talks to the running proxy takes --admin, --token, --config, and
 --format table|json|csv; the endpoint and token fall back to TOLLBOOTH_ADMIN and
@@ -78,12 +78,11 @@ func run(args []string, stdout, stderr *os.File) int {
 		return runBackends(args[1:], stdout, stderr)
 	case "doctor":
 		return runDoctor(args[1:], stdout, stderr)
+	case "tui":
+		return runTUI(args[1:], stdout, stderr)
 	case "version":
 		_, _ = fmt.Fprintf(stdout, "tollbooth %s (commit %s, built %s, %s)\n", version, commit, date, runtime.Version())
 		return 0
-	case "tui":
-		_, _ = fmt.Fprintf(stderr, "tollbooth %s: not available yet (see docs/STATUS.md)\n", args[0])
-		return 2
 	case "-h", "--help", "help":
 		_, _ = fmt.Fprint(stdout, usage)
 		return 0

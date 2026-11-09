@@ -110,8 +110,12 @@ func TestVersionAndUsage(t *testing.T) {
 		t.Fatalf("unknown: rc %d", rc)
 	}
 	out, errOut = tempFiles(t)
-	if rc := run([]string{"tui"}, out, errOut); rc != 2 || !strings.Contains(read(errOut), "not available yet") {
-		t.Fatalf("later-phase verb: rc %d", rc)
+	if rc := run([]string{"tui", "--nope"}, out, errOut); rc != 2 {
+		t.Fatalf("bad flag on tui: rc %d", rc)
+	}
+	out, errOut = tempFiles(t)
+	if rc := run([]string{"help"}, out, errOut); rc != 0 || !strings.Contains(read(out), "tui") {
+		t.Fatalf("help: rc %d", rc)
 	}
 }
 
