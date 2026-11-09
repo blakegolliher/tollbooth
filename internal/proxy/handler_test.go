@@ -741,8 +741,8 @@ func TestAccessLoggerNilIsOff(t *testing.T) {
 
 func TestWriteS3Error(t *testing.T) {
 	rec := httptest.NewRecorder()
-	rid := writeS3Error(rec, CodeTooManyRequests, `/b/k<&>"'`, 3)
-	if rec.Code != http.StatusTooManyRequests || rec.Header().Get("Retry-After") != "3" || rec.Header().Get("x-amz-request-id") != rid || len(rid) != 32 {
+	rid := writeS3Error(rec, CodeTooManyRequests, `/b/k<&>"'`, 2*time.Second+300*time.Millisecond)
+	if rec.Code != http.StatusTooManyRequests || rec.Header().Get("Retry-After") != "3" || rec.Header().Get("x-amz-retry-after") != "2300" || rec.Header().Get("x-amz-request-id") != rid || len(rid) != 32 {
 		t.Fatalf("status %d headers %v", rec.Code, rec.Header())
 	}
 	var e ErrorResponse
@@ -757,7 +757,7 @@ func TestWriteS3Error(t *testing.T) {
 	}
 	rec = httptest.NewRecorder()
 	writeS3Error(rec, CodeServiceUnavailable, "/", 0)
-	if rec.Header().Get("Retry-After") != "" || rec.Code != 503 {
+	if rec.Header().Get("Retry-After") != "" || rec.Header().Get("x-amz-retry-after") != "" || rec.Code != 503 {
 		t.Fatalf("no Retry-After expected: %v", rec.Header())
 	}
 }

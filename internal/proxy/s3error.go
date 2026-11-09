@@ -18,7 +18,7 @@
 // reduced to the four codes tollbooth itself originates (it never answers for the backend);
 // TooManyRequests added; Retry-After and a generated x-amz-request-id on every response; the body
 // is built in a pooled buffer with one Write; headers are stored under canonical keys with shared
-// values so a denial costs four allocations.
+// values; x-amz-retry-after carries the exact wait in milliseconds.
 
 package proxy
 
@@ -28,6 +28,7 @@ import (
 	"net/http"
 	"strconv"
 	"sync"
+	"time"
 )
 
 // Code is an S3 error code as it appears in the <Code> element of an error response.
@@ -83,13 +84,16 @@ var (
 	hdrLength       = "Content-Length"
 	hdrRequestID    = "X-Amz-Request-Id" // the canonical form of x-amz-request-id, as net/http would store it
 	hdrRetryAfter   = "Retry-After"
+	hdrRetryAfterMS = "X-Amz-Retry-After" // milliseconds; the AWS SDKs' exact-wait header (D-043)
 	retryAfterCache = [...][]string{{"1"}, {"2"}, {"3"}, {"4"}, {"5"}, {"6"}, {"7"}, {"8"}, {"9"}, {"10"}}
 )
 
 // writeS3Error answers the client with an S3 error body for code. resource is the raw path, which
-// S3 itself echoes in <Resource>; retryAfter in seconds adds a Retry-After header when > 0. Rule
-// identifiers never appear here. Returns the request id written.
-func writeS3Error(w http.ResponseWriter, code Code, resource string, retryAfter int) string {
+// S3 itself echoes in <Resource>. A positive wait adds Retry-After (whole seconds, rounded up, at
+// least 1, which every SDK can read) and x-amz-retry-after (milliseconds, rounded up, which
+// aws-sdk-go-v2 and the clients built on it honor exactly; D-043). Rule identifiers never appear
+// here. Returns the request id written.
+func writeS3Error(w http.ResponseWriter, code Code, resource string, wait time.Duration) string {
 	e := errorTable[code]
 	rid := newRequestID()
 	bp := errorBodyPool.Get().(*[]byte) //nolint:errcheck // the pool holds only *[]byte
@@ -107,12 +111,15 @@ func writeS3Error(w http.ResponseWriter, code Code, resource string, retryAfter 
 	h[hdrContentType] = xmlContentType
 	h[hdrLength] = []string{strconv.Itoa(len(b))}
 	h[hdrRequestID] = []string{rid}
-	if retryAfter > 0 {
-		if retryAfter <= len(retryAfterCache) {
-			h[hdrRetryAfter] = retryAfterCache[retryAfter-1]
+	if wait > 0 {
+		secs := int((wait + time.Second - 1) / time.Second)
+		if secs <= len(retryAfterCache) {
+			h[hdrRetryAfter] = retryAfterCache[secs-1]
 		} else {
-			h[hdrRetryAfter] = []string{strconv.Itoa(retryAfter)}
+			h[hdrRetryAfter] = []string{strconv.Itoa(secs)}
 		}
+		ms := int64((wait + time.Millisecond - 1) / time.Millisecond)
+		h[hdrRetryAfterMS] = []string{strconv.FormatInt(ms, 10)}
 	}
 	w.WriteHeader(e.status)
 	_, _ = w.Write(b)

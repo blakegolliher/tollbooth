@@ -24,6 +24,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"regexp"
+	"strconv"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -105,7 +106,7 @@ func TestThrottleSlowDown(t *testing.T) {
 	}
 	body, _ := io.ReadAll(resp.Body)
 	resp.Body.Close() //nolint:errcheck // test
-	if resp.StatusCode != http.StatusServiceUnavailable || resp.Header.Get("Content-Type") != "application/xml" || resp.Header.Get("Retry-After") != "1" {
+	if resp.StatusCode != http.StatusServiceUnavailable || resp.Header.Get("Content-Type") != "application/xml" || resp.Header.Get("Retry-After") != "1" || resp.Header.Get("x-amz-retry-after") != "1000" {
 		t.Fatalf("status %d headers %v", resp.StatusCode, resp.Header)
 	}
 	var e ErrorResponse
@@ -187,8 +188,9 @@ func TestThrottleRetryAfterIsHonest(t *testing.T) {
 		t.Fatalf("first: %d", resp.StatusCode)
 	}
 	resp := get()
-	if resp.StatusCode != 503 || resp.Header.Get("Retry-After") != "2" {
-		t.Fatalf("second: %d Retry-After %q", resp.StatusCode, resp.Header.Get("Retry-After"))
+	ms, _ := strconv.Atoi(resp.Header.Get("x-amz-retry-after"))
+	if resp.StatusCode != 503 || resp.Header.Get("Retry-After") != "2" || ms < 1900 || ms > 2000 {
+		t.Fatalf("second: %d Retry-After %q x-amz-retry-after %q", resp.StatusCode, resp.Header.Get("Retry-After"), resp.Header.Get("x-amz-retry-after"))
 	}
 }
 
@@ -357,9 +359,9 @@ func TestThrottledAllocations(t *testing.T) {
 }
 
 // throttledAllocBudget is the measured denied-path count (docs/DESIGN.md §9, D-041): the request
-// id string, the Content-Length string, and the two single-value header slices that vary
-// (Content-Length and X-Amz-Request-Id).
-const throttledAllocBudget = 4
+// id string, the Content-Length and x-amz-retry-after strings, and the three single-value header
+// slices that vary (Content-Length, X-Amz-Request-Id, X-Amz-Retry-After).
+const throttledAllocBudget = 6
 
 func allocRig(t *testing.T, tail string) (*Handler, *nopWriter, *http.Request) {
 	t.Helper()
