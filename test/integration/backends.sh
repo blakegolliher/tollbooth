@@ -30,8 +30,9 @@ fetch_verified() { # url sha256 dest
   tmp=$(mktemp "$dest.XXXXXX")
   # --retry-all-errors: plain --retry does not retry an HTTP 4xx/5xx, and release CDNs return
   # those transiently (seen on 2026-11-09 in CI).
-  if ! curl -sfL --retry 5 --retry-delay 3 --retry-all-errors --max-time 600 -o "$tmp" "$url"; then
-    echo "backends: download failed: $url" >&2; rm -f "$tmp"; exit 1
+  local code
+  if ! code=$(curl -sfL --retry 5 --retry-delay 3 --retry-all-errors --max-time 600 -o "$tmp" -w '%{http_code}' "$url"); then
+    echo "backends: download failed (curl exit $?, last HTTP status ${code:-none}): $url" >&2; rm -f "$tmp"; exit 1
   fi
   echo "$sha  $tmp" | sha256sum -c --quiet - || { rm -f "$tmp"; echo "backends: checksum mismatch for $url" >&2; exit 1; }
   mv "$tmp" "$dest"
@@ -67,14 +68,16 @@ rpc_secret = "$(head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n')"
 [s3_api]
 s3_region = "garage"
 api_bind_addr = "127.0.0.1:3900"
-root_domain = ".s3.garage.localhost"
+# Passthrough preserves Host, so the backend must own the proxy's base domain (the vhost
+# deployment constraint, docs/OPERATIONS.md); the suite's base domain is tb.example.com.
+root_domain = ".tb.example.com"
 [admin]
 api_bind_addr = "127.0.0.1:3903"
 admin_token = "$(head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n')"
 TOML
   fi
   "$BIN/garage" -c "$DATA/garage/garage.toml" server > "$DATA/garage.log" 2>&1 & echo $! > "$DATA/garage.pid"
-  ROOT_ACCESS_KEY=$VGW_ACCESS ROOT_SECRET_KEY=$VGW_SECRET "$BIN/versitygw" --port 127.0.0.1:7070 posix "$DATA/versitygw" > "$DATA/versitygw.log" 2>&1 & echo $! > "$DATA/versitygw.pid"
+  ROOT_ACCESS_KEY=$VGW_ACCESS ROOT_SECRET_KEY=$VGW_SECRET "$BIN/versitygw" --port 127.0.0.1:7070 --virtual-domain tb.example.com posix "$DATA/versitygw" > "$DATA/versitygw.log" 2>&1 & echo $! > "$DATA/versitygw.pid"
   # Garage needs a layout and a key once; idempotent on a reused data dir.
   for _ in $(seq 1 50); do "$BIN/garage" -c "$DATA/garage/garage.toml" status > /dev/null 2>&1 && break; sleep 0.2; done
   node=$("$BIN/garage" -c "$DATA/garage/garage.toml" status | awk '/^[0-9a-f]{16}/ {print $1; exit}')

@@ -34,8 +34,9 @@ S3CMD_VERSION=2.4.0
 fetch_verified() { # url sha256 dest
   local url=$1 sha=$2 dest=$3 tmp
   tmp=$(mktemp "$dest.XXXXXX")
-  if ! curl -sfL --retry 5 --retry-delay 3 --retry-all-errors --max-time 600 -o "$tmp" "$url"; then
-    echo "clients: download failed: $url" >&2; rm -f "$tmp"; exit 1
+  local code
+  if ! code=$(curl -sfL --retry 5 --retry-delay 3 --retry-all-errors --max-time 600 -o "$tmp" -w '%{http_code}' "$url"); then
+    echo "clients: download failed (curl exit $?, last HTTP status ${code:-none}): $url" >&2; rm -f "$tmp"; exit 1
   fi
   echo "$sha  $tmp" | sha256sum -c --quiet - || { rm -f "$tmp"; echo "clients: checksum mismatch for $url" >&2; exit 1; }
   mv "$tmp" "$dest"

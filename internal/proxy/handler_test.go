@@ -802,3 +802,47 @@ func BenchmarkSmallGETEndToEnd(b *testing.B) {
 }
 
 var _ = context.Background
+
+// D-034: a backend that answers and closes before reading the request body. Go's transport
+// races the write error against the response; the proxy relays the response when it wins and
+// answers 503 when it does not. Either way the client gets a complete answer, promptly, and the
+// backend saw no body it did not ask for. With Expect: 100-continue the answer is always relayed.
+func TestBackendAnswersBeforeReadingBody(t *testing.T) {
+	r := rigFor(t, http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/xml")
+		w.Header().Set("Connection", "close")
+		w.WriteHeader(http.StatusForbidden)
+		_, _ = w.Write([]byte(`<Error><Code>AccessDenied</Code></Error>`))
+	}), time.Second)
+	body := bytes.Repeat([]byte("p"), 8<<20)
+	for i := 0; i < 3; i++ {
+		req, _ := http.NewRequest(http.MethodPut, r.front.URL+"/b/k", bytes.NewReader(body))
+		start := time.Now()
+		resp, err := fresh().Do(req)
+		if err != nil {
+			t.Fatalf("attempt %d: %v", i, err)
+		}
+		io.Copy(io.Discard, resp.Body) //nolint:errcheck // test
+		resp.Body.Close()              //nolint:errcheck // test
+		if resp.StatusCode != http.StatusForbidden && resp.StatusCode != http.StatusServiceUnavailable {
+			t.Fatalf("attempt %d: status %d", i, resp.StatusCode)
+		}
+		if d := time.Since(start); d > 5*time.Second {
+			t.Fatalf("attempt %d took %v", i, d)
+		}
+	}
+	// With Expect: 100-continue the 403 arrives before any body byte and is relayed every time.
+	for i := 0; i < 3; i++ {
+		req, _ := http.NewRequest(http.MethodPut, r.front.URL+"/b/k", bytes.NewReader(body))
+		req.Header.Set("Expect", "100-continue")
+		resp, err := (&http.Client{Transport: &http.Transport{ExpectContinueTimeout: time.Second, DisableKeepAlives: true}}).Do(req)
+		if err != nil {
+			t.Fatalf("expect attempt %d: %v", i, err)
+		}
+		io.Copy(io.Discard, resp.Body) //nolint:errcheck // test
+		resp.Body.Close()              //nolint:errcheck // test
+		if resp.StatusCode != http.StatusForbidden {
+			t.Fatalf("expect attempt %d: status %d, want 403 relayed", i, resp.StatusCode)
+		}
+	}
+}
