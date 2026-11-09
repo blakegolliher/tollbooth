@@ -1,0 +1,110 @@
+# Linter set carried from shunt (.golangci.yml at 9b36d09), plus the depguard rule the operator
+# surface requires: charmbracelet is imported only from cmd/tollbooth/tui (docs/adr/0003).
+# No disabled checks without a comment.
+version: "2"
+
+run:
+  timeout: 5m
+  tests: true
+
+linters:
+  default: none
+  enable:
+    - govet
+    - staticcheck
+    - errcheck
+    - gosec
+    - revive
+    - gocritic
+    - bodyclose
+    - noctx
+    - prealloc
+    - unconvert
+    - misspell
+    - depguard
+  settings:
+    depguard:
+      rules:
+        # The TUI framework stays off the data path and out of every other package. A violation
+        # fails the build (docs/SPEC.md, Operator surface; test plan category 12).
+        no-tui-outside-tui:
+          list-mode: lax
+          files:
+            - "!**/cmd/tollbooth/tui/**"
+          deny:
+            - pkg: github.com/charmbracelet
+              desc: "charmbracelet packages are imported only from cmd/tollbooth/tui (ADR-0003)"
+        # The archived gopkg.in/yaml.v3 must not appear anywhere; go.yaml.in/yaml is the YAML library.
+        no-archived-yaml:
+          list-mode: lax
+          deny:
+            - pkg: gopkg.in/yaml.v3
+              desc: "use go.yaml.in/yaml (docs/SPEC.md, Dependencies)"
+            - pkg: gopkg.in/yaml.v2
+              desc: "use go.yaml.in/yaml (docs/SPEC.md, Dependencies)"
+        # Bench-only: HDR histograms never link into the proxy binary.
+        no-hdr-outside-bench:
+          list-mode: lax
+          files:
+            - "!**/bench/**"
+          deny:
+            - pkg: github.com/HdrHistogram
+              desc: "hdrhistogram-go is allowed in bench/ only (docs/SPEC.md, Dependencies)"
+    govet:
+      enable-all: true
+      disable:
+        # fieldalignment reorders structs for padding; config structs are ordered for readability.
+        # Hot-path structs (limiter key, showback key) are checked by hand in docs/DESIGN.md §9.
+        - fieldalignment
+    revive:
+      rules:
+        - name: exported
+        - name: package-comments
+        - name: unused-parameter
+        - name: error-strings
+        - name: error-return
+        - name: errorf
+        - name: var-naming
+    gocritic:
+      enabled-tags:
+        - diagnostic
+        - style
+        - performance
+      disabled-checks:
+        # hugeParam flags every pass-by-value config struct in tests; benchmarks cover the real cost.
+        - hugeParam
+    gosec:
+      excludes:
+        # G304: check-config and usage query open the paths the operator passed on the command line.
+        - G304
+    misspell:
+      locale: US
+  exclusions:
+    rules:
+      # Tests hand-write HTTP over raw sockets and ignore Close errors on purpose. The production
+      # rules stay on for non-test code.
+      - path: _test\.go
+        linters: [noctx, bodyclose, gosec, gocritic]
+      - path: _test\.go
+        linters: [errcheck]
+        text: "Close|Fprint"
+      - path: _test\.go
+        linters: [revive]
+        text: "unused-parameter"
+      - path: _test\.go
+        linters: [govet]
+        text: "shadow"
+      # bench/ and test/ hold main packages whose job is to send requests to operator-given
+      # endpoints; gosec's SSRF taint analysis flags exactly that.
+      - path: ^(bench|test)/
+        linters: [gosec]
+        text: "G704"
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0

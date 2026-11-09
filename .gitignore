@@ -1,0 +1,13 @@
+/bin/
+/dist/
+/tollbooth
+*.test
+*.out
+*.prof
+*.log
+/bench/results/*/raw/
+/test/integration/data/
+/test/integration/certs/
+/test/bench/new.txt
+/run/
+/test/integration/bin/

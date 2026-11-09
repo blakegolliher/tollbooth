@@ -1,0 +1,13 @@
+tollbooth — S3 rate-limit and showback proxy
+Copyright 2026 Blake Golliher
+
+This product includes software developed by Blake Golliher and
+contributors (https://github.com/blakegolliher/tollbooth).
+
+It incorporates code adapted from shunt (https://github.com/blakegolliher/shunt),
+Copyright 2026 Blake Golliher, licensed under the Apache License 2.0. Every
+adapted file carries its original header and a modification notice, and is
+listed in THIRD_PARTY_NOTICES.md and docs/deps.md.
+
+Module dependencies and their licenses are listed in docs/deps.md and
+THIRD_PARTY_NOTICES.md.

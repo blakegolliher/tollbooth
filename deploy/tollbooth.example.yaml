@@ -1,0 +1,92 @@
+# tollbooth example configuration. Every key is set to its default except the required ones,
+# which carry example values. docs/CONFIG.md documents each key. Unknown keys are errors.
+# Nothing in tollbooth ever writes this file; edit it and run `tollbooth config reload`.
+
+node_id: tb-a01                     # required; stable across restarts
+base_domains: []                    # virtual-hosted-style base domains, e.g. [s3.lab.example.com]
+
+listen:
+  address: ":8443"
+  tls:
+    cert: ""                        # both empty = plaintext
+    key: ""
+    min_version: "1.2"
+  proxy_protocol: false
+  trusted_proxies: []               # CIDRs whose X-Forwarded-For is honored
+  read_header_timeout: 10s
+  idle_timeout: 120s
+  max_header_bytes: 1048576
+  max_inflight: 4096                # with copy_buffer_bytes bounds copy memory at 512 MiB
+
+backend:
+  scheme: http                      # required: http | https
+  endpoints:                        # required: host:port, round-robin
+    - 127.0.0.1:9000
+  tls:
+    ca_bundle: ""
+    insecure_skip_verify: false     # lab only
+  dial_timeout: 2s
+  response_header_timeout: 300s
+  idle_body_timeout: 60s
+  max_idle_conns_per_host: 1024
+  health_check:
+    interval: 5s
+    timeout: 2s
+
+proxy:
+  copy_buffer_bytes: 131072
+  drain_timeout: 30s
+
+cluster:
+  node_count: 1                     # each node enforces rate / node_count
+
+rate_limits:
+  default_on_limit: slowdown        # slowdown (503 SlowDown) | too_many_requests (429)
+  rules: []
+  # rules:
+  #   - id: tenant-a-writes
+  #     match:
+  #       access_keys: [AKIAEXAMPLE1, AKIAEXAMPLE2]
+  #       buckets: [training-data, checkpoints]
+  #       prefixes: [ckpt/, logs/]
+  #       source_cidrs: [10.20.0.0/16]
+  #       ops: [WRITE]
+  #     group_by: [access_key, bucket]
+  #     limit: { rate: 2000, burst: 4000 }
+  #   - id: list-storm-per-client
+  #     match: { ops: [LIST] }
+  #     group_by: [source_ip]
+  #     limit: { rate: 50, burst: 200 }
+  #     on_limit: too_many_requests
+  #   - id: frozen-key
+  #     match: { access_keys: [AKIAREVOKED] }
+  #     limit: { rate: 0 }
+
+limiter:
+  max_keys: 2000000
+  sweep_interval: 10s
+
+showback:
+  dir: /var/lib/tollbooth/showback  # required; persistent path
+  flush_interval: 60s
+  retention_days: 400
+  dimensions: [access_key, bucket, prefix, operation, status_class]
+  max_tuples_per_hour: 250000
+  prefixes: {}                      # e.g. {checkpoints: [ckpt/, logs/]}
+
+admin:
+  address: 127.0.0.1:9900
+  token_file: ""                    # preferred: file holding the bearer token for /admin/*
+  token: ""                         # inline alternative for labs; redacted in config show
+  pprof: false
+
+logging:
+  level: info
+  access: false
+  throttle_sample: 100
+
+features: {}
+
+kill_switches:
+  limiter_disable: false
+  showback_disable: false

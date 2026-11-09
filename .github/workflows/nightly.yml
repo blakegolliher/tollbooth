@@ -1,0 +1,54 @@
+name: nightly
+
+# Nightly adds the one-hour fuzz and the regression benchmarks with the ±10% threshold against the
+# committed baseline (docs/SPEC.md, Test plan categories 4 and 10). Fixed runner label so
+# benchmark numbers are comparable night to night.
+
+on:
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  fuzz-1h:
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: fuzz 1 CPU-hour total, split evenly across targets
+        run: |
+          n=$(go list ./... | xargs -n1 go test -list '^Fuzz' 2>/dev/null | grep -c '^Fuzz' || true)
+          if [ "$n" = "0" ]; then echo "no fuzz targets yet"; exit 0; fi
+          make fuzz FUZZ_TIME=$((3600 / n))s
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: fuzz-logs
+          path: run/
+          if-no-files-found: ignore
+
+  bench-regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: benchmarks against the committed baseline
+        run: |
+          if [ ! -f test/bench/baseline.txt ]; then echo "no baseline yet (committed at Gate 2)"; exit 0; fi
+          make bench-compare
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: bench
+          path: test/bench/new.txt
+          if-no-files-found: ignore
