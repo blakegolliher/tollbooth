@@ -384,7 +384,7 @@ func allocRig(t *testing.T, tail string) (*Handler, *nopWriter, *http.Request) {
 	if err := lim.Apply(c); err != nil {
 		t.Fatal(err)
 	}
-	h := New(cfg, pool, m, lim, nil, nil)
+	h := New(cfg, pool, m, lim, nil, nil, nil)
 	req := httptest.NewRequest(http.MethodGet, "/b/k", nil)
 	req.RequestURI = "/b/k"
 	req.RemoteAddr = "192.0.2.1:1234"

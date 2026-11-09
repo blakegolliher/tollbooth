@@ -31,6 +31,7 @@ import (
 	"github.com/blakegolliher/tollbooth/internal/config"
 	"github.com/blakegolliher/tollbooth/internal/limiter"
 	"github.com/blakegolliher/tollbooth/internal/s3id"
+	"github.com/blakegolliher/tollbooth/internal/showback"
 )
 
 // Route is one admin HTTP route. The table is exported so the parity test (test plan category
@@ -55,7 +56,7 @@ var Routes = []Route{
 	{Method: http.MethodGet, Path: "/admin/limits", Phase: 2},
 	{Method: http.MethodGet, Path: "/admin/limits/top", Phase: 2},
 	{Method: http.MethodPost, Path: "/admin/limits/test", Phase: 2}, // moved from Phase 4: `rules test` is a Phase 2 verb (D-039)
-	{Method: http.MethodGet, Path: "/admin/usage", Phase: 3},
+	{Method: http.MethodGet, Path: "/admin/usage", Phase: 3},        // served from Phase 3
 	{Method: http.MethodGet, Path: "/admin/status", Phase: 4},
 	{Method: http.MethodGet, Path: "/admin/backends", Phase: 4},
 	{Method: http.MethodGet, Path: "/debug/pprof/", Phase: 1},
@@ -98,6 +99,14 @@ type Server struct {
 	Reload func() ReloadResult
 	// Config returns the effective config and reload state. nil: not served.
 	Config func() ConfigView
+	// Usage answers GET /admin/usage over this node's showback directory. nil: not served.
+	Usage *Usage
+}
+
+// Usage is the showback query surface: this node's directory only, the same code path as
+// `tollbooth usage query`.
+type Usage struct {
+	Dir string
 }
 
 // Handler builds the mux. A mux is fine here: nothing on this port is an object key.
@@ -131,6 +140,9 @@ func (s *Server) Handler() http.Handler {
 		mux.HandleFunc("GET /admin/config", func(w http.ResponseWriter, _ *http.Request) {
 			writeJSON(w, http.StatusOK, s.Config())
 		})
+	}
+	if s.Usage != nil {
+		mux.HandleFunc("GET /admin/usage", s.usage)
 	}
 	if s.Limiter != nil {
 		mux.HandleFunc("GET /admin/limits", s.limits)
@@ -246,6 +258,53 @@ func identityFor(req *TestRequest) (s3id.RequestIdentity, error) {
 		id.SourceIP = a.Unmap()
 	}
 	return id, nil
+}
+
+// usage is GET /admin/usage?from=&to=&group_by=&where=&format=json|csv: filter, group, and sum
+// over this node's files (docs/SPEC.md, Showback, Query interface). from and to are RFC 3339;
+// group_by and where are comma-separated.
+func (s *Server) usage(w http.ResponseWriter, r *http.Request) {
+	q := r.URL.Query()
+	var qry showback.Query
+	var err error
+	if v := q.Get("from"); v != "" {
+		if qry.From, err = time.Parse(time.RFC3339, v); err != nil {
+			writeError(w, http.StatusBadRequest, "from: "+err.Error())
+			return
+		}
+	}
+	if v := q.Get("to"); v != "" {
+		if qry.To, err = time.Parse(time.RFC3339, v); err != nil {
+			writeError(w, http.StatusBadRequest, "to: "+err.Error())
+			return
+		}
+	}
+	if v := q.Get("group_by"); v != "" {
+		qry.GroupBy = strings.Split(v, ",")
+	}
+	if qry.Where, err = showback.ParseWhere(q.Get("where")); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	files, err := showback.Files(s.Usage.Dir)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	res, err := qry.Run(files)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	switch q.Get("format") {
+	case "", "json":
+		writeJSON(w, http.StatusOK, res)
+	case "csv":
+		w.Header().Set("Content-Type", "text/csv")
+		_, _ = w.Write(showback.CSV(res))
+	default:
+		writeError(w, http.StatusBadRequest, "format must be json or csv")
+	}
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) {

@@ -31,6 +31,7 @@ import (
 	"github.com/blakegolliher/tollbooth/bench/nullbackend"
 	"github.com/blakegolliher/tollbooth/internal/admin"
 	"github.com/blakegolliher/tollbooth/internal/config"
+	"github.com/blakegolliher/tollbooth/internal/showback"
 )
 
 // Reload under load (docs/SPEC.md, Rate limiting, Hot reload): with clients hammering the proxy,
@@ -192,5 +193,72 @@ func waitReady(t *testing.T, url string) {
 			t.Fatalf("%s never answered 200 (last err %v)", url, err)
 		}
 		time.Sleep(20 * time.Millisecond)
+	}
+}
+
+// serve snapshots the open hour every flush_interval and takes a final snapshot on drain, so a
+// stop loses nothing that completed, and the files read back with the usage verbs.
+func TestServeShowbackSnapshotAndDrain(t *testing.T) {
+	nb := nullbackend.New(64)
+	be := httptest.NewServer(nb)
+	defer be.Close()
+	dir := t.TempDir()
+	listen, adminAddr := freePort(t), freePort(t)
+	path := writeConfig(t, dir, "node_id: sb\nlisten: {address: "+listen+"}\nadmin: {address: "+adminAddr+"}\nbackend: {scheme: http, endpoints: ["+strings.TrimPrefix(be.URL, "http://")+"], health_check: {interval: 50ms, timeout: 200ms}}\nshowback: {dir: "+dir+"/sb, flush_interval: 200ms}\n")
+	cfg, err := config.Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	log := slog.New(slog.NewJSONHandler(&lockedBuffer{}, nil))
+	ctx, cancel := context.WithCancel(context.Background())
+	stdout, _ := tempFiles(t)
+	done := make(chan error, 1)
+	go func() { done <- serve(ctx, path, cfg, log, stdout) }()
+	waitReady(t, "http://"+adminAddr+"/readyz")
+	for i := 0; i < 3; i++ {
+		resp, err := http.Get("http://" + listen + "/b/k") //nolint:noctx // test
+		if err != nil {
+			t.Fatal(err)
+		}
+		io.Copy(io.Discard, resp.Body) //nolint:errcheck // test
+		resp.Body.Close()              //nolint:errcheck // test
+	}
+	// The periodic snapshot appears within a flush interval or two.
+	cur := showback.CurrentPath(dir+"/sb", "sb", time.Now().Unix()/3600)
+	deadline := time.Now().Add(3 * time.Second)
+	for {
+		if _, err := os.Stat(cur); err == nil {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("no snapshot at %s", cur)
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	// GET /admin/usage sees them (open hour, partial).
+	resp, err := http.Get("http://" + adminAddr + "/admin/usage?group_by=operation") //nolint:noctx // test
+	if err != nil {
+		t.Fatal(err)
+	}
+	var res showback.Result
+	_ = json.NewDecoder(resp.Body).Decode(&res)
+	resp.Body.Close() //nolint:errcheck // test
+	if !res.Partial || res.Requests < 1 {
+		t.Fatalf("admin usage: %+v", res)
+	}
+	resp, _ = http.Get("http://" + listen + "/b/k2") //nolint:noctx // test
+	io.Copy(io.Discard, resp.Body)                   //nolint:errcheck // test
+	resp.Body.Close()                                //nolint:errcheck // test
+	cancel()
+	if err := <-done; err != nil {
+		t.Fatal(err)
+	}
+	// The final snapshot on drain holds all four.
+	out, errOut := tempFiles(t)
+	if rc := run([]string{"usage", "query", "--group-by", "operation", dir + "/sb"}, out, errOut); rc != 0 {
+		t.Fatalf("rc %d: %s", rc, read(errOut))
+	}
+	if s := read(out); !strings.Contains(s, "4 requests") || !strings.Contains(s, "GetObject") {
+		t.Fatalf("usage query after drain:\n%s", s)
 	}
 }

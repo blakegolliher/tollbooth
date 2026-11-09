@@ -29,6 +29,7 @@ import (
 
 	"github.com/blakegolliher/tollbooth/internal/limiter"
 	"github.com/blakegolliher/tollbooth/internal/s3id"
+	"github.com/blakegolliher/tollbooth/internal/showback"
 )
 
 // StatusClass is the showback and metrics status partition (docs/SPEC.md, Showback).
@@ -123,6 +124,8 @@ type Metrics struct {
 	// Limiter holds the five limiter rows of the catalog; internal/limiter observes them and never
 	// registers anything itself (Phase 2). The shaping histogram arrives with shaping (ADR-0004).
 	Limiter limiter.Metrics
+	// Showback holds the five showback rows of the catalog (Phase 3); internal/showback observes.
+	Showback showback.Metrics
 }
 
 // Side of a connection gauge.
@@ -206,9 +209,28 @@ func NewMetrics() *Metrics {
 			Name: "tollbooth_limiter_errors_total", Help: "Panics or internal errors inside the limiter, each failed open.",
 		}),
 	}
+	m.Showback = showback.Metrics{
+		Tuples: prometheus.NewGauge(prometheus.GaugeOpts{
+			Name: "tollbooth_showback_tuples", Help: "Distinct tuples in the open hour.",
+		}),
+		FlushDuration: prometheus.NewHistogram(prometheus.HistogramOpts{
+			Name: "tollbooth_showback_flush_duration_seconds", Help: "Time to snapshot or seal one hour file (encode, fsync, rename).",
+			Buckets: logBuckets(1e-3, 60, 16),
+		}),
+		FlushErrors: prometheus.NewCounter(prometheus.CounterOpts{
+			Name: "tollbooth_showback_flush_errors_total", Help: "Snapshot or seal attempts that failed (disk full, read-only, I/O error); counting continued in memory.",
+		}),
+		Collapsed: prometheus.NewCounter(prometheus.CounterOpts{
+			Name: "tollbooth_showback_collapsed_total", Help: "Requests folded into the __overflow__ row because showback.max_tuples_per_hour was reached.",
+		}),
+		ClockSkew: prometheus.NewCounter(prometheus.CounterOpts{
+			Name: "tollbooth_showback_clock_skew_total", Help: "Requests whose completion hour was earlier than the open hour (wall clock stepped back); counted in the open hour.",
+		}),
+	}
 	reg.MustRegister(m.requestsTotal, m.requestDuration, m.proxyOverhead, m.backendTTFB, m.bytesTotal, m.connectionsOpen,
 		m.Inflight, m.BackendUp, m.BackendErrors, m.BackendRetries, m.ConfigReload,
 		m.Limiter.Decision.(prometheus.Collector), m.Limiter.Keys, m.Limiter.Overflow, m.Limiter.Denied, m.Limiter.Errors,
+		m.Showback.Tuples, m.Showback.FlushDuration.(prometheus.Collector), m.Showback.FlushErrors, m.Showback.Collapsed, m.Showback.ClockSkew,
 		collectors.NewGoCollector(), collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))
 
 	// Resolve every per-request handle once. The cardinality is fixed by construction:

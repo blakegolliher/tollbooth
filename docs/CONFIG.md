@@ -100,9 +100,9 @@ Every listed match condition must hold (AND); an omitted condition matches anyth
 | `showback.dir` | path | **required** | Node-local store: `current/` holds the open hour's snapshot, `usage/YYYY/MM/DD/` the sealed hours. Must be a persistent path; `check-config` refuses an empty value and `doctor` warns when it sits on tmpfs or an ephemeral volume. |
 | `showback.flush_interval` | duration | `60s` | Snapshot cadence for the open hour. A crash loses at most this much. |
 | `showback.retention_days` | int | `400` | Sealed files older than this are deleted by a daily sweep. `0` disables deletion. |
-| `showback.dimensions` | list of `access_key`, `bucket`, `prefix`, `source_ip`, `operation`, `status_class` | `[access_key, bucket, prefix, operation, status_class]` | Columns that form a tuple. `operation` and `status_class` are always present; omitting them is an error. Add `source_ip` to track addresses. |
+| `showback.dimensions` | list of `access_key`, `bucket`, `prefix`, `source_ip`, `operation`, `status_class` | `[access_key, bucket, prefix, operation, status_class]` | Columns that form a tuple. `operation` and `status_class` are always present; omitting them is an error. Add `source_ip` to track addresses. Restart-only (D-046). |
 | `showback.max_tuples_per_hour` | int | `250000` | Tuple cap per open hour. Past it, new tuples fold into one `__overflow__` row per `(operation, status_class)` and `showback_collapsed_total` increments. |
-| `showback.prefixes` | map of bucket → list of string | `{}` | Per-bucket showback prefixes, longest match; a key under none of them is recorded as `""` (bucket root). Arbitrary key depth is never recorded. Example: `{checkpoints: [ckpt/, logs/]}`. |
+| `showback.prefixes` | map of bucket → list of string | `{}` | Per-bucket showback prefixes, longest match; a key under none of them is recorded as `""` (bucket root). For the four bucket listings the request's `prefix` parameter is matched (ADR-0001). Arbitrary key depth is never recorded. Example: `{checkpoints: [ckpt/, logs/]}`. Restart-only (D-046). |
 
 ## `admin`
 
@@ -151,8 +151,9 @@ and matchers, and swaps one pointer. The route answers 200 with the result (`ok`
 file is rejected (D-040); `GET /admin/config` repeats the last result. Requests in flight finish under the config they started with.
 Limiter state is keyed by rule id and is never reset: a changed `rate` or `burst` applies from the
 next decision; state of removed rules is swept. `listen.address`, `listen.proxy_protocol`,
-`admin.address`, `node_id`, `showback.dir`, `proxy.copy_buffer_bytes`, and every `backend.*` key
-cannot change on reload (the listener, the copy-buffer pool, and the backend transport are built
+`admin.address`, `node_id`, `showback.dir`, `showback.dimensions`, `showback.prefixes` (the row
+shape and prefix tables are fixed for the process, D-046), `proxy.copy_buffer_bytes`, and every
+`backend.*` key cannot change on reload (the listener, the copy-buffer pool, and the backend transport are built
 once, D-029); a change to any of them is a reload error that keeps the running config and says a
 restart is needed. TLS certificates are re-read. Reload must complete
 in under 100 ms with zero failed requests under load (Phase 2 test).
