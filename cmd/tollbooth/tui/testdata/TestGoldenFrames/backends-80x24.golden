@@ -1,4 +1,4 @@
- 1 Overview  2 Limits  3 Usage  4 Backends  5 Config  tui-node · v0.0.0-tui
+ 1 Overview  2 Limits  3 Usage  4 Backends  5 Config  6 Graphs  tui-node · v0.0.
   ENDPOINT               STATE IN_FLIGHT  REQUESTS  ERRORS   DIAL    TLS  TIMEOU
   10.0.0.1:9000          up            2     12000       0      0      0        
   10.0.0.2:9000          DOWN          0       345       6      6      0        

@@ -1,0 +1,40 @@
+ 1 Overview  2 Limits  3 Usage  4 Backends  5 Config  6 Graphs  tui-node · v0.0.0-tui
+  tollbooth.yaml  -- NORMAL -- · modified  line 2 col 1
+ 1 bogus: 1                                                                                                           
+ 2 node_id: tui-node                                                                                                  
+ 3 backend: {scheme: http, endpoints: [10.0.0.1:9000, 10.0.0.2:9000]}                                                 
+ 4 showback: {dir: /tmp/x}                                                                                            
+ 5 admin: {token: tok}                                                                                                
+ 6 rate_limits:                                                                                                       
+ 7   rules:                                                                                                           
+ 8     - id: tenant-a-writes                                                                                          
+ 9       match: {access_keys: [AKIAEXAMPLE1], buckets: [training-data], prefixes: [ckpt/], ops: [WRITE]}              
+ 10       group_by: [access_key, bucket]                                                                              
+ 11       limit: {rate: 2000, burst: 8000}                                                                            
+ 12     - id: list-storm                                                                                              
+ 13       match: {ops: [LIST]}                                                                                        
+ 14       group_by: [source_ip]                                                                                       
+ 15       limit: {rate: 50, burst: 200}                                                                               
+ 16       on_limit: too_many_requests                                                                                 
+ 17     - id: frozen                                                                                                  
+ 18       match: {access_keys: [AKIAREVOKED]}                                                                         
+ 19       limit: {rate: 0}                                                                                            
+ 20                                                                                                                   
+                                                                                                                      
+                                                                                                                      
+                                                                                                                      
+                                                                                                                      
+                                                                                                                      
+                                                                                                                      
+                                                                                                                      
+                                                                                                                      
+                                                                                                                      
+                                                                                                                      
+                                                                                                                      
+                                                                                                                      
+   INVALID: bogus: unknown key 
+
+
+
+
+NORMAL · i insert · ctrl+s save · ctrl+r save and reload · E $EDITOR · L reload buffer · esc close

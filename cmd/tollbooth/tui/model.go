@@ -12,10 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package tui is `tollbooth tui`: five read-only screens over the admin API, polled every
-// interval, keyboard only, 80×24 minimum, honoring NO_COLOR and TERM=dumb, showing the last state
-// under a staleness banner when the admin API is unreachable (docs/SPEC.md, Operator surface;
-// ADR-0003). It is the only package that imports charmbracelet (depguard).
+// Package tui is `tollbooth tui`: six screens over the admin API, polled every interval, keyboard
+// only, 80×24 minimum, honoring NO_COLOR and TERM=dumb, showing the last state under a staleness
+// banner when the admin API is unreachable (docs/SPEC.md, Operator surface; ADR-0003). Five are
+// read-only; the Config screen's editor (ADR-0006) writes the config file only on an explicit save.
+// It is the only package that imports charmbracelet (depguard).
 package tui
 
 import (
@@ -37,7 +38,7 @@ import (
 	"github.com/blakegolliher/tollbooth/internal/showback"
 )
 
-// Screen is one of the five.
+// Screen is one of the six.
 type Screen int
 
 // The screens, in key order.
@@ -47,9 +48,10 @@ const (
 	ScreenUsage
 	ScreenBackends
 	ScreenConfig
+	ScreenGraphs
 )
 
-var screenNames = map[Screen]string{ScreenOverview: "Overview", ScreenLimits: "Limits", ScreenUsage: "Usage", ScreenBackends: "Backends", ScreenConfig: "Config"}
+var screenNames = map[Screen]string{ScreenOverview: "Overview", ScreenLimits: "Limits", ScreenUsage: "Usage", ScreenBackends: "Backends", ScreenConfig: "Config", ScreenGraphs: "Graphs"}
 
 // Options configure a Model.
 type Options struct {
@@ -60,6 +62,10 @@ type Options struct {
 	Now func() time.Time
 	// Hours of usage the Usage screen shows by default.
 	UsageHours int
+	// History is how many polls the Graphs screen keeps (default 300: ten minutes at 2 s).
+	History int
+	// Editor is the external editor for `E` on the Config screen; empty means $EDITOR, then vi.
+	Editor string
 }
 
 // usageGroupBys are the group-by choices `g` cycles through.
@@ -75,6 +81,7 @@ type snapshot struct {
 	view     configView
 	usage    *showback.Result
 	usageErr string
+	metrics  map[string]float64 // the few process gauges the Graphs screen plots
 	at       time.Time
 }
 
@@ -111,10 +118,15 @@ type (
 	clearNotice struct{}
 )
 
-// sample is one poll's rates, for the sparklines.
+// sample is one poll's numbers, for the Overview sparklines and the Graphs screen.
 type sample struct {
 	at                  time.Time
 	requests, throttled float64
+	inflight            float64
+	ttfb                map[string]float64 // endpoint → last TTFB ms
+	denied              map[string]int64   // rule → denied since start (cumulative)
+	heapMiB, rssMiB     float64
+	goroutines          float64
 }
 
 // Model is the Bubble Tea model.
@@ -128,9 +140,13 @@ type Model struct {
 	snap    *snapshot // last successful poll; nil before the first
 	stale   bool      // the last poll failed; snap is old
 	lastErr string
-	history []sample // last five minutes of polls
+	history []sample // the last Options.History polls
+	paused  bool     // Graphs: history frozen
 
 	notice string // one-line message at the bottom
+
+	// Config editor (ADR-0006)
+	ed editorState
 
 	// Limits
 	filter     textinput.Model
@@ -171,6 +187,9 @@ func New(opts Options) Model {
 	}
 	if opts.UsageHours <= 0 {
 		opts.UsageHours = 24
+	}
+	if opts.History <= 0 {
+		opts.History = 300
 	}
 	m := Model{opts: opts, screen: ScreenOverview, width: 80, height: 24}
 	m.filter = newInput("filter rules by id, bucket, key…", 40)
@@ -240,6 +259,9 @@ func (m Model) poll() tea.Cmd {
 			return pollMsg{err: err}
 		}
 		s.config, s.view = cv.Config, cv.configView
+		if raw, err := c.Do(ctx, http.MethodGet, "/metrics", nil, nil); err == nil {
+			s.metrics = parseGauges(raw, "go_memstats_heap_alloc_bytes", "go_goroutines", "process_resident_memory_bytes")
+		}
 		q := url.Values{"group_by": {groupBy}}
 		if from != "" {
 			q.Set("from", from)
@@ -259,9 +281,15 @@ func (m Model) poll() tea.Cmd {
 
 // Update handles messages.
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	if m2, cmd, ok := m.updateEditor(msg); ok {
+		return m2, cmd
+	}
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width, m.height = msg.Width, msg.Height
+		if m.ed.open {
+			m.sizeEditor()
+		}
 		return m, nil
 	case tickMsg:
 		return m, tea.Batch(m.poll(), m.tick())
@@ -272,10 +300,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.stale, m.lastErr = false, ""
 		m.snap = msg.snap
-		m.history = append(m.history, sample{at: msg.snap.at, requests: msg.snap.status.Rates.Requests1s, throttled: msg.snap.status.Rates.Throttled1s})
-		cutoff := msg.snap.at.Add(-5 * time.Minute)
-		for len(m.history) > 0 && m.history[0].at.Before(cutoff) {
-			m.history = m.history[1:]
+		if !m.paused {
+			m.history = append(m.history, sampleOf(msg.snap))
+			for len(m.history) > m.opts.History {
+				m.history = m.history[1:]
+			}
 		}
 		if m.selected >= len(m.visibleRules()) {
 			m.selected = max(0, len(m.visibleRules())-1)
@@ -332,6 +361,9 @@ func clearAfter(d time.Duration) tea.Cmd {
 // key handles a key press: text inputs first when one is active, then the global keys, then the
 // screen's own.
 func (m Model) key(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if m.ed.open {
+		return m.keyEditor(msg)
+	}
 	if m.testing {
 		return m.keyTestForm(msg)
 	}
@@ -400,14 +432,24 @@ func (m Model) key(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "?":
 		m.help = !m.help
 		return m, nil
-	case "1", "2", "3", "4", "5":
+	case "1", "2", "3", "4", "5", "6":
 		m.screen = Screen(msg.String()[0] - '0')
 		m.help = false
 		m.detail = false
 		return m, nil
 	case "r":
-		if m.screen == ScreenOverview || m.screen == ScreenConfig {
+		switch m.screen {
+		case ScreenOverview, ScreenConfig:
 			return m, m.reload()
+		case ScreenGraphs:
+			m.history = nil
+			return m, nil
+		default:
+		}
+	case " ":
+		if m.screen == ScreenGraphs {
+			m.paused = !m.paused
+			return m, nil
 		}
 	case "esc":
 		m.detail = false
@@ -421,12 +463,54 @@ func (m Model) key(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case ScreenUsage:
 		return m.keyUsage(msg)
 	case ScreenConfig:
-		if msg.String() == "v" {
+		switch msg.String() {
+		case "v":
 			return m, m.validate()
+		case "e":
+			return m.openEditor()
 		}
 	default:
 	}
 	return m, nil
+}
+
+// sampleOf reduces a poll to the numbers the graphs keep.
+func sampleOf(s *snapshot) sample {
+	out := sample{at: s.at, requests: s.status.Rates.Requests1s, throttled: s.status.Rates.Throttled1s, inflight: float64(s.status.Inflight),
+		ttfb: make(map[string]float64, len(s.status.Backends)), denied: make(map[string]int64, len(s.limits.Rules))}
+	for i := range s.status.Backends {
+		out.ttfb[s.status.Backends[i].Endpoint] = s.status.Backends[i].TTFBLastMS
+	}
+	for i := range s.limits.Rules {
+		out.denied[s.limits.Rules[i].ID] = s.limits.Rules[i].Denied
+	}
+	out.heapMiB = s.metrics["go_memstats_heap_alloc_bytes"] / (1 << 20)
+	out.rssMiB = s.metrics["process_resident_memory_bytes"] / (1 << 20)
+	out.goroutines = s.metrics["go_goroutines"]
+	return out
+}
+
+// parseGauges picks named series out of a Prometheus text exposition; absent names are absent.
+func parseGauges(raw []byte, names ...string) map[string]float64 {
+	want := make(map[string]bool, len(names))
+	for _, n := range names {
+		want[n] = true
+	}
+	out := map[string]float64{}
+	for _, line := range strings.Split(string(raw), "\n") {
+		if line == "" || line[0] == '#' {
+			continue
+		}
+		name, val, ok := strings.Cut(line, " ")
+		if !ok || !want[name] {
+			continue
+		}
+		var f float64
+		if _, err := fmt.Sscanf(val, "%g", &f); err == nil {
+			out[name] = f
+		}
+	}
+	return out
 }
 
 func (m Model) keyLimits(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
