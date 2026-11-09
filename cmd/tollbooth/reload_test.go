@@ -209,7 +209,8 @@ func TestServeShowbackSnapshotAndDrain(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	log := slog.New(slog.NewJSONHandler(&lockedBuffer{}, nil))
+	logBuf := &lockedBuffer{}
+	log := slog.New(slog.NewJSONHandler(logBuf, &slog.HandlerOptions{Level: slog.LevelDebug}))
 	ctx, cancel := context.WithCancel(context.Background())
 	stdout, _ := tempFiles(t)
 	done := make(chan error, 1)
@@ -259,6 +260,6 @@ func TestServeShowbackSnapshotAndDrain(t *testing.T) {
 		t.Fatalf("rc %d: %s", rc, read(errOut))
 	}
 	if s := read(out); !strings.Contains(s, "4 requests") || !strings.Contains(s, "GetObject") {
-		t.Fatalf("usage query after drain:\n%s", s)
+		t.Fatalf("usage query after drain:\n%s\nserve log:\n%s", s, logBuf.String())
 	}
 }
