@@ -41,17 +41,19 @@ import (
 	"github.com/blakegolliher/tollbooth/internal/config"
 	"github.com/blakegolliher/tollbooth/internal/limiter"
 	"github.com/blakegolliher/tollbooth/internal/s3id"
+	"github.com/blakegolliher/tollbooth/internal/showback"
 )
 
 // Handler is the one pipeline. All fields are set once at startup; per-request configuration is
 // read from Config at handler entry.
 type Handler struct {
-	Config  *atomic.Pointer[config.Config]
-	Backend *Pool
-	Metrics *admin.Metrics
-	Limiter *limiter.Limiter // the rule set in force is read inside Decide; nil means no limiter (tests)
-	Access  *AccessLogger    // nil: access logging off (the default; showback is the record)
-	Log     *slog.Logger
+	Config   *atomic.Pointer[config.Config]
+	Backend  *Pool
+	Metrics  *admin.Metrics
+	Limiter  *limiter.Limiter     // the rule set in force is read inside Decide; nil means no limiter (tests)
+	Showback *showback.Aggregator // every completed request is counted here; nil means off (tests)
+	Access   *AccessLogger        // nil: access logging off (the default; showback is the record)
+	Log      *slog.Logger
 
 	pool        *bufPool
 	inflight    atomic.Int64
@@ -62,9 +64,9 @@ type Handler struct {
 }
 
 // New wires a Handler. copyBufferBytes is proxy.copy_buffer_bytes, fixed for the process.
-func New(cfg *atomic.Pointer[config.Config], backend *Pool, m *admin.Metrics, lim *limiter.Limiter, access *AccessLogger, log *slog.Logger) *Handler {
+func New(cfg *atomic.Pointer[config.Config], backend *Pool, m *admin.Metrics, lim *limiter.Limiter, sb *showback.Aggregator, access *AccessLogger, log *slog.Logger) *Handler {
 	c := cfg.Load()
-	return &Handler{Config: cfg, Backend: backend, Metrics: m, Limiter: lim, Access: access, Log: log, pool: newBufPool(c.Proxy.CopyBufferBytes)}
+	return &Handler{Config: cfg, Backend: backend, Metrics: m, Limiter: lim, Showback: sb, Access: access, Log: log, pool: newBufPool(c.Proxy.CopyBufferBytes)}
 }
 
 // outcome is filled in as the request progresses and recorded exactly once by finish().
@@ -337,7 +339,7 @@ func (h *Handler) guard(w http.ResponseWriter, o *outcome) {
 }
 
 // finish records the request exactly once: the pre-resolved counters, the three latencies, the
-// byte counters, and the access log line when enabled. Phase 3 adds the showback increment.
+// byte counters, the showback increment, and the access log line when enabled.
 func (h *Handler) finish(r *http.Request, o *outcome) {
 	if o.recorded {
 		return
@@ -360,6 +362,10 @@ func (h *Handler) finish(r *http.Request, o *outcome) {
 	h.Metrics.Request(o.id.Op, sc, res).Inc()
 	h.Metrics.Observe(o.id.Class, total.Seconds(), overhead.Seconds(), o.ttfb.Seconds())
 	h.Metrics.AddBytes(o.bytesIn, o.bytesOut)
+	if h.Showback != nil && !h.Config.Load().Kill.ShowbackDisable {
+		// Once, at completion, with the bytes actually moved; the hour is read inside Record (D-025).
+		h.Showback.Record(&o.id, showback.Status(sc), o.bytesIn, o.bytesOut)
+	}
 	if h.Access != nil {
 		h.Access.Log(&Access{
 			Client: o.id.SourceIP, Method: r.Method, Host: r.Host, Addressing: o.id.Addressing.String(),
