@@ -1,18 +1,17 @@
 # STATUS
 
-Current phase: **0 (Design) passed; Phase 1 cleared to start.** Fable's second review (2026-11-08)
-graded Gate 0 **pass** after reading the report, all decisions, DESIGN.md, the op-table
-reconciliation, the ADRs, CONFIG.md, the lint and CI config, the backend script, and the deps
-ledger. Five corrections (none blocking) are folded into the design below; the Phase 0 PR from
-`phase-0` into `main` is the phase-close step. Phase 1 begins on branch `phase-1` once the PR is
-merged.
+Current phase: **1 (Passthrough), in progress** on branch `phase-1` as feature PRs merged in order.
+Merged: #2 identity and classifier, #4 config, #5 proxy, admin, and null backend, #6 serve,
+check-config, version. Open: #7 byte-equivalence harness (record mode 285 cases, 0 diffs), #8
+client compatibility matrix. Gate 1 needs the Garage and versitygw byte-equivalence and client
+matrix green in CI, the one-CPU-hour fuzz, and `docs/reports/gate-1.md`.
 
 ## Phases
 
 | Phase | Deliverables | Gate | State |
 | --- | --- | --- | --- |
 | 0 Design | `docs/DESIGN.md`; ADR-0001, ADR-0002 (open decisions) and ADR-0003 (TUI in one binary); shunt's op table checked against the API reference (`docs/OPERATIONS_TABLE.md`); repo scaffold, `Makefile`, CI skeleton, `THIRD_PARTY_NOTICES.md`; `docs/CONFIG.md` | Fable approves the design and ADRs; every requirement maps to a `DESIGN.md` section or an explicit deferral | **pass, 2026-11-08** (first review: pass with fixes; fixes applied; second review: pass); tagged `phase-0` |
-| 1 Passthrough | transparent proxy lifted from shunt + TLS, PROXY protocol, trusted XFF; identity; classifier; backend pool; admin health/ready/metrics; null and recording backends | byte-equivalence green; compat matrix 100% on Garage and versitygw; fuzz 1 CPU-hour clean; `-race` clean | cleared to start |
+| 1 Passthrough | transparent proxy lifted from shunt + TLS, PROXY protocol, trusted XFF; identity; classifier; backend pool; admin health/ready/metrics; null and recording backends | byte-equivalence green; compat matrix 100% on Garage and versitygw; fuzz 1 CPU-hour clean; `-race` clean | **in progress**: code merged (#2 #4 #5 #6), harness PRs #7 #8 open |
 | 2 Rate limiting | rules, matchers, GCRA, single pass, both modes, `Expect: 100-continue` measured, hot reload, limiter metrics, `/admin/limits`, `rules *` verbs | limiter suite green (fake clock); 10 µs p99; reload under load zero failures; SDKs complete work under 1 req/s | not started |
 | 3 Showback | aggregator, snapshot and seal, NDJSON, `usage` verbs, `/admin/usage`, dimensions and cap, restart, multi-node sum | reconciliation exact; rollover tests; kill between snapshots loses ≤ `flush_interval`; verify detects a removed hour | not started |
 | 4 Operator surface | remaining verbs, shared admin client, `/admin/status`, `/admin/limits/test`, `/admin/backends`, `tollbooth tui` | parity test; CLI goldens ×3 formats; `teatest` goldens; runbook tasks from the TUI and CLI alone | not started |
