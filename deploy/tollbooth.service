@@ -1,0 +1,75 @@
+# tollbooth: transparent S3 proxy with inline rate limiting and hourly showback.
+#
+# Install: copy the binary to /usr/local/bin/tollbooth, the config to /etc/tollbooth/tollbooth.yaml,
+# and the admin token to /etc/tollbooth/admin.token (mode 0600, owner tollbooth); then
+#   systemctl enable --now tollbooth
+# Reload rules without dropping connections: systemctl reload tollbooth (SIGHUP) or
+#   tollbooth config reload --config /etc/tollbooth/tollbooth.yaml
+# Upgrade without dropping in-flight requests: install the new binary, then systemctl restart
+# tollbooth; stop drains in-flight requests up to proxy.drain_timeout (30 s by default) and takes the
+# showback snapshot before exiting (docs/OPERATIONS.md, Upgrade).
+
+[Unit]
+Description=tollbooth S3 rate-limit and showback proxy
+Documentation=https://github.com/blakegolliher/tollbooth/blob/main/docs/OPERATIONS.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=tollbooth
+Group=tollbooth
+ExecStartPre=/usr/local/bin/tollbooth check-config /etc/tollbooth/tollbooth.yaml
+ExecStart=/usr/local/bin/tollbooth serve --config /etc/tollbooth/tollbooth.yaml
+ExecReload=/bin/kill -HUP $MAINPID
+# Drain: SIGTERM, then up to drain_timeout plus the showback snapshot before SIGKILL.
+KillSignal=SIGTERM
+TimeoutStopSec=45
+Restart=on-failure
+RestartSec=2
+
+# Resource caps (docs/SPEC.md, Performance targets; docs/OPERATIONS.md, Sizing).
+# GOMEMLIMIT is the memory target the specification measures against: the heap stays under it at
+# 1,000,000 limiter keys and 250,000 showback tuples (226 and 257 bytes each, measured).
+Environment=GOMEMLIMIT=1GiB
+# Every client and backend connection is one descriptor: about 2 × listen.max_inflight plus the idle
+# backend pool, with headroom (tollbooth doctor checks this).
+LimitNOFILE=65536
+# MemoryMax is the hard cap the kernel enforces above the Go limit; tune with GOMEMLIMIT together.
+MemoryMax=1536M
+TasksMax=16384
+
+# State and secrets.
+StateDirectory=tollbooth
+StateDirectoryMode=0750
+ConfigurationDirectory=tollbooth
+ReadWritePaths=/var/lib/tollbooth
+
+# Hardening: no privileges, no writable system, no new capabilities. The proxy binds :8443 by
+# default (unprivileged); for :443 add AmbientCapabilities=CAP_NET_BIND_SERVICE.
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+ProtectProc=invisible
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallFilter=~@privileged @resources
+CapabilityBoundingSet=
+UMask=0027
+
+[Install]
+WantedBy=multi-user.target
