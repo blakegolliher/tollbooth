@@ -102,9 +102,10 @@ func (l *countingListener) Accept() (net.Conn, error) {
 }
 
 // client is an aws-sdk-go-v2 S3 client at the proxy. maxAttempts 0 keeps the SDK's default retry
-// settings (standard mode, 3 attempts, exponential backoff with jitter, x-amz-retry-after
-// honored), which is what category 7 tests; adaptive selects the SDK's own throttling-aware mode
-// (client-side rate limiting that adapts to SlowDown), as AWS_RETRY_MODE=adaptive would.
+// settings (standard mode, 3 attempts, exponential backoff with jitter; Retry-After and
+// x-amz-retry-after ignored unless AWS_NEW_RETRIES_2026=true), which is what category 7 tests;
+// adaptive selects the SDK's own throttling-aware mode (client-side rate limiting that adapts to
+// SlowDown), as AWS_RETRY_MODE=adaptive would.
 func (r *rig) client(maxAttempts int, adaptive bool) *s3.Client {
 	cfg := aws.Config{
 		Region:      "us-east-1",
@@ -180,40 +181,66 @@ rate_limits:
 	}
 }
 
-// Gate 2 criterion: SDK clients complete work under a 1 req/s rule via their own retries. The Go
-// SDK's default retryer (standard mode, 3 attempts, exponential backoff with jitter) is used as is;
-// it waits at least the proxy's x-amz-retry-after (D-043), so a sequential client never burns its
-// three attempts inside one emission interval. The test reports attempts, failures, and time.
+// Gate 2 criterion: SDK clients complete work under a 1 req/s rule via their own retries. Three
+// configurations of the Go SDK run the same five sequential PutObjects:
+//
+//   - standard-default: the SDK as shipped (3 attempts, jittered exponential backoff, both
+//     Retry-After headers ignored). A throttled attempt is followed by a random wait in [0, 2 s)
+//     and then [0, 4 s), so three attempts can land inside one emission interval with about 6%
+//     probability per throttled object; completion is recorded, not asserted.
+//   - standard-2026: AWS_NEW_RETRIES_2026=true, the SDK's next retry behavior, which waits at
+//     least the proxy's x-amz-retry-after (D-043): completion is deterministic and asserted.
+//   - adaptive: the SDK's throttling-aware mode (AWS_RETRY_MODE=adaptive): asserted.
+//
+// Every configuration asserts the invariants: the backend served exactly the objects the client
+// counts as done, every failure is the proxy's throttle error, and the work took at least the
+// time the rule allows.
 func TestGoSDKCompletesUnderOneRequestPerSecond(t *testing.T) {
-	r := start(t, `
+	for _, mode := range []struct {
+		name     string
+		adaptive bool
+		env2026  bool
+		assert   bool
+	}{{"standard-default", false, false, false}, {"standard-2026", false, true, true}, {"adaptive", true, false, true}} {
+		t.Run(mode.name, func(t *testing.T) {
+			if mode.env2026 {
+				t.Setenv("AWS_NEW_RETRIES_2026", "true")
+			}
+			r := start(t, `
 rate_limits:
   rules:
     - id: one-per-second
       match: {buckets: [slow]}
       limit: {rate: 1, burst: 1}
 `)
-	c := r.client(0, false)
-	const objects = 5
-	start := time.Now()
-	failed := 0
-	for i := 0; i < objects; i++ {
-		_, err := c.PutObject(context.Background(), &s3.PutObjectInput{Bucket: aws.String("slow"), Key: aws.String(fmt.Sprintf("o%d", i)), Body: bytes.NewReader(bytes.Repeat([]byte("x"), 4096))})
-		if err != nil {
-			failed++
-			t.Logf("object %d failed after the SDK's retries: %v", i, err)
-		}
-	}
-	elapsed := time.Since(start)
-	denied := r.denied("one-per-second")
-	t.Logf("%d sequential PutObjects under a 1 req/s rule with the Go SDK's default retries: %d failed, %.0f throttled attempts, %v total (floor %v)", objects, failed, denied, elapsed.Round(time.Millisecond), (objects-1)*time.Second)
-	if served := r.nb.Served(); int(served) != objects-failed {
-		t.Fatalf("backend served %d, want %d", served, objects-failed)
-	}
-	if failed != 0 {
-		t.Fatalf("%d of %d objects failed under a 1 req/s rule with default retries", failed, objects)
-	}
-	if elapsed < (objects-1)*time.Second {
-		t.Fatalf("%d objects at 1 req/s finished in %v, faster than the rule allows", objects, elapsed)
+			c := r.client(0, mode.adaptive)
+			const objects = 5
+			start := time.Now()
+			failed := 0
+			for i := 0; i < objects; i++ {
+				_, err := c.PutObject(context.Background(), &s3.PutObjectInput{Bucket: aws.String("slow"), Key: aws.String(fmt.Sprintf("o%d", i)), Body: bytes.NewReader(bytes.Repeat([]byte("x"), 4096))})
+				if err != nil {
+					failed++
+					var api smithy.APIError
+					if !errors.As(err, &api) || api.ErrorCode() != "SlowDown" {
+						t.Fatalf("object %d failed with something other than the proxy's SlowDown: %v", i, err)
+					}
+					t.Logf("object %d failed after the SDK's retries: %v", i, err)
+				}
+			}
+			elapsed := time.Since(start)
+			denied := r.denied("one-per-second")
+			t.Logf("%s: %d sequential PutObjects under a 1 req/s rule: %d failed, %.0f throttled attempts, %v total (floor %v)", mode.name, objects, failed, denied, elapsed.Round(time.Millisecond), (objects-1)*time.Second)
+			if served := r.nb.Served(); int(served) != objects-failed {
+				t.Fatalf("backend served %d, want %d", served, objects-failed)
+			}
+			if failed == 0 && elapsed < (objects-1)*time.Second {
+				t.Fatalf("%d objects at 1 req/s finished in %v, faster than the rule allows", objects, elapsed)
+			}
+			if mode.assert && failed != 0 {
+				t.Fatalf("%s: %d of %d objects failed under a 1 req/s rule", mode.name, failed, objects)
+			}
+		})
 	}
 }
 

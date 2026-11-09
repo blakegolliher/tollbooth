@@ -91,7 +91,7 @@ import glob, os, sys
 run, out, backends = sys.argv[1], sys.argv[2], sys.argv[3:]
 cells = {}  # (tool, op) -> {backend: (status, detail)}
 for b in backends:
-    for f in glob.glob(os.path.join(run, f"results-*-{b}.tsv")):
+    for f in glob.glob(os.path.join(run, f"results-s3diff-{b}.tsv")) + glob.glob(os.path.join(run, f"results-clients-{b}.tsv")):
         for line in open(f):
             parts = line.rstrip("\n").split("\t")
             if len(parts) < 3:
