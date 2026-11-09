@@ -99,7 +99,9 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: compat-logs
-          path: run/compat/
+          path: |
+            run/compat/
+            docs/COMPAT.md
           if-no-files-found: ignore
       - name: stop the backends
         if: always()

@@ -170,7 +170,9 @@ func (t *target) rawPut(ctx context.Context, bucket, key string, payload []byte,
 	n := int64(len(payload))
 	switch m.payload {
 	case "presigned":
-		req, err := http.NewRequestWithContext(ctx, http.MethodPut, u, http.NoBody)
+		// The signer signs whatever query is present; X-Amz-Expires is the S3 presigner's job, so
+		// it is added here, as every SDK's presigner does.
+		req, err := http.NewRequestWithContext(ctx, http.MethodPut, u+"?X-Amz-Expires=300", http.NoBody)
 		if err != nil {
 			return err
 		}
@@ -324,7 +326,7 @@ func encodeSignedChunks(payload, key []byte, seed, ts, scope, trailerName, algo 
 
 // rawPresignedGet reads bucket/key through a SigV4 presigned URL and checks the body.
 func (t *target) rawPresignedGet(ctx context.Context, bucket, key string, want [32]byte, checkContent bool) error {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, t.objectURL(bucket, key), http.NoBody)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, t.objectURL(bucket, key)+"?X-Amz-Expires=300", http.NoBody)
 	if err != nil {
 		return err
 	}

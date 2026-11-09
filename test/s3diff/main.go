@@ -65,7 +65,7 @@ var headerAllow = map[string]bool{
 }
 
 // xmlNoise strips per-request values from XML bodies before comparing them.
-var xmlNoise = regexp.MustCompile(`<(UploadId|RequestId|HostId|LastModified|CreationDate|Initiated|Date|VersionId|DeleteMarkerVersionId)>[^<]*</`)
+var xmlNoise = regexp.MustCompile(`<(UploadId|NextUploadIdMarker|UploadIdMarker|RequestId|HostId|LastModified|CreationDate|Initiated|Date|VersionId|DeleteMarkerVersionId)>[^<]*</`)
 
 // locationPort strips the port from <Location>: backends echo the Host header into it, and the
 // proxy's listener port differs from the backend's. Passthrough preserves Host by design.
