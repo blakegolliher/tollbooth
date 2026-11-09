@@ -494,12 +494,12 @@ listener's pool. Routes, each a read of state the proxy already holds:
 | `GET /healthz` | Process is up. |
 | `GET /readyz` | Config loaded and at least one backend healthy. |
 | `GET /metrics` | Prometheus exposition. |
-| `POST /admin/reload` | Same as `SIGHUP`; returns the validation result. |
-| `GET /admin/config` | Effective config with `admin.token` redacted, last reload result and time. |
+| `POST /admin/reload` | Same as `SIGHUP`; returns the result as JSON, 200 when published, 422 when the file was rejected (D-040). |
+| `GET /admin/config` | Effective config with `admin.token` redacted, in the file's key names, with the generation, load time, and last reload result (D-040). |
 | `GET /admin/status` | Uptime, node id, in-flight, req/s, throttled/s, backend health, config generation, last reload result. |
 | `GET /admin/limits` | Rules in force, live key count per rule, denied counts since start. |
 | `GET /admin/limits/top?n=` | Top denied keys in the last 60 s (5.5). |
-| `POST /admin/limits/test` | Dry run for `rules test` (5.3, `consume=false`). |
+| `POST /admin/limits/test` | Dry run for `rules test` (5.3, `consume=false`); served from Phase 2 (D-039). |
 | `GET /admin/backends` | Endpoints, health, in-flight, error counters, TTFB. |
 | `GET /admin/usage?from=&to=&group_by=&where=&format=` | Showback query over this node's store (6.4). |
 | `GET /debug/pprof/*` | Only with `admin.pprof: true`. |
@@ -571,8 +571,12 @@ example by embedding the readers in one per-request struct), the table shrinks a
 bound follows it; it never grows without an ADR.
 
 Denied path (throttle): stages 2–5, then the XML body is written from a pooled byte slice with
-`Retry-After` and a request id (one 16-byte random read, one string); ≤ 3 allocations, no body
-read. A throttle storm is cheaper per request than a forwarded request.
+`Retry-After` and a request id (128 random bits from `math/rand/v2`, formatted on the stack).
+Measured 2026-11-09 by `TestThrottledAllocations` (pinned at the measured value, D-041):
+**4 allocations** in both build modes, the request-id string, the `Content-Length` string, and the
+two single-value header slices that vary (`Content-Length`, `X-Amz-Request-Id`); `Content-Type` and
+small `Retry-After` values are shared slices; no body read, nothing per body byte. A throttle storm
+allocates less per request than a forwarded request and does none of its I/O.
 
 ### 9.3 Pre-resolved metric handles
 

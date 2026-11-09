@@ -146,7 +146,9 @@ document what breaks when flipped.
 ## Reload semantics
 
 `SIGHUP` or `POST /admin/reload` parses and validates the whole file, builds the complete rule set
-and matchers, and swaps one pointer. Requests in flight finish under the config they started with.
+and matchers, and swaps one pointer. The route answers 200 with the result (`ok`, `generation`,
+`rules`, `duration_ms`) when the new config is published and 422 with the validation error when the
+file is rejected (D-040); `GET /admin/config` repeats the last result. Requests in flight finish under the config they started with.
 Limiter state is keyed by rule id and is never reset: a changed `rate` or `burst` applies from the
 next decision; state of removed rules is swept. `listen.address`, `listen.proxy_protocol`,
 `admin.address`, `node_id`, `showback.dir`, `proxy.copy_buffer_bytes`, and every `backend.*` key
