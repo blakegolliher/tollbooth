@@ -148,7 +148,9 @@ document what breaks when flipped.
 `SIGHUP` or `POST /admin/reload` parses and validates the whole file, builds the complete rule set
 and matchers, and swaps one pointer. Requests in flight finish under the config they started with.
 Limiter state is keyed by rule id and is never reset: a changed `rate` or `burst` applies from the
-next decision; state of removed rules is swept. `listen.address`, `admin.address`, `node_id`, and
-`showback.dir` cannot change on reload; a change to any of them is a reload error that keeps the
-running config and says a restart is needed. TLS certificates are re-read. Reload must complete
+next decision; state of removed rules is swept. `listen.address`, `listen.proxy_protocol`,
+`admin.address`, `node_id`, `showback.dir`, `proxy.copy_buffer_bytes`, and every `backend.*` key
+cannot change on reload (the listener, the copy-buffer pool, and the backend transport are built
+once, D-029); a change to any of them is a reload error that keeps the running config and says a
+restart is needed. TLS certificates are re-read. Reload must complete
 in under 100 ms with zero failed requests under load (Phase 2 test).

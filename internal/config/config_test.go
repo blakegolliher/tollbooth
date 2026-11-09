@@ -310,8 +310,9 @@ func TestReloadCompatible(t *testing.T) {
 	b.Listen.Address = ":9999"
 	b.NodeID = "other"
 	b.Proxy.DrainTimeout = time.Minute // allowed to change
+	b.Backend.Endpoints = []string{"other:1"}
 	err = b.ReloadCompatible(a)
-	if err == nil || !strings.Contains(err.Error(), "listen.address: cannot change on reload") || !strings.Contains(err.Error(), "node_id: cannot change") || strings.Contains(err.Error(), "drain_timeout") {
+	if err == nil || !strings.Contains(err.Error(), "listen.address: cannot change on reload") || !strings.Contains(err.Error(), "node_id: cannot change") || !strings.Contains(err.Error(), "backend: cannot change") || strings.Contains(err.Error(), "drain_timeout") {
 		t.Fatalf("reload compatibility: %v", err)
 	}
 }
