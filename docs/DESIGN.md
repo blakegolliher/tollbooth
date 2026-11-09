@@ -159,9 +159,17 @@ out := &http.Request{
 
 - `URL.Opaque` carries the raw path so `%2F`, `+`, `//`, and every other byte reach the backend
   unchanged; `RawQuery` is appended verbatim by `URL.RequestURI()`. Go would otherwise normalize
-  `%2F` into `/` and break the signature. A request-target that begins with `//` cannot be
-  expressed through `Opaque` (Go would emit absolute-form); the handler answers it `400 InvalidURI`
-  and counts `proxy_error` (`docs/DECISIONS.md` D-004).
+  `%2F` into `/` and break the signature. One case needs a second mechanism: `URL.RequestURI()`
+  turns an `Opaque` that begins with `//` into absolute-form (`scheme://…`). For a raw path that
+  begins with `//` the handler instead sets `URL.Path = unescape(rawPath)` and
+  `URL.RawPath = rawPath`, and `EscapedPath()` returns `rawPath` byte-for-byte whenever Go's
+  `validEncoded` accepts it (every properly percent-encoded path does). Path-style `//key` has an
+  empty bucket, classifies `Unknown`, and is forwarded for the backend to answer; virtual-hosted
+  `//key` is the legal object key `/key` and is forwarded the same way. **The proxy never rejects
+  what the backend might accept.** Its only self-generated `400 InvalidURI` is a request-target it
+  cannot forward at all: a leading `//` combined with bytes Go would re-encode (raw non-ASCII or
+  the few reserved characters `validEncoded` refuses), which no S3 client produces. Both `//`
+  cases are s3diff cases (`docs/DECISIONS.md` D-004, revised at Gate 0).
 - Hop-by-hop headers are deleted from the shared map before sending: `Connection`, `Keep-Alive`,
   `Proxy-Authenticate`, `Proxy-Authorization`, `Proxy-Connection`, `TE`, `Trailer`,
   `Transfer-Encoding`, `Upgrade`, plus any header named in `Connection`. `Expect` is kept: it
@@ -502,9 +510,27 @@ nothing scales with body size.
 | 9. Finish | pre-resolved counters (9.3), two histogram observes, showback `Record` | 0 steady state; new tuple: 1 `row` + up to 3 clones | ≤ 2 µs p99 showback + ≤ 1 µs metrics |
 
 Total ours: **≤ 7 small allocations per forwarded request**, 0 per body byte, 0 in the limiter
-decision and the showback increment at steady state. `BenchmarkHandlerGetObject` with `-benchmem`
-records the real number at Gate 1 and it becomes the committed baseline with the ±10% threshold;
-the limiter and showback microbenchmarks assert exactly 0.
+decision and the showback increment at steady state. The seven, by name:
+
+| # | Allocation | Where | Why it cannot be avoided |
+| --- | --- | --- | --- |
+| 1 | `*http.Request` for the outbound request | §4.4 | `http.Transport.RoundTrip` takes a pointer it retains for the request's lifetime |
+| 2 | `*url.URL` for the outbound request | §4.4 | `Request.URL` is a pointer; the inbound URL cannot be reused because `Opaque`, `Scheme`, and `Host` differ |
+| 3 | `*progressReader` on the request body | §4.4 | only when the request has a body; `Request.Body` is an interface value, so a heap object is needed |
+| 4 | `*progressReader` on the response body | §4.6 | `io.CopyBuffer`'s source is an interface value |
+| 5 | `*deadlineWriter` on the `ResponseWriter` | §4.6 | `io.CopyBuffer`'s destination is an interface value; it also hides `ReaderFrom` so the pooled buffer is used |
+| 6 | `*http.ResponseController` | §4.4, §4.6 | `http.NewResponseController` returns a pointer and the readers hold it |
+| 7 | `*time.Timer` for the idle watchdog | §4.6 | `time.AfterFunc` allocates its timer; one per request with a body or response body |
+
+Everything else is pooled (copy buffer), pre-resolved (metric handles, §9.3), or a struct value
+that does not escape (`RequestIdentity`, the limiter decision, the outcome record). Enforcement:
+`TestHandlerAllocations` in `internal/proxy` runs `testing.AllocsPerRun` over a warmed-up 4 KiB
+`GetObject` against the null backend, subtracts the `net/http` baseline measured the same way
+without the handler, and **fails if the difference exceeds 7**; `BenchmarkHandlerGetObject`
+`-benchmem` records the absolute number for the committed baseline. The limiter and showback
+microbenchmarks assert exactly 0 allocs/op. If Gate 1 finds one of the seven avoidable (for
+example by embedding the readers in one per-request struct), the table shrinks and the test's
+bound follows it; it never grows without an ADR.
 
 Denied path (throttle): stages 2–5, then the XML body is written from a pooled byte slice with
 `Retry-After` and a request id (one 16-byte random read, one string); ≤ 3 allocations, no body
@@ -579,7 +605,7 @@ Every category in docs/SPEC.md (Test plan) maps to a package and a phase:
 | 3 | Limiter | `internal/limiter` with an injected clock | 2 |
 | 4 | Fuzzing | `FuzzParse`, `FuzzClassify` (`internal/s3id`, shunt's corpus as seed), `FuzzConfig`, `FuzzNDJSON` | 1–3 |
 | 5 | Byte-equivalence | `test/s3diff` + `bench/recordbackend` | 1 |
-| 6 | Client compatibility | `test/integration`, `docs/COMPAT.md` | 1 |
+| 6 | Client compatibility | `test/integration` (Garage, versitygw, and MinIO run as pinned static binaries downloaded by `test/integration/backends.sh`, no container runtime), `docs/COMPAT.md` | 1 |
 | 7 | Throttling behavior | `test/e2e` with each SDK | 2 |
 | 8 | Showback correctness | `internal/showback` (injected clock) + reconciliation in `test/e2e` | 3 |
 | 9 | Chaos and resilience | `test/e2e` + null backend fault injection | 1–5 |
