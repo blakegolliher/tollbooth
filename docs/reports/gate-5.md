@@ -51,7 +51,7 @@ pasted in the appendix). CI on PR #24 at 8d2a209: run 42674520784, six jobs, all
 | 7 Client throttling | 7 rows, 5 completed in this CI run: aws cli default 75/200 (no), aws cli adaptive 200 (yes), boto3 default 194/200 (no), boto3 adaptive 200 (yes), s5cmd, rclone, s3cmd yes (D-044) | `docs/THROTTLE.md` (updated from run 42674520784) |
 | 8 Failure injection | the soak smoke: backend 503, bounded stall, reset, process down, invalid and valid reload, read-only showback directory, SIGHUP; every error event attributed to its window, 0 unexplained | `run/soak-smoke` in the PR description; 24 h run pending |
 | 9 Soak | **running**: 24 h at 804 req/s, chaos every 10 min, samples every 60 s | `bench/results/soak-2026-11-09T183931Z/` |
-| 10 Performance regression | microbenchmarks ran locally; the ±10% comparison on the fixed runner is the nightly (run 42673827885 dispatched on `p5/release`, result in the appendix when it completes) | `test/bench/baseline.txt` |
+| 10 Performance regression | nightly 42673827885 on the fixed runner versus the committed baseline (run 42629583831): **13 benchmarks compared, 0 failed**, deltas −6.2% to +6.4% (`SmallGET` +6.4% is the largest), allocations identical (7 on `SmallGET`, 161 end to end, 0 on `Decide` and `Record`). Finding: benchstat had never compared the two files (§5); replaced by `test/bench/compare` (6093653), which fails the build past 10% or on any extra allocation | `run/compare-nightly.txt`; `test/bench/compare` |
 
 Race: 9 packages ok under `-race -count=1`, 0 failures, coverage **90.2%** of statements (floor
 85%). Fuzz: 5 targets × 60 s, 0 crashers. Skipped: none. Not run this phase: the SDK e2e suite
@@ -99,6 +99,7 @@ p50 946 µs, p99 1.68 s (the SDK's backoff).
 | `bench/nullbackend` and `bench/loadgen` have no unit tests (pre-existing; the null backend is exercised by `internal/proxy`'s tests, the generator by every bench and soak run) | a test for the control listener's parsing and for `-rate`'s pacing arithmetic | 6 |
 | Test-to-code ratio moved from 0.654 to 0.649: 86 Go lines added this phase (bench tooling), 0 test lines | the row above | 6 |
 | The soak's error attribution is by sample, so a step that ends just before a sample and the next that begins just after share a label (`a/b`) | acceptable at 60 s samples and 10 min spacing (steps never share a sample); recorded in D-056 | — |
+| **The benchmark regression gate never enforced anything**: benchstat printed the baseline and the new run as two tables with no deltas (Gate 2 and 3: different `GOMAXPROCS` suffixes; nightly: a `go: downloading` line captured into `new.txt` made it a different configuration) and exited 0, so the specification's ±10% threshold and "an allocation on the decision path fails the build" were claims, not checks, from Phase 2 until today | fixed this phase (6093653): `test/bench/compare` (stdlib, tested) takes medians, compares same-name benchmarks, exits 1 past the threshold or on any allocs/op increase; `make bench-compare` and the nightly use it; benchstat dropped from `docs/deps.md` | 5 (done) |
 
 ## 6. Questions
 
@@ -135,14 +136,17 @@ gh workflow run nightly.yml --ref p5/release # the fixed-runner benchmark compar
 ### G1 Simplicity review
 
 Exported identifiers added this phase: one, `nullbackend.Server.StallFor` (`atomic.Int64`), read by
-`ServeHTTP` and set by the control listener in `cmd/nullbackend` (second caller). No new types,
-interfaces, or functions in `internal/` or `cmd/tollbooth`. Dependencies added: none (`go.mod`,
+`ServeHTTP` and set by the control listener in `cmd/nullbackend` (second caller). `test/bench/compare`
+is a `main` package with unexported functions and its own tests. No new types, interfaces, or
+functions in `internal/` or `cmd/tollbooth`. Dependencies added: none (`go.mod`,
 `go.sum`, `docs/deps.md` unchanged; `make tidy` clean). Body buffering in new code: none
 (`bytes.Buffer`, `io.ReadAll` absent from the diff). Feature flags and kill switches: unchanged
 from Phase 4 (showback kill switch defaults to on). LOC this phase excluding `bench/results/`:
 +893 / −29 over 18 files (86 Go lines, the rest shell, YAML, Dockerfile, unit, Markdown);
-`bench/results/` adds 6,942 lines of recorded output. Test-to-code ratio 8,083 / 12,446 = 0.649
-(was 0.654): the Go added is bench tooling with no unit tests, listed in section 5. Deletions
+`bench/results/` adds 6,942 lines of recorded output; `test/bench/compare` adds 190 lines of code
+and 95 of tests after that count. Test-to-code ratio 8,083 / 12,446 = 0.649 before the compare
+command (was 0.654): the Go added earlier in the phase is bench tooling with no unit tests, listed in
+section 5. Deletions
 made: none needed.
 
 ### G2 Validation
@@ -166,7 +170,8 @@ CI run 42674520784 (PR #24 at 8d2a209): `unit` (make all, tidy, fuzz 60 s), `aud
 against Garage and versitygw, client matrix, throttle rows): all success. The first run of the PR
 (42672430358) failed in 51 s with GitHub's "workflow file issue" and no jobs; its re-run started
 four of six jobs and reported failure; the next push ran all six green. Nightly 42673827885
-(benchmark comparison, fuzz, gated big tests): **pending**.
+on `p5/release`: `bench-regression` success (the comparison above, recomputed with `test/bench/compare`
+from the job log into `run/compare-nightly.txt`); `fuzz-1h` **pending** (one hour per target).
 
 ### G3 Telemetry and docs
 
