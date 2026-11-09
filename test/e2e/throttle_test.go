@@ -253,7 +253,8 @@ rate_limits:
 					if err != nil {
 						failed.Add(1)
 						var api smithy.APIError
-						if !(errors.As(err, &api) && api.ErrorCode() == "SlowDown") && !strings.Contains(err.Error(), "retry quota exceeded") {
+						slowDown := errors.As(err, &api) && api.ErrorCode() == "SlowDown"
+						if !slowDown && !strings.Contains(err.Error(), "retry quota exceeded") {
 							wrongErr.Add(1)
 							t.Logf("unexpected error: %v", err)
 						}
