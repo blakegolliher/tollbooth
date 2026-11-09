@@ -6,17 +6,175 @@ Source table: shunt `internal/s3/op.go` and `classify.go` at commit `9b36d09` (9
 
 ## Result of the check
 
-| Outcome | Count | Operations |
-| --- | --- | --- |
-| In shunt and in the reference, kept | 92 | everything not listed below |
-| In the reference, missing from shunt, **added** | 18 | the metadata-table family (9), `GetBucketAbac`, `PutBucketAbac`, `CreateSession`, `RenameObject`, `GetObjectAnnotation`, `PutObjectAnnotation`, `DeleteObjectAnnotation`, `ListObjectAnnotations`, `UpdateObjectEncryption` |
-| In the reference, same wire shape as a kept operation, **folded** | 4 | `GetBucketLifecycle` → `GetBucketLifecycleConfiguration`, `PutBucketLifecycle` → `PutBucketLifecycleConfiguration`, `GetBucketNotification` → `GetBucketNotificationConfiguration`, `PutBucketNotification` → `PutBucketNotificationConfiguration` (deprecated aliases; `GET /?lifecycle` and `GET /?notification` are byte-identical request lines) |
-| In the reference, not distinguishable without `x-id`, **folded** | 1 | `ListDirectoryBuckets` → `ListBuckets` (`GET /` on the `s3express-control` endpoint; the only discriminator is the host or `x-id`, and `x-id` is never the sole source) |
-| In the reference, unreachable through an S3-compatible backend, **not added** | 1 | `WriteGetObjectResponse` (`POST /WriteGetObjectResponse` to an S3 Object Lambda endpoint; through the proxy it parses as a path-style bucket named `WriteGetObjectResponse` and classifies as `PostObject`) |
-| In shunt, not in the reference, kept | 2 | `PostObject` (browser form upload, documented by AWS outside the operations list) and `Preflight` (CORS `OPTIONS`, not an API operation) |
-| Sentinel | 1 | `Unknown` |
+The arithmetic, computed by a script over the fetched list and shunt's enum (not by hand):
 
-Table size after the check: **113** entries (110 reference names + `PostObject` + `Preflight` + `Unknown`). 92 + 18 = 110; 116 − 4 folded aliases − 1 `ListDirectoryBuckets` − 1 `WriteGetObjectResponse` = 110.
+| Set | Count | Derivation |
+| --- | --- | --- |
+| AWS operations on the reference page | **116** | fetched 2026-11-08 |
+| shunt table entries at `9b36d09` | **95** | 92 AWS names + 3 entries with no AWS counterpart (`Unknown`, `Preflight`, `PostObject`) |
+| AWS names kept from shunt | 92 | in both lists |
+| AWS names **added** | 18 | in the reference, not in shunt |
+| AWS names **folded** into a kept entry | 5 | identical request line, or distinguishable only by `x-id` |
+| AWS names **excluded** | 1 | unreachable through an S3-compatible backend |
+| check: 92 + 18 + 5 + 1 | **116** | every AWS name accounted for |
+| tollbooth table entries | **113** | 92 kept + 18 added + 3 non-AWS (`Unknown`, `Preflight`, `PostObject`) |
+
+The earlier version of this file said "95 → 113, 18 added" without separating the three non-AWS
+entries, which made the sums look wrong (Gate 0 review). They were never part of the 116.
+
+### Entries with no AWS counterpart
+
+| Entry | Why it exists |
+| --- | --- |
+| `Unknown` | Sentinel: nothing matched; passed through and counted. |
+| `Preflight` | CORS `OPTIONS` at any level; not an API action but real traffic. Class `BUCKET`, anonymous. |
+| `PostObject` | Browser-form upload (`POST /` on a bucket with `multipart/form-data`), documented by AWS at [POST Object](https://docs.aws.amazon.com/AmazonS3/latest/API/RESTObjectPOST.html) outside the operations list. |
+
+### Reconciliation: every AWS name
+
+| AWS operation (link) | Disposition | Note |
+| --- | --- | --- |
+| [AbortMultipartUpload](https://docs.aws.amazon.com/AmazonS3/latest/API/API_AbortMultipartUpload.html) | table entry (from shunt) | — |
+| [CompleteMultipartUpload](https://docs.aws.amazon.com/AmazonS3/latest/API/API_CompleteMultipartUpload.html) | table entry (from shunt) | — |
+| [CopyObject](https://docs.aws.amazon.com/AmazonS3/latest/API/API_CopyObject.html) | table entry (from shunt) | — |
+| [CreateBucket](https://docs.aws.amazon.com/AmazonS3/latest/API/API_CreateBucket.html) | table entry (from shunt) | — |
+| [CreateBucketMetadataConfiguration](https://docs.aws.amazon.com/AmazonS3/latest/API/API_CreateBucketMetadataConfiguration.html) | table entry (**added 2026-11-08**) | request syntax read from the linked page |
+| [CreateBucketMetadataTableConfiguration](https://docs.aws.amazon.com/AmazonS3/latest/API/API_CreateBucketMetadataTableConfiguration.html) | table entry (**added 2026-11-08**) | request syntax read from the linked page |
+| [CreateMultipartUpload](https://docs.aws.amazon.com/AmazonS3/latest/API/API_CreateMultipartUpload.html) | table entry (from shunt) | — |
+| [CreateSession](https://docs.aws.amazon.com/AmazonS3/latest/API/API_CreateSession.html) | table entry (**added 2026-11-08**) | request syntax read from the linked page |
+| [DeleteBucket](https://docs.aws.amazon.com/AmazonS3/latest/API/API_DeleteBucket.html) | table entry (from shunt) | — |
+| [DeleteBucketAnalyticsConfiguration](https://docs.aws.amazon.com/AmazonS3/latest/API/API_DeleteBucketAnalyticsConfiguration.html) | table entry (from shunt) | — |
+| [DeleteBucketCors](https://docs.aws.amazon.com/AmazonS3/latest/API/API_DeleteBucketCors.html) | table entry (from shunt) | — |
+| [DeleteBucketEncryption](https://docs.aws.amazon.com/AmazonS3/latest/API/API_DeleteBucketEncryption.html) | table entry (from shunt) | — |
+| [DeleteBucketIntelligentTieringConfiguration](https://docs.aws.amazon.com/AmazonS3/latest/API/API_DeleteBucketIntelligentTieringConfiguration.html) | table entry (from shunt) | — |
+| [DeleteBucketInventoryConfiguration](https://docs.aws.amazon.com/AmazonS3/latest/API/API_DeleteBucketInventoryConfiguration.html) | table entry (from shunt) | — |
+| [DeleteBucketLifecycle](https://docs.aws.amazon.com/AmazonS3/latest/API/API_DeleteBucketLifecycle.html) | table entry (from shunt) | — |
+| [DeleteBucketMetadataConfiguration](https://docs.aws.amazon.com/AmazonS3/latest/API/API_DeleteBucketMetadataConfiguration.html) | table entry (**added 2026-11-08**) | request syntax read from the linked page |
+| [DeleteBucketMetadataTableConfiguration](https://docs.aws.amazon.com/AmazonS3/latest/API/API_DeleteBucketMetadataTableConfiguration.html) | table entry (**added 2026-11-08**) | request syntax read from the linked page |
+| [DeleteBucketMetricsConfiguration](https://docs.aws.amazon.com/AmazonS3/latest/API/API_DeleteBucketMetricsConfiguration.html) | table entry (from shunt) | — |
+| [DeleteBucketOwnershipControls](https://docs.aws.amazon.com/AmazonS3/latest/API/API_DeleteBucketOwnershipControls.html) | table entry (from shunt) | — |
+| [DeleteBucketPolicy](https://docs.aws.amazon.com/AmazonS3/latest/API/API_DeleteBucketPolicy.html) | table entry (from shunt) | — |
+| [DeleteBucketReplication](https://docs.aws.amazon.com/AmazonS3/latest/API/API_DeleteBucketReplication.html) | table entry (from shunt) | — |
+| [DeleteBucketTagging](https://docs.aws.amazon.com/AmazonS3/latest/API/API_DeleteBucketTagging.html) | table entry (from shunt) | — |
+| [DeleteBucketWebsite](https://docs.aws.amazon.com/AmazonS3/latest/API/API_DeleteBucketWebsite.html) | table entry (from shunt) | — |
+| [DeleteObject](https://docs.aws.amazon.com/AmazonS3/latest/API/API_DeleteObject.html) | table entry (from shunt) | — |
+| [DeleteObjectAnnotation](https://docs.aws.amazon.com/AmazonS3/latest/API/API_DeleteObjectAnnotation.html) | table entry (**added 2026-11-08**) | request syntax read from the linked page |
+| [DeleteObjects](https://docs.aws.amazon.com/AmazonS3/latest/API/API_DeleteObjects.html) | table entry (from shunt) | — |
+| [DeleteObjectTagging](https://docs.aws.amazon.com/AmazonS3/latest/API/API_DeleteObjectTagging.html) | table entry (from shunt) | — |
+| [DeletePublicAccessBlock](https://docs.aws.amazon.com/AmazonS3/latest/API/API_DeletePublicAccessBlock.html) | table entry (from shunt) | — |
+| [GetBucketAbac](https://docs.aws.amazon.com/AmazonS3/latest/API/API_GetBucketAbac.html) | table entry (**added 2026-11-08**) | request syntax read from the linked page |
+| [GetBucketAccelerateConfiguration](https://docs.aws.amazon.com/AmazonS3/latest/API/API_GetBucketAccelerateConfiguration.html) | table entry (from shunt) | — |
+| [GetBucketAcl](https://docs.aws.amazon.com/AmazonS3/latest/API/API_GetBucketAcl.html) | table entry (from shunt) | — |
+| [GetBucketAnalyticsConfiguration](https://docs.aws.amazon.com/AmazonS3/latest/API/API_GetBucketAnalyticsConfiguration.html) | table entry (from shunt) | — |
+| [GetBucketCors](https://docs.aws.amazon.com/AmazonS3/latest/API/API_GetBucketCors.html) | table entry (from shunt) | — |
+| [GetBucketEncryption](https://docs.aws.amazon.com/AmazonS3/latest/API/API_GetBucketEncryption.html) | table entry (from shunt) | — |
+| [GetBucketIntelligentTieringConfiguration](https://docs.aws.amazon.com/AmazonS3/latest/API/API_GetBucketIntelligentTieringConfiguration.html) | table entry (from shunt) | — |
+| [GetBucketInventoryConfiguration](https://docs.aws.amazon.com/AmazonS3/latest/API/API_GetBucketInventoryConfiguration.html) | table entry (from shunt) | — |
+| [GetBucketLifecycle](https://docs.aws.amazon.com/AmazonS3/latest/API/API_GetBucketLifecycle.html) | **folded** into `GetBucketLifecycleConfiguration` | identical request line |
+| [GetBucketLifecycleConfiguration](https://docs.aws.amazon.com/AmazonS3/latest/API/API_GetBucketLifecycleConfiguration.html) | table entry (from shunt) | — |
+| [GetBucketLocation](https://docs.aws.amazon.com/AmazonS3/latest/API/API_GetBucketLocation.html) | table entry (from shunt) | — |
+| [GetBucketLogging](https://docs.aws.amazon.com/AmazonS3/latest/API/API_GetBucketLogging.html) | table entry (from shunt) | — |
+| [GetBucketMetadataConfiguration](https://docs.aws.amazon.com/AmazonS3/latest/API/API_GetBucketMetadataConfiguration.html) | table entry (**added 2026-11-08**) | request syntax read from the linked page |
+| [GetBucketMetadataTableConfiguration](https://docs.aws.amazon.com/AmazonS3/latest/API/API_GetBucketMetadataTableConfiguration.html) | table entry (**added 2026-11-08**) | request syntax read from the linked page |
+| [GetBucketMetricsConfiguration](https://docs.aws.amazon.com/AmazonS3/latest/API/API_GetBucketMetricsConfiguration.html) | table entry (from shunt) | — |
+| [GetBucketNotification](https://docs.aws.amazon.com/AmazonS3/latest/API/API_GetBucketNotification.html) | **folded** into `GetBucketNotificationConfiguration` | identical request line |
+| [GetBucketNotificationConfiguration](https://docs.aws.amazon.com/AmazonS3/latest/API/API_GetBucketNotificationConfiguration.html) | table entry (from shunt) | — |
+| [GetBucketOwnershipControls](https://docs.aws.amazon.com/AmazonS3/latest/API/API_GetBucketOwnershipControls.html) | table entry (from shunt) | — |
+| [GetBucketPolicy](https://docs.aws.amazon.com/AmazonS3/latest/API/API_GetBucketPolicy.html) | table entry (from shunt) | — |
+| [GetBucketPolicyStatus](https://docs.aws.amazon.com/AmazonS3/latest/API/API_GetBucketPolicyStatus.html) | table entry (from shunt) | — |
+| [GetBucketReplication](https://docs.aws.amazon.com/AmazonS3/latest/API/API_GetBucketReplication.html) | table entry (from shunt) | — |
+| [GetBucketRequestPayment](https://docs.aws.amazon.com/AmazonS3/latest/API/API_GetBucketRequestPayment.html) | table entry (from shunt) | — |
+| [GetBucketTagging](https://docs.aws.amazon.com/AmazonS3/latest/API/API_GetBucketTagging.html) | table entry (from shunt) | — |
+| [GetBucketVersioning](https://docs.aws.amazon.com/AmazonS3/latest/API/API_GetBucketVersioning.html) | table entry (from shunt) | — |
+| [GetBucketWebsite](https://docs.aws.amazon.com/AmazonS3/latest/API/API_GetBucketWebsite.html) | table entry (from shunt) | — |
+| [GetObject](https://docs.aws.amazon.com/AmazonS3/latest/API/API_GetObject.html) | table entry (from shunt) | — |
+| [GetObjectAcl](https://docs.aws.amazon.com/AmazonS3/latest/API/API_GetObjectAcl.html) | table entry (from shunt) | — |
+| [GetObjectAnnotation](https://docs.aws.amazon.com/AmazonS3/latest/API/API_GetObjectAnnotation.html) | table entry (**added 2026-11-08**) | request syntax read from the linked page |
+| [GetObjectAttributes](https://docs.aws.amazon.com/AmazonS3/latest/API/API_GetObjectAttributes.html) | table entry (from shunt) | — |
+| [GetObjectLegalHold](https://docs.aws.amazon.com/AmazonS3/latest/API/API_GetObjectLegalHold.html) | table entry (from shunt) | — |
+| [GetObjectLockConfiguration](https://docs.aws.amazon.com/AmazonS3/latest/API/API_GetObjectLockConfiguration.html) | table entry (from shunt) | — |
+| [GetObjectRetention](https://docs.aws.amazon.com/AmazonS3/latest/API/API_GetObjectRetention.html) | table entry (from shunt) | — |
+| [GetObjectTagging](https://docs.aws.amazon.com/AmazonS3/latest/API/API_GetObjectTagging.html) | table entry (from shunt) | — |
+| [GetObjectTorrent](https://docs.aws.amazon.com/AmazonS3/latest/API/API_GetObjectTorrent.html) | table entry (from shunt) | — |
+| [GetPublicAccessBlock](https://docs.aws.amazon.com/AmazonS3/latest/API/API_GetPublicAccessBlock.html) | table entry (from shunt) | — |
+| [HeadBucket](https://docs.aws.amazon.com/AmazonS3/latest/API/API_HeadBucket.html) | table entry (from shunt) | — |
+| [HeadObject](https://docs.aws.amazon.com/AmazonS3/latest/API/API_HeadObject.html) | table entry (from shunt) | — |
+| [ListBucketAnalyticsConfigurations](https://docs.aws.amazon.com/AmazonS3/latest/API/API_ListBucketAnalyticsConfigurations.html) | table entry (from shunt) | — |
+| [ListBucketIntelligentTieringConfigurations](https://docs.aws.amazon.com/AmazonS3/latest/API/API_ListBucketIntelligentTieringConfigurations.html) | table entry (from shunt) | — |
+| [ListBucketInventoryConfigurations](https://docs.aws.amazon.com/AmazonS3/latest/API/API_ListBucketInventoryConfigurations.html) | table entry (from shunt) | — |
+| [ListBucketMetricsConfigurations](https://docs.aws.amazon.com/AmazonS3/latest/API/API_ListBucketMetricsConfigurations.html) | table entry (from shunt) | — |
+| [ListBuckets](https://docs.aws.amazon.com/AmazonS3/latest/API/API_ListBuckets.html) | table entry (from shunt) | — |
+| [ListDirectoryBuckets](https://docs.aws.amazon.com/AmazonS3/latest/API/API_ListDirectoryBuckets.html) | **folded** into `ListBuckets` | identical request line |
+| [ListMultipartUploads](https://docs.aws.amazon.com/AmazonS3/latest/API/API_ListMultipartUploads.html) | table entry (from shunt) | — |
+| [ListObjectAnnotations](https://docs.aws.amazon.com/AmazonS3/latest/API/API_ListObjectAnnotations.html) | table entry (**added 2026-11-08**) | request syntax read from the linked page |
+| [ListObjects](https://docs.aws.amazon.com/AmazonS3/latest/API/API_ListObjects.html) | table entry (from shunt) | — |
+| [ListObjectsV2](https://docs.aws.amazon.com/AmazonS3/latest/API/API_ListObjectsV2.html) | table entry (from shunt) | — |
+| [ListObjectVersions](https://docs.aws.amazon.com/AmazonS3/latest/API/API_ListObjectVersions.html) | table entry (from shunt) | — |
+| [ListParts](https://docs.aws.amazon.com/AmazonS3/latest/API/API_ListParts.html) | table entry (from shunt) | — |
+| [PutBucketAbac](https://docs.aws.amazon.com/AmazonS3/latest/API/API_PutBucketAbac.html) | table entry (**added 2026-11-08**) | request syntax read from the linked page |
+| [PutBucketAccelerateConfiguration](https://docs.aws.amazon.com/AmazonS3/latest/API/API_PutBucketAccelerateConfiguration.html) | table entry (from shunt) | — |
+| [PutBucketAcl](https://docs.aws.amazon.com/AmazonS3/latest/API/API_PutBucketAcl.html) | table entry (from shunt) | — |
+| [PutBucketAnalyticsConfiguration](https://docs.aws.amazon.com/AmazonS3/latest/API/API_PutBucketAnalyticsConfiguration.html) | table entry (from shunt) | — |
+| [PutBucketCors](https://docs.aws.amazon.com/AmazonS3/latest/API/API_PutBucketCors.html) | table entry (from shunt) | — |
+| [PutBucketEncryption](https://docs.aws.amazon.com/AmazonS3/latest/API/API_PutBucketEncryption.html) | table entry (from shunt) | — |
+| [PutBucketIntelligentTieringConfiguration](https://docs.aws.amazon.com/AmazonS3/latest/API/API_PutBucketIntelligentTieringConfiguration.html) | table entry (from shunt) | — |
+| [PutBucketInventoryConfiguration](https://docs.aws.amazon.com/AmazonS3/latest/API/API_PutBucketInventoryConfiguration.html) | table entry (from shunt) | — |
+| [PutBucketLifecycle](https://docs.aws.amazon.com/AmazonS3/latest/API/API_PutBucketLifecycle.html) | **folded** into `PutBucketLifecycleConfiguration` | identical request line |
+| [PutBucketLifecycleConfiguration](https://docs.aws.amazon.com/AmazonS3/latest/API/API_PutBucketLifecycleConfiguration.html) | table entry (from shunt) | — |
+| [PutBucketLogging](https://docs.aws.amazon.com/AmazonS3/latest/API/API_PutBucketLogging.html) | table entry (from shunt) | — |
+| [PutBucketMetricsConfiguration](https://docs.aws.amazon.com/AmazonS3/latest/API/API_PutBucketMetricsConfiguration.html) | table entry (from shunt) | — |
+| [PutBucketNotification](https://docs.aws.amazon.com/AmazonS3/latest/API/API_PutBucketNotification.html) | **folded** into `PutBucketNotificationConfiguration` | identical request line |
+| [PutBucketNotificationConfiguration](https://docs.aws.amazon.com/AmazonS3/latest/API/API_PutBucketNotificationConfiguration.html) | table entry (from shunt) | — |
+| [PutBucketOwnershipControls](https://docs.aws.amazon.com/AmazonS3/latest/API/API_PutBucketOwnershipControls.html) | table entry (from shunt) | — |
+| [PutBucketPolicy](https://docs.aws.amazon.com/AmazonS3/latest/API/API_PutBucketPolicy.html) | table entry (from shunt) | — |
+| [PutBucketReplication](https://docs.aws.amazon.com/AmazonS3/latest/API/API_PutBucketReplication.html) | table entry (from shunt) | — |
+| [PutBucketRequestPayment](https://docs.aws.amazon.com/AmazonS3/latest/API/API_PutBucketRequestPayment.html) | table entry (from shunt) | — |
+| [PutBucketTagging](https://docs.aws.amazon.com/AmazonS3/latest/API/API_PutBucketTagging.html) | table entry (from shunt) | — |
+| [PutBucketVersioning](https://docs.aws.amazon.com/AmazonS3/latest/API/API_PutBucketVersioning.html) | table entry (from shunt) | — |
+| [PutBucketWebsite](https://docs.aws.amazon.com/AmazonS3/latest/API/API_PutBucketWebsite.html) | table entry (from shunt) | — |
+| [PutObject](https://docs.aws.amazon.com/AmazonS3/latest/API/API_PutObject.html) | table entry (from shunt) | — |
+| [PutObjectAcl](https://docs.aws.amazon.com/AmazonS3/latest/API/API_PutObjectAcl.html) | table entry (from shunt) | — |
+| [PutObjectAnnotation](https://docs.aws.amazon.com/AmazonS3/latest/API/API_PutObjectAnnotation.html) | table entry (**added 2026-11-08**) | request syntax read from the linked page |
+| [PutObjectLegalHold](https://docs.aws.amazon.com/AmazonS3/latest/API/API_PutObjectLegalHold.html) | table entry (from shunt) | — |
+| [PutObjectLockConfiguration](https://docs.aws.amazon.com/AmazonS3/latest/API/API_PutObjectLockConfiguration.html) | table entry (from shunt) | — |
+| [PutObjectRetention](https://docs.aws.amazon.com/AmazonS3/latest/API/API_PutObjectRetention.html) | table entry (from shunt) | — |
+| [PutObjectTagging](https://docs.aws.amazon.com/AmazonS3/latest/API/API_PutObjectTagging.html) | table entry (from shunt) | — |
+| [PutPublicAccessBlock](https://docs.aws.amazon.com/AmazonS3/latest/API/API_PutPublicAccessBlock.html) | table entry (from shunt) | — |
+| [RenameObject](https://docs.aws.amazon.com/AmazonS3/latest/API/API_RenameObject.html) | table entry (**added 2026-11-08**) | request syntax read from the linked page |
+| [RestoreObject](https://docs.aws.amazon.com/AmazonS3/latest/API/API_RestoreObject.html) | table entry (from shunt) | — |
+| [SelectObjectContent](https://docs.aws.amazon.com/AmazonS3/latest/API/API_SelectObjectContent.html) | table entry (from shunt) | — |
+| [UpdateBucketMetadataAnnotationTableConfiguration](https://docs.aws.amazon.com/AmazonS3/latest/API/API_UpdateBucketMetadataAnnotationTableConfiguration.html) | table entry (**added 2026-11-08**) | request syntax read from the linked page |
+| [UpdateBucketMetadataInventoryTableConfiguration](https://docs.aws.amazon.com/AmazonS3/latest/API/API_UpdateBucketMetadataInventoryTableConfiguration.html) | table entry (**added 2026-11-08**) | request syntax read from the linked page |
+| [UpdateBucketMetadataJournalTableConfiguration](https://docs.aws.amazon.com/AmazonS3/latest/API/API_UpdateBucketMetadataJournalTableConfiguration.html) | table entry (**added 2026-11-08**) | request syntax read from the linked page |
+| [UpdateObjectEncryption](https://docs.aws.amazon.com/AmazonS3/latest/API/API_UpdateObjectEncryption.html) | table entry (**added 2026-11-08**) | request syntax read from the linked page |
+| [UploadPart](https://docs.aws.amazon.com/AmazonS3/latest/API/API_UploadPart.html) | table entry (from shunt) | — |
+| [UploadPartCopy](https://docs.aws.amazon.com/AmazonS3/latest/API/API_UploadPartCopy.html) | table entry (from shunt) | — |
+| [WriteGetObjectResponse](https://docs.aws.amazon.com/AmazonS3/latest/API/API_WriteGetObjectResponse.html) | **excluded** | `POST /WriteGetObjectResponse` to an S3 Object Lambda endpoint only; unreachable through an S3-compatible backend (classifies as PostObject if ever seen) |
+
+### The 18 added operations, with the request syntax read from the linked pages
+
+| Operation | Request line (from "Request Syntax") | Scope note |
+| --- | --- | --- |
+| [CreateSession](https://docs.aws.amazon.com/AmazonS3/latest/API/API_CreateSession.html) | `GET /?session` | directory buckets (zonal endpoint) |
+| [RenameObject](https://docs.aws.amazon.com/AmazonS3/latest/API/API_RenameObject.html) | `PUT /{Key+}?renameObject` with required `x-amz-rename-source` | directory buckets |
+| [CreateBucketMetadataTableConfiguration](https://docs.aws.amazon.com/AmazonS3/latest/API/API_CreateBucketMetadataTableConfiguration.html) | `POST /?metadataTable` | general purpose (V1) |
+| [GetBucketMetadataTableConfiguration](https://docs.aws.amazon.com/AmazonS3/latest/API/API_GetBucketMetadataTableConfiguration.html) | `GET /?metadataTable` | general purpose (V1) |
+| [DeleteBucketMetadataTableConfiguration](https://docs.aws.amazon.com/AmazonS3/latest/API/API_DeleteBucketMetadataTableConfiguration.html) | `DELETE /?metadataTable` | general purpose (V1) |
+| [CreateBucketMetadataConfiguration](https://docs.aws.amazon.com/AmazonS3/latest/API/API_CreateBucketMetadataConfiguration.html) | `POST /?metadataConfiguration` | general purpose (V2) |
+| [GetBucketMetadataConfiguration](https://docs.aws.amazon.com/AmazonS3/latest/API/API_GetBucketMetadataConfiguration.html) | `GET /?metadataConfiguration` | general purpose (V2) |
+| [DeleteBucketMetadataConfiguration](https://docs.aws.amazon.com/AmazonS3/latest/API/API_DeleteBucketMetadataConfiguration.html) | `DELETE /?metadataConfiguration` | general purpose (V2) |
+| [UpdateBucketMetadataInventoryTableConfiguration](https://docs.aws.amazon.com/AmazonS3/latest/API/API_UpdateBucketMetadataInventoryTableConfiguration.html) | `PUT /?metadataInventoryTable` | general purpose |
+| [UpdateBucketMetadataJournalTableConfiguration](https://docs.aws.amazon.com/AmazonS3/latest/API/API_UpdateBucketMetadataJournalTableConfiguration.html) | `PUT /?metadataJournalTable` | general purpose |
+| [UpdateBucketMetadataAnnotationTableConfiguration](https://docs.aws.amazon.com/AmazonS3/latest/API/API_UpdateBucketMetadataAnnotationTableConfiguration.html) | `PUT /?metadataAnnotationTable` | general purpose |
+| [GetBucketAbac](https://docs.aws.amazon.com/AmazonS3/latest/API/API_GetBucketAbac.html) | `GET /?abac` | general purpose |
+| [PutBucketAbac](https://docs.aws.amazon.com/AmazonS3/latest/API/API_PutBucketAbac.html) | `PUT /?abac` | general purpose |
+| [GetObjectAnnotation](https://docs.aws.amazon.com/AmazonS3/latest/API/API_GetObjectAnnotation.html) | `GET /{Key+}?annotation&annotationName=…` | general purpose; not directory buckets |
+| [PutObjectAnnotation](https://docs.aws.amazon.com/AmazonS3/latest/API/API_PutObjectAnnotation.html) | `PUT /{Key+}?annotation&annotationName=…` | general purpose |
+| [DeleteObjectAnnotation](https://docs.aws.amazon.com/AmazonS3/latest/API/API_DeleteObjectAnnotation.html) | `DELETE /{Key+}?annotation&annotationName=…` | general purpose |
+| [ListObjectAnnotations](https://docs.aws.amazon.com/AmazonS3/latest/API/API_ListObjectAnnotations.html) | `GET /{Key+}?annotation&annotation-prefix=…` (no `annotationName`) | general purpose |
+| [UpdateObjectEncryption](https://docs.aws.amazon.com/AmazonS3/latest/API/API_UpdateObjectEncryption.html) | `PUT /{Key+}?encryption&versionId=…` | general purpose; not directory buckets |
+
+Folded pairs, verified on the linked pages: [GetBucketLifecycle](https://docs.aws.amazon.com/AmazonS3/latest/API/API_GetBucketLifecycle.html) and [GetBucketLifecycleConfiguration](https://docs.aws.amazon.com/AmazonS3/latest/API/API_GetBucketLifecycleConfiguration.html) are both `GET /?lifecycle`; [GetBucketNotification](https://docs.aws.amazon.com/AmazonS3/latest/API/API_GetBucketNotification.html) and [GetBucketNotificationConfiguration](https://docs.aws.amazon.com/AmazonS3/latest/API/API_GetBucketNotificationConfiguration.html) are both `GET /?notification`; the `Put` pairs mirror them. [ListDirectoryBuckets](https://docs.aws.amazon.com/AmazonS3/latest/API/API_ListDirectoryBuckets.html) is `GET /` on the `s3express-control` regional endpoint, distinguishable from `ListBuckets` only by host or `x-id`. [WriteGetObjectResponse](https://docs.aws.amazon.com/AmazonS3/latest/API/API_WriteGetObjectResponse.html) is `POST /WriteGetObjectResponse` with required `x-amz-request-route` and `x-amz-request-token`, served by S3 Object Lambda endpoints only.
 
 ## Classes
 
