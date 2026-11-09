@@ -10,6 +10,7 @@ listen:
 backend:
   scheme: @BACKEND_SCHEME@
   endpoints: [@BACKEND@]
+  tls: {insecure_skip_verify: @BACKEND_INSECURE@}   # lab certificates; false in production
   health_check: {interval: 1s, timeout: 1s}
 
 rate_limits:

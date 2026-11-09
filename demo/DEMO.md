@@ -281,18 +281,40 @@ by object key or access key.
 
 ## Running it against a real S3 endpoint (the POC)
 
-1. `make release`; copy `dist/tollbooth-<version>-linux-amd64.tar.gz` to the host; follow
-   `docs/OPERATIONS.md` §1 (binary to `/usr/local/bin`, unit to `/etc/systemd/system`).
-2. `demo/tollbooth.poc.yaml` → `/etc/tollbooth/tollbooth.yaml`: fill `node_id` and the S3
-   endpoints (https, the cluster's VIPs), create `/etc/tollbooth/admin.token` (mode 0600).
-3. `tollbooth check-config /etc/tollbooth/tollbooth.yaml`, `tollbooth doctor --config …`,
-   `systemctl enable --now tollbooth`.
-4. Point one client at `https://<host>:8443` (or plaintext `:8443`) and run steps 2, 3, 6, 7
-   above with `TOLLBOOTH_S3`, `TOLLBOOTH_ADMIN`, and `TOLLBOOTH_TOKEN` set; `s3 ls` and `s3 cp`
-   now return real listings and real objects.
-5. For a measured number on their hardware: `make bench-e2e` on the same host, `bench/crosscheck.sh`
-   with elbencho against the cluster, and `make soak` overnight (docs/adr/0005 says what has and
-   has not been verified where).
+The same stack, with the null backend replaced by the cluster's S3 endpoint. Everything else is
+the same: the proxy adds no headers and rewrites nothing, so clients only change their endpoint.
 
-Or, for a local run against any S3 server you already have:
-`BACKEND=host:port BACKEND_SCHEME=https demo/run.sh start`.
+```
+export AWS_ACCESS_KEY_ID=<your key> AWS_SECRET_ACCESS_KEY=<your secret>
+export LOAD_BUCKET=<an existing bucket you can write to>
+BACKEND=<s3 host>:443 BACKEND_SCHEME=https BACKEND_INSECURE=true demo/run.sh start   # INSECURE only for a lab certificate
+source demo/env.sh
+tb doctor --config $TOLLBOOTH_DEMO_CONFIG           # backend <host>: ok, tcp and HEAD / answered
+s3 ls s3://$LOAD_BUCKET/                            # real listing, through the proxy
+```
+
+1. **Put your key on a rule.** `tb tui --config $TOLLBOOTH_DEMO_CONFIG`, `5`, `e`, `i`: on the
+   `tenant-a-reads` rule change `access_keys: [DEMO-TENANT-A]` to `access_keys: [<your key>]` and
+   `rate: 2, burst: 2` to something above the load you are about to run, say `rate: 200, burst: 200`;
+   `esc`, `ctrl+r`. The bottom line says `reloaded: generation 2`.
+2. **Start traffic.** In another shell, `demo/run.sh load 100`: 100 requests per second of GET,
+   PUT, and HEAD against `$LOAD_BUCKET` as your key, after seeding 200 small objects so the reads
+   find something. `6` in the TUI: the request line climbs to 100/s, the backend TTFB line shows
+   the cluster's answer time, throttles stay at zero. Give it a minute of history.
+3. **Lower the limit.** `5`, `e`, `i`, change `rate: 200, burst: 200` to `rate: 30, burst: 30`,
+   `esc`, `ctrl+r`. Back on `6`: within two polls the throttle line rises, the request line (what
+   completes) drops to about 30/s, and `denied per second, by rule` shows `tenant-a-reads`
+   carrying the difference. The generator keeps running: its SDK honors `Retry-After` and backs
+   off, nothing is lost, the cluster sees 30/s. `2` shows the rule with live keys and the denied
+   count; `enter` on it shows your key as the one being held.
+4. **Raise it again** the same way and watch the lines cross back. `demo/run.sh load 300` restarts
+   the generator at another rate; `demo/run.sh stop` ends the load and the proxy.
+5. **Showback** (`3`, or `tb usage query --config $TOLLBOOTH_DEMO_CONFIG --group-by access_key,bucket`)
+   shows your key and bucket with the requests and bytes of the run, by hour, in files under
+   `demo/state/showback/`.
+
+For a host install rather than the demo stack: `make release`, the tarball's `tollbooth.service`,
+`demo/tollbooth.poc.yaml` with the three fields filled in, `docs/OPERATIONS.md` §1 and §2. For a
+measured number on the cluster: `make bench-e2e` on the proxy host with `-direct` at the cluster
+and `-proxied` at tollbooth, `bench/crosscheck.sh` with elbencho, and `make soak` overnight
+(`docs/adr/0005-performance-targets-at-v0.1.0.md` says what has and has not been verified where).

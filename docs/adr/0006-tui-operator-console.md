@@ -1,8 +1,10 @@
 # ADR-0006: The TUI as the operator console: performance graphs and a config editor that saves
 
-Status: **proposed** (2026-11-09, on Blake's direction: "it needs to be where we can configure, and
-get a visual cue as to how the service is performing … graphs like nfsview … inline editor and
-syntax checker like the bucket policy tool"). Blake decides; this ADR challenges one fixed decision.
+Status: **accepted** (Blake, 2026-11-09, by merging #27 after the question was put to him in the
+PR). Written on Blake's direction: "it needs to be where we can configure, and get a visual cue as
+to how the service is performing … graphs like nfsview … inline editor and syntax checker like the
+bucket policy tool". This ADR challenged one fixed decision; the specification's sentence is to be
+amended as proposed below (Fable's edit).
 
 ## Context
 
