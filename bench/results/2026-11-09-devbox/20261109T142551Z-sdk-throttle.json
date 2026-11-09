@@ -1,0 +1,60 @@
+{
+  "mode": "sdk",
+  "options": {},
+  "environment": {
+    "cpu": "AMD EPYC 7402P 24-Core Processor",
+    "go": "go1.27.3",
+    "gogc": "",
+    "gomaxprocs": "2",
+    "gomemlimit": "",
+    "host": "sts-workshop",
+    "kernel": "Linux version 5.14.0-570.17.1.el9_6.x86_64 (mockbuild@iad1-prod-build001.bld.equ.rockylinux.org) (gcc (GCC) 11.5.0 20240719 (Red Hat 11.5.0-5), GNU ld version 2.35.2-63.el9) #1 SMP PREEMPT_DYNAMIC Fri May 23 22:47:01 UTC 2025",
+    "num_cpu": "2"
+  },
+  "runs": [
+    {
+      "target": "proxied",
+      "index": 1,
+      "seconds": 22.350780053,
+      "requests": 10499,
+      "rps": 469.7375203506952,
+      "bytes": 43003904,
+      "status": {
+        "200": 10499
+      },
+      "errors": 0,
+      "attempts": 10640,
+      "throttled": 141,
+      "latency_us": {
+        "max": 4546625.535,
+        "p50": 1001.471,
+        "p90": 6889.471,
+        "p99": 495976.447,
+        "p99.9": 1888485.375
+      }
+    }
+  ],
+  "median": {
+    "proxied": {
+      "target": "proxied",
+      "index": 1,
+      "seconds": 22.350780053,
+      "requests": 10499,
+      "rps": 469.7375203506952,
+      "bytes": 43003904,
+      "status": {
+        "200": 10499
+      },
+      "errors": 0,
+      "attempts": 10640,
+      "throttled": 141,
+      "latency_us": {
+        "max": 4546625.535,
+        "p50": 1001.471,
+        "p90": 6889.471,
+        "p99": 495976.447,
+        "p99.9": 1888485.375
+      }
+    }
+  }
+}

@@ -1,0 +1,18 @@
+run 1/3 direct  warm-up 10s
+run 1/3 direct  measuring 20s … 47160 requests, 2357 req/s, p50 2345 µs, p99 15958 µs, p99.9 26378 µs, errors 0, attempts 47160, throttled 0
+run 1/3 proxied warm-up 10s
+run 1/3 proxied measuring 20s … 28602 requests, 1430 req/s, p50 4280 µs, p99 24461 µs, p99.9 40108 µs, errors 0, attempts 28602, throttled 0
+run 2/3 direct  warm-up 10s
+run 2/3 direct  measuring 20s … 46823 requests, 2341 req/s, p50 2398 µs, p99 16400 µs, p99.9 26411 µs, errors 0, attempts 46823, throttled 0
+run 2/3 proxied warm-up 10s
+run 2/3 proxied measuring 20s … 30222 requests, 1511 req/s, p50 4024 µs, p99 22856 µs, p99.9 35717 µs, errors 0, attempts 30222, throttled 0
+run 3/3 direct  warm-up 10s
+run 3/3 direct  measuring 20s … 49131 requests, 2456 req/s, p50 2212 µs, p99 16073 µs, p99.9 24314 µs, errors 0, attempts 49131, throttled 0
+run 3/3 proxied warm-up 10s
+run 3/3 proxied measuring 20s … 28077 requests, 1404 req/s, p50 4227 µs, p99 25756 µs, p99.9 43319 µs, errors 0, attempts 28077, throttled 0
+
+median        req/s     p50 µs     p90 µs     p99 µs   p99.9 µs     max µs   errors   attempts  throttled
+direct         2357       2345       7664      15958      26378      64881        0      47160          0
+proxied        1404       4227      12100      25756      43319      77005        0      28077          0
+added                     1882       4436       9798      16941
+wrote bench/results/2026-11-09-devbox/20261109T142523Z-sdk-mix.json
