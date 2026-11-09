@@ -60,7 +60,7 @@ The example file `deploy/tollbooth.example.yaml` sets every key to its default.
 
 | Key | Type | Default | Meaning |
 | --- | --- | --- | --- |
-| `cluster.node_count` | int ≥ 1 | `1` | Number of identical proxy nodes behind the load balancer. Each node enforces `rate / node_count` and `burst / node_count` (rounded up; a burst never rounds below 1). No coordination. |
+| `cluster.node_count` | int 1 … 1024 | `1` | Number of identical proxy nodes behind the load balancer. Each node enforces `rate / node_count` and `burst / node_count` (rounded up; a burst never rounds below 1). No coordination. The upper bound keeps the per-node emission interval inside the limiter's arithmetic (D-037). |
 
 ## `rate_limits`
 
@@ -80,8 +80,8 @@ The example file `deploy/tollbooth.example.yaml` sets every key to its default.
 | `match.source_cidrs` | list of cidr | any | Source address ranges. |
 | `match.ops` | list of string | any | Operation classes (`LIST`, `READ`, `WRITE`, `DELETE`, `BUCKET`, `UNKNOWN`) and/or operation names from `docs/OPERATIONS_TABLE.md`. Unknown names are errors. |
 | `group_by` | list of `access_key`, `bucket`, `prefix`, `source_ip` | `[]` | One GCRA state per distinct tuple of these dimensions. Empty means one shared state for everything the rule matches. `prefix` requires `match.prefixes` and means the matched configured prefix. |
-| `limit.rate` | number ≥ 0 | **required** | Requests per second. `0` blocks every matching request with `Retry-After: 1`. Fractional rates are allowed (`0.5` = one request every two seconds). |
-| `limit.burst` | int ≥ 1 | `max(1, ceil(rate))` | Bucket capacity: exactly this many requests are admitted from a full bucket. Ignored when `rate` is `0`. |
+| `limit.rate` | number ≥ 0 | **required** | Requests per second. `0` blocks every matching request with `Retry-After: 1`. Fractional rates are allowed (`0.5` = one request every two seconds). A non-zero rate must lie between `0.000001` and `1000000000` (D-037). |
+| `limit.burst` | int ≥ 1 | `max(1, ceil(rate))` | Bucket capacity: exactly this many requests are admitted from a full bucket. Ignored when `rate` is `0`. `burst / rate` must not exceed `1000000000` seconds, the time a full refill may take (D-037). |
 | `on_limit` | `slowdown` or `too_many_requests` | `rate_limits.default_on_limit` | Response mode when this rule denies. |
 
 Every listed match condition must hold (AND); an omitted condition matches anything. `limit.bandwidth` is reserved for Phase 6 and is rejected as an unknown key until then.
@@ -136,7 +136,7 @@ document what breaks when flipped.
 
 - Unknown keys anywhere are errors, with the key path named.
 - `node_id`, `showback.dir`, `backend.scheme`, `backend.endpoints` are required.
-- Rule ids are unique; `group_by: [prefix]` needs `match.prefixes`; `match.ops` names must exist; CIDRs parse; `on_limit` and `default_on_limit` are one of the two modes.
+- Rule ids are unique; `group_by: [prefix]` needs `match.prefixes`; `match.ops` names must exist; CIDRs parse; `on_limit` and `default_on_limit` are one of the two modes; a non-zero `limit.rate` is between `1e-6` and `1e9`, `limit.burst / limit.rate` is at most `1e9` seconds, and `cluster.node_count` is at most 1024 (D-037).
 - `listen.tls.cert` and `listen.tls.key` are set together, the files exist, and the pair loads.
 - `admin.token` and `admin.token_file` are not both set; a `token_file` must exist and be non-empty.
 - `backend.tls.*` is rejected with `scheme: http`.

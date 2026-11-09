@@ -268,15 +268,19 @@ so the forwarded path allocates nothing for it.
 
 ### 5.1 Compiled rules
 
-Reload builds a `RuleSet` from the validated config and publishes it inside the config pointer:
+Reload compiles a `RuleSet` from the validated config and publishes it with one pointer store
+inside the limiter (`Limiter.Apply`), immediately after the config pointer swap (D-036; the
+config package cannot import the limiter, and a config value carrying compiled state would need
+an interface with one implementation):
 
 ```go
 type RuleSet struct {
-    rules   []*rule            // config order
-    byClass [numClasses][]*rule // candidates per operation class; a rule with ops=any is in every list
+    rules   []*Rule            // config order
+    byID    map[string]*Rule   // for the sweeper and the admin API
+    byClass [numClasses][]*Rule // candidates per operation class; a rule with ops=any is in every list
 }
-type rule struct {
-    id        string             // cloned once at compile; part of every key
+type Rule struct {
+    ID        string             // cloned once at compile; part of every key
     idx       int                // position, for metrics and the deny sampler
     accessKeys map[string]struct{} // nil = any; "" is a legal member (anonymous)
     buckets    map[string]struct{} // nil = any; "" = service level
@@ -287,8 +291,15 @@ type rule struct {
     T, tau     int64              // emission interval and tolerance in nanoseconds, after node_count
     blockAll   bool               // rate == 0
     mode       Mode               // slowdown | too_many_requests
+    stats      *ruleStats         // live keys, denials since start, deny ring; owned by the id, survives reloads
+    denied     prometheus.Counter // pre-resolved limiter_denied_total{rule}
 }
 ```
+
+Bounds (D-037): a non-zero `rate` lies in [1e-6, 1e9], `burst / rate ≤ 1e9` s, and
+`cluster.node_count ≤ 1024`, so `T ≤ ~1e15` ns and `tau ≤ 1e18` ns and no GCRA sum can overflow
+`int64` in a 30-year process lifetime. Validation enforces them; `compile` re-checks and a reload
+never publishes a half-built set.
 
 Matching walks `byClass[identity.Class]` in config order and tests, in the cheapest order: ops
 bit, bucket set, access-key set, CIDR list, prefix list. Each test is a map lookup, a bit test, a
@@ -323,6 +334,10 @@ A decision for one matching rule: lock the shard, look the key up (a miss means 
 Live keys are counted in one `atomic.Int64`; at `limiter.max_keys` a miss does not insert, the
 request is allowed for that rule, and `limiter_keys_overflow_total` increments. Fail open.
 
+Measured 2026-11-09 on the dev box (`TOLLBOOTH_BIG=1 go test -run TestDecisionLatencyAtOneMillionKeys`):
+**226 bytes per key** at 1,000,000 live keys (heap delta 215 MiB), against the ~190 B estimate in
+§9.4; decision latency with 100 rules loaded p50 2.6 µs, p99 4.7 µs, p99.9 17.5 µs.
+
 ### 5.3 GCRA
 
 Monotonic clock: `now = int64(time.Since(epoch))` where `epoch` is process start, taken once per
@@ -345,7 +360,10 @@ Evaluation is one pass over the matching rules in config order, consuming from e
 denial ends the pass, decides the mode from that rule, and the tokens already taken from earlier
 rules stay taken (S3's behavior; no check-then-consume, no rollback). `TestDenialChargesEarlierRule`
 asserts the charge. `rules test` uses the same function with `consume=false`, which computes the
-decision without storing.
+decision without storing; in that mode it continues past the first denial so the operator sees every
+matching rule's own verdict as well as the decision the real pass would reach (D-038). A panic
+anywhere in the pass is recovered inside `Decide`: the request is allowed and
+`limiter_errors_total` increments, so every caller fails open.
 
 ### 5.4 Sweeper and reload
 
@@ -353,20 +371,25 @@ A goroutine wakes every `limiter.sweep_interval`, takes each shard lock in turn,
 every key whose `TAT ≤ now` (that bucket is full, so re-creating it on the next request is
 indistinguishable from having kept it: eviction is exact, `TestEvictionLossless`) and every key
 whose `rule` is not in the current `RuleSet`. It decrements the live count. Each shard lock is
-held for the walk of that shard only; with 1,000,000 keys that is ~4,000 keys per shard, tens of
-microseconds, 256 times per sweep.
+held for the walk of that shard only; with 1,000,000 keys that is ~4,000 keys per shard. Measured
+2026-11-09: a sweep that deletes all 1,000,000 keys takes 165 ms, so each shard lock is held about
+0.65 ms, 256 times per sweep.
 
-Reload swaps the config pointer; the store is untouched. A changed `rate` or `burst` applies from
-the next decision because a TAT is a timestamp. Requests in flight finish with the `RuleSet` they
-loaded at entry. `TestReloadKeepsState` and the Phase 2 reload-under-load test (≤ 100 ms, zero
-failed requests) pin this.
+Reload swaps the config pointer, then `Limiter.Apply` compiles and stores the new `RuleSet`; the
+store is untouched. A changed `rate` or `burst` applies from the next decision because a TAT is a
+timestamp. Per-rule counters and the deny ring belong to the rule id (`ruleStats`) and move to the
+new compiled rule; the stats and the `limiter_denied_total{rule}` child of a removed id are deleted.
+Requests in flight finish with the `RuleSet` they loaded at entry. `TestReloadKeepsState` and the
+Phase 2 reload-under-load test (≤ 100 ms, zero failed requests) pin this.
 
 ### 5.5 Deny sampler (`/admin/limits/top`)
 
 Per rule, a fixed ring of 1,024 `{key, at int64}` entries written under a per-rule mutex on each
-denial. `GET /admin/limits/top?n=20` reads the rings, counts entries within the last 60 s by key,
-and returns the top n with the rule id and the key's dimensions. The ring holds cloned strings
-only. Allowed requests never touch it.
+denial; the array is allocated on the rule's first denial. `GET /admin/limits/top?n=20&window=60s`
+reads the rings, counts entries within the window by key, and returns the top n with the rule id
+and the key's dimensions. The ring holds cloned strings only; a slot that already holds the same
+key is reused without cloning, so a storm on few keys allocates nothing after the first lap
+(`TestDecideAllocatesZero`). Allowed requests never touch it.
 
 ## 6. Showback (`internal/showback`)
 
