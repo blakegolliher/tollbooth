@@ -23,6 +23,7 @@ BUCKET (created and deleted here), ADDRESSING (path|virtual).
 import hashlib
 import os
 import sys
+import urllib.error
 import urllib.request
 
 import boto3
@@ -113,14 +114,22 @@ def rm():
     assert len(r.get("Deleted", [])) == 5, r
 
 
+def fetch(req):
+    """urlopen that reports the backend's error body instead of a bare status."""
+    try:
+        with urllib.request.urlopen(req) as resp:  # noqa: S310 - test tool, local endpoint
+            return resp.status, resp.read()
+    except urllib.error.HTTPError as e:
+        raise AssertionError(f"HTTP {e.code}: {e.read()[:300]!r}") from None
+
+
 def presign():
     url = s3.generate_presigned_url("get_object", Params={"Bucket": BUCKET, "Key": "dir/small.bin"}, ExpiresIn=300)
-    with urllib.request.urlopen(url) as resp:  # noqa: S310 - test tool, local endpoint
-        assert resp.read() == SMALL, "presigned body mismatch"
+    status, body = fetch(url)
+    assert body == SMALL, f"presigned body mismatch ({status})"
     url = s3.generate_presigned_url("put_object", Params={"Bucket": BUCKET, "Key": "dir/presigned-put.bin"}, ExpiresIn=300)
-    req = urllib.request.Request(url, data=SMALL, method="PUT")
-    with urllib.request.urlopen(req) as resp:  # noqa: S310
-        assert resp.status == 200, resp.status
+    status, _ = fetch(urllib.request.Request(url, data=SMALL, method="PUT"))
+    assert status == 200, status
     assert s3.get_object(Bucket=BUCKET, Key="dir/presigned-put.bin")["Body"].read() == SMALL
 
 
@@ -173,7 +182,7 @@ def checksums():
     except Exception as e:  # noqa: BLE001
         if "accepted" in str(e):
             raise
-        if "BadDigest" not in str(e) and "InvalidRequest" not in str(e) and "XAmzContentSHA256Mismatch" not in str(e) and "400" not in str(e):
+        if not any(code in str(e) for code in ("BadDigest", "InvalidDigest", "InvalidRequest", "XAmzContentSHA256Mismatch", "400")):
             raise AssertionError(f"unexpected refusal: {e}")
 
 

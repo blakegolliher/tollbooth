@@ -169,6 +169,18 @@ func (h *Handler) build(ctx context.Context, r *http.Request, id *s3id.RequestId
 	if _, ok := r.Header["User-Agent"]; !ok {
 		r.Header["User-Agent"] = emptyUA
 	}
+	if inBody == nil && r.ContentLength == 0 {
+		if cl, ok := r.Header["Content-Length"]; ok && len(cl) > 0 && !methodSendsEmptyLength(r.Method) {
+			// The client sent an explicit "Content-Length: 0" on a bodiless request, and some
+			// clients sign it (aws cli v2 on GET and DELETE; found by the Garage client matrix:
+			// "signed header content-length is not present"). Go's Transport writes Content-Length
+			// itself and drops the canonical map entry, and for GET, HEAD, DELETE, and OPTIONS with
+			// no body it writes none. The header is therefore carried under a non-canonical key,
+			// which the request writer does not filter, so the wire carries "content-length: 0"
+			// exactly as the client declared it. POST, PUT, and PATCH get it from the Transport.
+			r.Header["content-length"] = cl
+		}
+	}
 	out := http.Request{
 		Method:        r.Method,
 		URL:           u,
@@ -184,6 +196,12 @@ func (h *Handler) build(ctx context.Context, r *http.Request, id *s3id.RequestId
 		out.Body = inBody
 	}
 	return out.WithContext(ctx), true
+}
+
+// methodSendsEmptyLength reports whether net/http's Transport writes "Content-Length: 0" by
+// itself for a bodiless request of this method.
+func methodSendsEmptyLength(method string) bool {
+	return method == http.MethodPost || method == http.MethodPut || method == http.MethodPatch
 }
 
 // roundTrip sends the request, moving to the next endpoint when one refuses the connection

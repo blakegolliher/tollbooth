@@ -853,3 +853,40 @@ func TestBackendAnswersBeforeReadingBody(t *testing.T) {
 		}
 	}
 }
+
+// A client's explicit "Content-Length: 0" on a bodiless request reaches the backend (aws cli v2
+// signs it on GET and DELETE); a POST with Content-Length: 0 carries exactly one such header.
+func TestExplicitZeroContentLengthIsPreserved(t *testing.T) {
+	r := newRig(t, 1, time.Second)
+	for _, method := range []string{"GET", "DELETE", "HEAD", "POST"} {
+		r.null.Clear()
+		conn := rawDial(t, r.front)
+		fmt.Fprintf(conn, "%s /b/k HTTP/1.1\r\nHost: h\r\nContent-Length: 0\r\nAuthorization: AWS4-HMAC-SHA256 Credential=AKIAX/20261109/us-east-1/s3/aws4_request, SignedHeaders=content-length;host, Signature=x\r\nConnection: close\r\n\r\n", method)
+		resp, err := http.ReadResponse(bufio.NewReader(conn), nil)
+		if err != nil {
+			t.Fatalf("%s: %v", method, err)
+		}
+		io.Copy(io.Discard, resp.Body) //nolint:errcheck // test
+		resp.Body.Close()              //nolint:errcheck // test
+		reqs := r.null.Requests()
+		if len(reqs) != 1 {
+			t.Fatalf("%s: backend saw %d requests", method, len(reqs))
+		}
+		if cl := reqs[0].Header.Values("Content-Length"); len(cl) != 1 || cl[0] != "0" {
+			t.Errorf("%s: backend saw Content-Length %v, want exactly [0]", method, cl)
+		}
+	}
+	// Without the header from the client, none is invented on a GET.
+	r.null.Clear()
+	conn := rawDial(t, r.front)
+	fmt.Fprintf(conn, "GET /b/k HTTP/1.1\r\nHost: h\r\nConnection: close\r\n\r\n")
+	resp, err := http.ReadResponse(bufio.NewReader(conn), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	io.Copy(io.Discard, resp.Body) //nolint:errcheck // test
+	resp.Body.Close()              //nolint:errcheck // test
+	if reqs := r.null.Requests(); len(reqs) != 1 || len(reqs[0].Header.Values("Content-Length")) != 0 {
+		t.Fatalf("GET without Content-Length: backend saw %v", reqs[0].Header)
+	}
+}
