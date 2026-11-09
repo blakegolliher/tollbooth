@@ -15,8 +15,11 @@
 package config
 
 import (
+	"encoding/json"
 	"net/netip"
 	"time"
+
+	"go.yaml.in/yaml/v4"
 
 	"github.com/blakegolliher/tollbooth/internal/s3id"
 )
@@ -205,6 +208,16 @@ const (
 	DefaultThrottleSample        = 100
 )
 
+// Bounds on the limiter arithmetic (D-037): with these, every GCRA quantity (emission interval,
+// tolerance, theoretical arrival time) stays inside int64 nanoseconds for a 30-year process
+// lifetime on up to MaxNodeCount nodes.
+const (
+	MinRate          = 1e-6 // one request every ~11.6 days
+	MaxRate          = 1e9  // requests per second
+	MaxRefillSeconds = 1e9  // burst / rate: a bucket refills within ~31.7 years
+	MaxNodeCount     = 1024
+)
+
 // DefaultDimensions is showback.dimensions when unset.
 var DefaultDimensions = []string{DimAccessKey, DimBucket, DimPrefix, DimOperation, DimStatusClass}
 
@@ -350,4 +363,19 @@ func parseCIDR(s string) (netip.Prefix, error) {
 		return netip.Prefix{}, err
 	}
 	return netip.PrefixFrom(a, a.BitLen()), nil
+}
+
+// MarshalJSON renders the config with the file's own key names (the yaml tags) by round-tripping
+// through the YAML encoder, so GET /admin/config and `config show --format json` read like the
+// file. Durations come out as strings ("10s"), as in the file. The receiver should be Redacted().
+func (c *Config) MarshalJSON() ([]byte, error) {
+	y, err := yaml.Marshal(c)
+	if err != nil {
+		return nil, err
+	}
+	var generic map[string]any
+	if err := yaml.Unmarshal(y, &generic); err != nil {
+		return nil, err
+	}
+	return json.Marshal(generic)
 }

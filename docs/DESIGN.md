@@ -245,9 +245,12 @@ Only four: `503 SlowDown` (throttle, in-flight cap), `429 TooManyRequests` (thro
 `503 ServiceUnavailable` (no backend reachable), `400 InvalidURI` (unforwardable request-target).
 Body is the S3 error XML from shunt's `internal/s3/errors.go` table (lifted, plus
 `TooManyRequests`), with `Resource` set to the raw path (S3 itself echoes it), a freshly generated
-`x-amz-request-id`, `Content-Type: application/xml`, `Content-Length`, and `Retry-After` on the
-throttle responses. Rule identifiers never appear. The request id is generated only on this path,
-so the forwarded path allocates nothing for it.
+`x-amz-request-id`, `Content-Type: application/xml`, `Content-Length`, and, on the throttle
+responses, `Retry-After` (whole seconds, rounded up, at least 1) and `x-amz-retry-after`
+(milliseconds, rounded up; the exact GCRA wait, which aws-sdk-go-v2 honors with its 2026 retry
+behavior on, D-043). Rule
+identifiers never appear. The request id is generated only on this path, so the forwarded path
+allocates nothing for it.
 
 ### 4.9 Invariants and the tests that pin them
 
@@ -268,15 +271,19 @@ so the forwarded path allocates nothing for it.
 
 ### 5.1 Compiled rules
 
-Reload builds a `RuleSet` from the validated config and publishes it inside the config pointer:
+Reload compiles a `RuleSet` from the validated config and publishes it with one pointer store
+inside the limiter (`Limiter.Apply`), immediately after the config pointer swap (D-036; the
+config package cannot import the limiter, and a config value carrying compiled state would need
+an interface with one implementation):
 
 ```go
 type RuleSet struct {
-    rules   []*rule            // config order
-    byClass [numClasses][]*rule // candidates per operation class; a rule with ops=any is in every list
+    rules   []*Rule            // config order
+    byID    map[string]*Rule   // for the sweeper and the admin API
+    byClass [numClasses][]*Rule // candidates per operation class; a rule with ops=any is in every list
 }
-type rule struct {
-    id        string             // cloned once at compile; part of every key
+type Rule struct {
+    ID        string             // cloned once at compile; part of every key
     idx       int                // position, for metrics and the deny sampler
     accessKeys map[string]struct{} // nil = any; "" is a legal member (anonymous)
     buckets    map[string]struct{} // nil = any; "" = service level
@@ -287,8 +294,15 @@ type rule struct {
     T, tau     int64              // emission interval and tolerance in nanoseconds, after node_count
     blockAll   bool               // rate == 0
     mode       Mode               // slowdown | too_many_requests
+    stats      *ruleStats         // live keys, denials since start, deny ring; owned by the id, survives reloads
+    denied     prometheus.Counter // pre-resolved limiter_denied_total{rule}
 }
 ```
+
+Bounds (D-037): a non-zero `rate` lies in [1e-6, 1e9], `burst / rate ≤ 1e9` s, and
+`cluster.node_count ≤ 1024`, so `T ≤ ~1e15` ns and `tau ≤ 1e18` ns and no GCRA sum can overflow
+`int64` in a 30-year process lifetime. Validation enforces them; `compile` re-checks and a reload
+never publishes a half-built set.
 
 Matching walks `byClass[identity.Class]` in config order and tests, in the cheapest order: ops
 bit, bucket set, access-key set, CIDR list, prefix list. Each test is a map lookup, a bit test, a
@@ -323,6 +337,10 @@ A decision for one matching rule: lock the shard, look the key up (a miss means 
 Live keys are counted in one `atomic.Int64`; at `limiter.max_keys` a miss does not insert, the
 request is allowed for that rule, and `limiter_keys_overflow_total` increments. Fail open.
 
+Measured 2026-11-09 on the dev box (`TOLLBOOTH_BIG=1 go test -run TestDecisionLatencyAtOneMillionKeys`):
+**226 bytes per key** at 1,000,000 live keys (heap delta 215 MiB), against the ~190 B estimate in
+§9.4; decision latency with 100 rules loaded p50 2.6 µs, p99 4.7 µs, p99.9 17.5 µs.
+
 ### 5.3 GCRA
 
 Monotonic clock: `now = int64(time.Since(epoch))` where `epoch` is process start, taken once per
@@ -345,7 +363,10 @@ Evaluation is one pass over the matching rules in config order, consuming from e
 denial ends the pass, decides the mode from that rule, and the tokens already taken from earlier
 rules stay taken (S3's behavior; no check-then-consume, no rollback). `TestDenialChargesEarlierRule`
 asserts the charge. `rules test` uses the same function with `consume=false`, which computes the
-decision without storing.
+decision without storing; in that mode it continues past the first denial so the operator sees every
+matching rule's own verdict as well as the decision the real pass would reach (D-038). A panic
+anywhere in the pass is recovered inside `Decide`: the request is allowed and
+`limiter_errors_total` increments, so every caller fails open.
 
 ### 5.4 Sweeper and reload
 
@@ -353,20 +374,25 @@ A goroutine wakes every `limiter.sweep_interval`, takes each shard lock in turn,
 every key whose `TAT ≤ now` (that bucket is full, so re-creating it on the next request is
 indistinguishable from having kept it: eviction is exact, `TestEvictionLossless`) and every key
 whose `rule` is not in the current `RuleSet`. It decrements the live count. Each shard lock is
-held for the walk of that shard only; with 1,000,000 keys that is ~4,000 keys per shard, tens of
-microseconds, 256 times per sweep.
+held for the walk of that shard only; with 1,000,000 keys that is ~4,000 keys per shard. Measured
+2026-11-09: a sweep that deletes all 1,000,000 keys takes 165 ms, so each shard lock is held about
+0.65 ms, 256 times per sweep.
 
-Reload swaps the config pointer; the store is untouched. A changed `rate` or `burst` applies from
-the next decision because a TAT is a timestamp. Requests in flight finish with the `RuleSet` they
-loaded at entry. `TestReloadKeepsState` and the Phase 2 reload-under-load test (≤ 100 ms, zero
-failed requests) pin this.
+Reload swaps the config pointer, then `Limiter.Apply` compiles and stores the new `RuleSet`; the
+store is untouched. A changed `rate` or `burst` applies from the next decision because a TAT is a
+timestamp. Per-rule counters and the deny ring belong to the rule id (`ruleStats`) and move to the
+new compiled rule; the stats and the `limiter_denied_total{rule}` child of a removed id are deleted.
+Requests in flight finish with the `RuleSet` they loaded at entry. `TestReloadKeepsState` and the
+Phase 2 reload-under-load test (≤ 100 ms, zero failed requests) pin this.
 
 ### 5.5 Deny sampler (`/admin/limits/top`)
 
 Per rule, a fixed ring of 1,024 `{key, at int64}` entries written under a per-rule mutex on each
-denial. `GET /admin/limits/top?n=20` reads the rings, counts entries within the last 60 s by key,
-and returns the top n with the rule id and the key's dimensions. The ring holds cloned strings
-only. Allowed requests never touch it.
+denial; the array is allocated on the rule's first denial. `GET /admin/limits/top?n=20&window=60s`
+reads the rings, counts entries within the window by key, and returns the top n with the rule id
+and the key's dimensions. The ring holds cloned strings only; a slot that already holds the same
+key is reused without cloning, so a storm on few keys allocates nothing after the first lap
+(`TestDecideAllocatesZero`). Allowed requests never touch it.
 
 ## 6. Showback (`internal/showback`)
 
@@ -471,12 +497,12 @@ listener's pool. Routes, each a read of state the proxy already holds:
 | `GET /healthz` | Process is up. |
 | `GET /readyz` | Config loaded and at least one backend healthy. |
 | `GET /metrics` | Prometheus exposition. |
-| `POST /admin/reload` | Same as `SIGHUP`; returns the validation result. |
-| `GET /admin/config` | Effective config with `admin.token` redacted, last reload result and time. |
+| `POST /admin/reload` | Same as `SIGHUP`; returns the result as JSON, 200 when published, 422 when the file was rejected (D-040). |
+| `GET /admin/config` | Effective config with `admin.token` redacted, in the file's key names, with the generation, load time, and last reload result (D-040). |
 | `GET /admin/status` | Uptime, node id, in-flight, req/s, throttled/s, backend health, config generation, last reload result. |
 | `GET /admin/limits` | Rules in force, live key count per rule, denied counts since start. |
 | `GET /admin/limits/top?n=` | Top denied keys in the last 60 s (5.5). |
-| `POST /admin/limits/test` | Dry run for `rules test` (5.3, `consume=false`). |
+| `POST /admin/limits/test` | Dry run for `rules test` (5.3, `consume=false`); served from Phase 2 (D-039). |
 | `GET /admin/backends` | Endpoints, health, in-flight, error counters, TTFB. |
 | `GET /admin/usage?from=&to=&group_by=&where=&format=` | Showback query over this node's store (6.4). |
 | `GET /debug/pprof/*` | Only with `admin.pprof: true`. |
@@ -548,8 +574,13 @@ example by embedding the readers in one per-request struct), the table shrinks a
 bound follows it; it never grows without an ADR.
 
 Denied path (throttle): stages 2–5, then the XML body is written from a pooled byte slice with
-`Retry-After` and a request id (one 16-byte random read, one string); ≤ 3 allocations, no body
-read. A throttle storm is cheaper per request than a forwarded request.
+`Retry-After` and a request id (128 random bits from `math/rand/v2`, formatted on the stack).
+Measured 2026-11-09 by `TestThrottledAllocations` (pinned at the measured value, D-041):
+**6 allocations** in both build modes, the request-id, `Content-Length`, and `x-amz-retry-after`
+strings and the three single-value header slices that vary (`Content-Length`, `X-Amz-Request-Id`,
+`X-Amz-Retry-After`); `Content-Type` and small `Retry-After` values are shared slices; no body read,
+nothing per body byte. A throttle storm
+allocates less per request than a forwarded request and does none of its I/O.
 
 ### 9.3 Pre-resolved metric handles
 
@@ -623,10 +654,10 @@ Every category in docs/SPEC.md (Test plan) maps to a package and a phase:
 | 4 | Fuzzing | `FuzzParse`, `FuzzClassify` (`internal/s3id`, shunt's corpus as seed), `FuzzConfig`, `FuzzNDJSON` | 1–3 |
 | 5 | Byte-equivalence | `test/s3diff` + `bench/recordbackend` | 1 |
 | 6 | Client compatibility | `test/integration` (Garage and versitygw run as pinned static binaries downloaded by `test/integration/backends.sh`, no container runtime; MinIO and `mc` dropped, D-022), `docs/COMPAT.md` | 1 |
-| 7 | Throttling behavior | `test/e2e` with each SDK | 2 |
+| 7 | Throttling behavior | `test/e2e` (aws-sdk-go-v2 in-process, every PR: body parsing, 1 req/s completion by retry mode, the 200-object sync at half concurrency in standard and adaptive modes, the Expect reconnect cost) and `test/integration/throttle.sh` (aws cli, boto3, s5cmd, rclone, s3cmd against Garage in the CI `integration` job, `docs/THROTTLE.md`) | 2 |
 | 8 | Showback correctness | `internal/showback` (injected clock) + reconciliation in `test/e2e` | 3 |
 | 9 | Chaos and resilience | `test/e2e` + null backend fault injection | 1–5 |
-| 10 | Performance regression | `make bench-compare`, baseline committed at Gate 2 | 2–5 |
+| 10 | Performance regression | `make bench-compare` against `test/bench/baseline.txt` (committed at Gate 2 from the fixed CI runner) in the nightly job; `make bench-e2e` (`bench/run.sh`, `bench/loadgen`) for the end-to-end rows | 2–5 |
 | 11 | Static analysis | CI (`.golangci.yml`, `govulncheck`, `gosec`, Semgrep, CodeQL, `go-licenses`) | 0 skeleton, 1 on |
 | 12 | Operator surface | `internal/admin` parity test, CLI goldens, `teatest` goldens | 4 |
 

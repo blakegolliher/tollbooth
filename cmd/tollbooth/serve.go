@@ -24,12 +24,14 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"sync"
 	"sync/atomic"
 	"syscall"
 	"time"
 
 	"github.com/blakegolliher/tollbooth/internal/admin"
 	"github.com/blakegolliher/tollbooth/internal/config"
+	"github.com/blakegolliher/tollbooth/internal/limiter"
 	"github.com/blakegolliher/tollbooth/internal/proxy"
 )
 
@@ -83,15 +85,25 @@ func serve(ctx context.Context, path string, cfg *config.Config, log *slog.Logge
 	pool.Start()
 	defer pool.Stop()
 
+	lim := limiter.New(&metrics.Limiter)
+	if err = lim.Apply(cfg); err != nil {
+		return fmt.Errorf("rules: %w", err)
+	}
+	sweepCtx, stopSweep := context.WithCancel(ctx)
+	defer stopSweep()
+	go lim.Run(sweepCtx)
+
 	var access *proxy.AccessLogger
 	if cfg.Logging.Access {
 		access = proxy.NewAccessLogger(stdout)
 	}
-	h := proxy.New(published, pool, metrics, access, log)
+	h := proxy.New(published, pool, metrics, lim, access, log)
 	data := proxy.NewServer(h, &cfg.Listen, metrics, log)
 	data.BaseContext = func(net.Listener) context.Context { return ctx }
 
-	adm := &admin.Server{Address: cfg.Admin.Address, Metrics: metrics, Ready: pool.Healthy, Token: cfg.AdminToken(), Pprof: cfg.Admin.Pprof}
+	rl := &reloader{path: path, published: published, certs: certs, lim: lim, metrics: metrics, log: log, generation: 1, loadedAt: time.Now()}
+	adm := &admin.Server{Address: cfg.Admin.Address, Metrics: metrics, Ready: pool.Healthy, Token: cfg.AdminToken(), Pprof: cfg.Admin.Pprof,
+		Limiter: lim, Reload: rl.reload, Config: rl.view}
 	admSrv := adm.HTTPServer()
 	admLn, err := (&net.ListenConfig{}).Listen(ctx, "tcp", cfg.Admin.Address)
 	if err != nil {
@@ -127,7 +139,7 @@ func serve(ctx context.Context, path string, cfg *config.Config, log *slog.Logge
 		case s := <-sigs:
 			switch s {
 			case syscall.SIGHUP:
-				reload(path, published, certs, metrics, log)
+				rl.reload()
 			default:
 				log.Info("signal received, draining", "signal", s.String())
 				return drain(data, admSrv, published.Load().Proxy.DrainTimeout, log)
@@ -136,24 +148,69 @@ func serve(ctx context.Context, path string, cfg *config.Config, log *slog.Logge
 	}
 }
 
-// reload loads the file again, refuses a change to a restart-only key, and swaps the pointer.
-// An invalid file keeps the running config and is logged and counted (docs/CONFIG.md).
-func reload(path string, published *atomic.Pointer[config.Config], certs *proxy.CertStore, metrics *admin.Metrics, log *slog.Logger) {
-	next, err := config.Load(path)
+// reloader is the one reload path, shared by SIGHUP and POST /admin/reload and serialized by its
+// mutex. It keeps the state GET /admin/config shows.
+type reloader struct {
+	path      string
+	published *atomic.Pointer[config.Config]
+	certs     *proxy.CertStore
+	lim       *limiter.Limiter
+	metrics   *admin.Metrics
+	log       *slog.Logger
+
+	mu         sync.Mutex
+	generation int
+	loadedAt   time.Time
+	last       *admin.ReloadResult
+}
+
+// reload loads the file again, refuses a change to a restart-only key, re-reads the TLS pair,
+// compiles and publishes the rule set, then swaps the config pointer. An invalid file keeps the
+// running config and is logged and counted (docs/CONFIG.md). The limiter's store is untouched.
+func (r *reloader) reload() admin.ReloadResult {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	start := time.Now()
+	next, err := config.Load(r.path)
 	if err == nil {
-		err = next.ReloadCompatible(published.Load())
+		err = next.ReloadCompatible(r.published.Load())
 	}
-	if err == nil && certs != nil {
-		err = certs.Load(next.Listen.TLS.Cert, next.Listen.TLS.Key)
+	if err == nil && r.certs != nil {
+		err = r.certs.Load(next.Listen.TLS.Cert, next.Listen.TLS.Key)
 	}
+	if err == nil {
+		err = r.lim.Apply(next) // D-036: the rule set first, so a compile failure publishes nothing
+	}
+	res := admin.ReloadResult{At: start, Generation: r.generation}
 	if err != nil {
-		metrics.ConfigReload.WithLabelValues("error").Inc()
-		log.Error("config reload failed; running config kept", "config", path, "err", err.Error())
-		return
+		res.Error = err.Error()
+		res.DurationMS = float64(time.Since(start)) / 1e6
+		r.last = &res
+		r.metrics.ConfigReload.WithLabelValues("error").Inc()
+		r.log.Error("config reload failed; running config kept", "config", r.path, "generation", r.generation, "err", err.Error())
+		return res
 	}
-	published.Store(next)
-	metrics.ConfigReload.WithLabelValues("ok").Inc()
-	log.Info("config reloaded", "config", path, "rules", len(next.RateLimits.Rules))
+	r.published.Store(next)
+	r.generation++
+	r.loadedAt = start
+	res.OK, res.Generation, res.Rules = true, r.generation, len(next.RateLimits.Rules)
+	res.DurationMS = float64(time.Since(start)) / 1e6
+	r.last = &res
+	r.metrics.ConfigReload.WithLabelValues("ok").Inc()
+	r.log.Info("config reloaded", "config", r.path, "generation", r.generation, "rules", res.Rules, "duration_ms", res.DurationMS)
+	return res
+}
+
+// view is GET /admin/config: the running config, redacted, with the reload state.
+func (r *reloader) view() admin.ConfigView {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	v := admin.ConfigView{Config: r.published.Load().Redacted(), Generation: r.generation, LoadedAt: r.loadedAt}
+	if r.last != nil {
+		last := *r.last
+		v.LastReload = &last
+	}
+	return v
 }
 
 // drain stops accepting, waits for in-flight requests up to the drain timeout, then stops the
