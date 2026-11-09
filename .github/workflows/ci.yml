@@ -1,0 +1,97 @@
+name: ci
+
+# Every PR: lint, unit with race, 60 s fuzz, govulncheck, go-licenses, CodeQL, Semgrep, and the
+# integration suite against MinIO and Garage (docs/SPEC.md, Engineering quality bar). Jobs whose
+# inputs do not exist yet (no Go code before Phase 1) succeed on an empty tree so the skeleton
+# is green from Phase 0; each one gains teeth in the phase that adds its inputs.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+  security-events: write # CodeQL and Semgrep SARIF upload
+
+jobs:
+  unit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: build, lint, test, race
+        run: make all
+      - name: go mod tidy is clean
+        run: make tidy
+      - name: fuzz 60s per target
+        run: make fuzz FUZZ_TIME=60s
+      - name: logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-logs
+          path: run/
+          if-no-files-found: ignore
+
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: govulncheck
+        run: make vuln
+      - name: go-licenses (deny GPL, LGPL, AGPL, SSPL) and notices
+        run: make licenses
+      - name: notices are committed
+        run: git diff --exit-code THIRD_PARTY_NOTICES.md
+
+  codeql:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: github/codeql-action/init@v3
+        with:
+          languages: go
+      - uses: github/codeql-action/analyze@v3
+
+  semgrep:
+    runs-on: ubuntu-latest
+    container:
+      image: semgrep/semgrep
+    steps:
+      - uses: actions/checkout@v4
+      - run: semgrep scan --config p/golang --config p/secrets --error --sarif --output semgrep.sarif
+      - uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: semgrep.sarif
+
+  integration:
+    # Phase 1 adds test/integration/docker-compose.yml (MinIO, Garage, versitygw) and the
+    # byte-equivalence and compatibility runs behind `make compat`.
+    runs-on: ubuntu-latest
+    if: ${{ hashFiles('test/integration/docker-compose.yml') != '' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: compat matrix against MinIO and Garage
+        run: make compat
+      - name: compat results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: compat
+          path: |
+            docs/COMPAT.md
+            run/
+          if-no-files-found: ignore
