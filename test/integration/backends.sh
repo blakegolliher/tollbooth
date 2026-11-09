@@ -30,9 +30,10 @@ fetch_verified() { # url sha256 dest
   tmp=$(mktemp "$dest.XXXXXX")
   # --retry-all-errors: plain --retry does not retry an HTTP 4xx/5xx, and release CDNs return
   # those transiently (seen on 2026-11-09 in CI).
-  local code
-  if ! code=$(curl -sfL --retry 5 --retry-delay 3 --retry-all-errors --max-time 600 -o "$tmp" -w '%{http_code}' "$url"); then
-    echo "backends: download failed (curl exit $?, last HTTP status ${code:-none}): $url" >&2; rm -f "$tmp"; exit 1
+  local code rc
+  code=$(curl -sfL --retry 8 --retry-delay 5 --retry-all-errors --max-time 600 -o "$tmp" -w '%{http_code}' "$url") || rc=$?
+  if [ "${rc:-0}" -ne 0 ]; then
+    echo "backends: download failed (curl exit $rc, last HTTP status ${code:-none}): $url" >&2; rm -f "$tmp"; exit 1
   fi
   echo "$sha  $tmp" | sha256sum -c --quiet - || { rm -f "$tmp"; echo "backends: checksum mismatch for $url" >&2; exit 1; }
   mv "$tmp" "$dest"

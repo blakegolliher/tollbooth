@@ -31,38 +31,48 @@ ELBENCHO_SHA256=cd33b7dd53dde164800df8eaefff9de8d680f9dc10fa195cc50a7a63db589cb2
 BOTO3_VERSION=1.43.126
 S3CMD_VERSION=2.4.0
 
-fetch_verified() { # url sha256 dest
-  local url=$1 sha=$2 dest=$3 tmp
+# fetch_verified url sha256 dest → 0 on success; 1 (not exit) on a download or checksum failure, so
+# one tool's bad day does not take the others down.
+fetch_verified() {
+  local url=$1 sha=$2 dest=$3 tmp code rc
   tmp=$(mktemp "$dest.XXXXXX")
-  local code
-  if ! code=$(curl -sfL --retry 5 --retry-delay 3 --retry-all-errors --max-time 600 -o "$tmp" -w '%{http_code}' "$url"); then
-    echo "clients: download failed (curl exit $?, last HTTP status ${code:-none}): $url" >&2; rm -f "$tmp"; exit 1
+  code=$(curl -sfL --retry 8 --retry-delay 5 --retry-all-errors --max-time 600 -o "$tmp" -w '%{http_code}' "$url") || rc=$?
+  if [ "${rc:-0}" -ne 0 ]; then
+    echo "clients: download failed (curl exit $rc, last HTTP status ${code:-none}): $url" >&2; rm -f "$tmp"; return 1
   fi
-  echo "$sha  $tmp" | sha256sum -c --quiet - || { rm -f "$tmp"; echo "clients: checksum mismatch for $url" >&2; exit 1; }
+  if ! echo "$sha  $tmp" | sha256sum -c --quiet -; then
+    rm -f "$tmp"; echo "clients: checksum mismatch for $url" >&2; return 1
+  fi
   mv "$tmp" "$dest"
 }
 
+# fetch installs every tool it can and returns non-zero if any is missing afterwards. A missing
+# tool shows up as FAIL cells in the matrix with "not installed", never as a silent skip.
 fetch() {
+  local missing=0
   if [ ! -x "$BIN/s5cmd" ]; then
-    fetch_verified "$S5CMD_URL" "$S5CMD_SHA256" "$BIN/s5cmd.tar.gz"
-    tar -xzf "$BIN/s5cmd.tar.gz" -C "$BIN" s5cmd && rm -f "$BIN/s5cmd.tar.gz"
+    if fetch_verified "$S5CMD_URL" "$S5CMD_SHA256" "$BIN/s5cmd.tar.gz"; then
+      tar -xzf "$BIN/s5cmd.tar.gz" -C "$BIN" s5cmd && rm -f "$BIN/s5cmd.tar.gz"
+    else missing=1; fi
   fi
   if [ ! -x "$BIN/rclone" ]; then
-    fetch_verified "$RCLONE_URL" "$RCLONE_SHA256" "$BIN/rclone.zip"
-    unzip -q -o -j "$BIN/rclone.zip" "rclone-${RCLONE_VERSION}-linux-amd64/rclone" -d "$BIN" && rm -f "$BIN/rclone.zip"
-    chmod +x "$BIN/rclone"
+    if fetch_verified "$RCLONE_URL" "$RCLONE_SHA256" "$BIN/rclone.zip"; then
+      unzip -q -o -j "$BIN/rclone.zip" "rclone-${RCLONE_VERSION}-linux-amd64/rclone" -d "$BIN" && rm -f "$BIN/rclone.zip"
+      chmod +x "$BIN/rclone"
+    else missing=1; fi
   fi
   if [ ! -x "$BIN/elbencho" ]; then
-    fetch_verified "$ELBENCHO_URL" "$ELBENCHO_SHA256" "$BIN/elbencho.tar.gz"
-    tar -xzf "$BIN/elbencho.tar.gz" -C "$BIN" elbencho && rm -f "$BIN/elbencho.tar.gz"
-    chmod +x "$BIN/elbencho"
+    if fetch_verified "$ELBENCHO_URL" "$ELBENCHO_SHA256" "$BIN/elbencho.tar.gz"; then
+      tar -xzf "$BIN/elbencho.tar.gz" -C "$BIN" elbencho && rm -f "$BIN/elbencho.tar.gz"
+      chmod +x "$BIN/elbencho"
+    else missing=1; fi
   fi
-  if [ ! -x "$VENV/bin/python" ]; then
-    python3 -m venv "$VENV"
-    "$VENV/bin/pip" install -q "boto3==$BOTO3_VERSION" "s3cmd==$S3CMD_VERSION"
+  if [ ! -x "$VENV/bin/python" ] || ! "$VENV/bin/python" -c "import boto3" 2>/dev/null; then
+    if python3 -m venv "$VENV" && "$VENV/bin/pip" install -q "boto3==$BOTO3_VERSION" "s3cmd==$S3CMD_VERSION"; then :; else missing=1; fi
   fi
-  command -v aws >/dev/null || { echo "clients: aws cli v2 is expected on the runner image" >&2; exit 1; }
-  echo "clients: aws $(aws --version 2>&1 | cut -d' ' -f1), boto3 $BOTO3_VERSION, s3cmd $S3CMD_VERSION, s5cmd $S5CMD_VERSION, rclone $RCLONE_VERSION, elbencho $ELBENCHO_VERSION"
+  command -v aws >/dev/null || { echo "clients: aws cli v2 is expected on the runner image" >&2; missing=1; }
+  echo "clients: aws $(aws --version 2>&1 | cut -d' ' -f1), boto3 $BOTO3_VERSION, s3cmd $S3CMD_VERSION, s5cmd $S5CMD_VERSION, rclone $RCLONE_VERSION, elbencho $ELBENCHO_VERSION (missing=$missing)"
+  return $missing
 }
 
 # record TOOL OP PASS|FAIL [detail]
@@ -72,6 +82,9 @@ record() { printf '%s\t%s\t%s\t%s\n' "$1" "$2" "$3" "${4:-}" >> "$RESULTS"; }
 try() {
   local tool=$1 op=$2; shift 2
   local out
+  if [[ "$1" == "$BIN/"* || "$1" == "$VENV/"* ]] && [ ! -x "$1" ]; then
+    record "$tool" "$op" FAIL "tool not installed (download failed)"; return
+  fi
   if out=$("$@" 2>&1); then
     record "$tool" "$op" PASS
   else

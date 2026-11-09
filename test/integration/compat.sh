@@ -18,7 +18,8 @@ BACKENDS=${BACKENDS:-garage versitygw}
 STAGES=${STAGES:-s3diff clients}
 export GOTOOLCHAIN=${GOTOOLCHAIN:-auto}
 
-case " $STAGES " in *" clients "*) "$HERE/clients.sh" fetch ;; esac
+# A client tool that cannot be fetched becomes FAIL cells, not an aborted run: stage 1 still runs.
+case " $STAGES " in *" clients "*) "$HERE/clients.sh" fetch || echo "compat: some client tools are missing; their cells will fail" >&2 ;; esac
 "$HERE/backends.sh" up
 trap '"$HERE/backends.sh" down; pkill -f "tollbooth serve --config $RUN/" 2>/dev/null || true' EXIT
 # shellcheck disable=SC1091
