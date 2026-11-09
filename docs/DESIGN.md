@@ -525,13 +525,15 @@ decision and the showback increment at steady state. The seven, by name:
 
 | # | Allocation | Where | Why it cannot be avoided |
 | --- | --- | --- | --- |
-| 1 | `*http.Request` for the outbound request | §4.4 | `http.Transport.RoundTrip` takes a pointer it retains for the request's lifetime |
+| 1 | `*http.Request` for the outbound request (`Request.WithContext` copies the stack literal) | §4.4 | `http.Transport.RoundTrip` takes a pointer it retains; the context field is unexported, so the copy is the only way to attach one |
 | 2 | `*url.URL` for the outbound request | §4.4 | `Request.URL` is a pointer; the inbound URL cannot be reused because `Opaque`, `Scheme`, and `Host` differ |
-| 3 | `*progressReader` on the request body | §4.4 | only when the request has a body; `Request.Body` is an interface value, so a heap object is needed |
-| 4 | `*progressReader` on the response body | §4.6 | `io.CopyBuffer`'s source is an interface value |
-| 5 | `*deadlineWriter` on the `ResponseWriter` | §4.6 | `io.CopyBuffer`'s destination is an interface value; it also hides `ReaderFrom` so the pooled buffer is used |
-| 6 | `*http.ResponseController` | §4.4, §4.6 | `http.NewResponseController` returns a pointer and the readers hold it |
-| 7 | `*time.Timer` for the idle watchdog | §4.6 | `time.AfterFunc` allocates its timer; one per request with a body or response body |
+| 3 | `*http.ResponseController` | §4.4, §4.6 | `http.NewResponseController` returns a pointer and the readers hold it |
+| 4 | one `reqState` holding the watchdog, both body readers, and the response writer | §4.4, §4.6 | `Request.Body` and `io.CopyBuffer`'s arguments are interface values, so the readers must live on the heap; one struct instead of four |
+| 5 | `*time.Timer` for the idle watchdog | §4.6 | `time.AfterFunc` allocates its timer; one per request |
+| 6 | `*cancelCtx` from `context.WithCancel` | §4.4 | the watchdog cancels the backend request through its context |
+| 7 | the `CancelFunc` closure from `context.WithCancel` | §4.4 | returned by the standard library with the context |
+
+Measured on 2026-11-09 by `TestHandlerAllocations` (no-op writer, fake `RoundTripper`): **7.00** per forwarded 4 KiB `GetObject`, 0 per body byte.
 
 Everything else is pooled (copy buffer), pre-resolved (metric handles, §9.3), or a struct value
 that does not escape (`RequestIdentity`, the limiter decision, the outcome record). Enforcement:

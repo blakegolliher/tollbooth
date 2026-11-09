@@ -94,6 +94,10 @@ type RequestIdentity struct {
 	Addressing Addressing
 	Level      Level
 	Method     string
+	// RawPath and RawQuery are the request-target as sent, split at the first '?', so the
+	// outbound request is built from the same bytes the identity was (docs/DESIGN.md §4.4).
+	RawPath  string
+	RawQuery string
 }
 
 // Config is the identity pass's configuration: the virtual-hosted base domains and the peers
@@ -194,7 +198,7 @@ func RawTarget(r *http.Request) (rawPath, rawQuery string, absolute bool) {
 // LevelService/OpUnknown and still proxied.
 func Parse(r *http.Request, c *Config) RequestIdentity {
 	rawPath, rawQuery, absolute := RawTarget(r)
-	id := RequestIdentity{Method: r.Method}
+	id := RequestIdentity{Method: r.Method, RawPath: rawPath, RawQuery: rawQuery}
 	if absolute {
 		id.Flags |= FlagAbsolute
 	}

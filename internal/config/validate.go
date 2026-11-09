@@ -300,6 +300,10 @@ func (c *Config) ReloadCompatible(prev *Config) error {
 	fixed("node_id", prev.NodeID, c.NodeID)
 	fixed("showback.dir", prev.Showback.Dir, c.Showback.Dir)
 	fixed("listen.proxy_protocol", strconv.FormatBool(prev.Listen.ProxyProtocol), strconv.FormatBool(c.Listen.ProxyProtocol))
+	fixed("proxy.copy_buffer_bytes", strconv.Itoa(prev.Proxy.CopyBufferBytes), strconv.Itoa(c.Proxy.CopyBufferBytes))
+	// The backend pool and its transport are built once (D-029); rebuilding them under load with
+	// a drain is Phase 6 work if the field needs it.
+	fixed("backend", fmt.Sprintf("%+v", prev.Backend), fmt.Sprintf("%+v", c.Backend))
 	return errors.Join(errs...)
 }
 
