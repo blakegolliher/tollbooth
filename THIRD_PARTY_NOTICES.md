@@ -254,6 +254,6 @@ LICENSE (verbatim):
 | `github.com/prometheus/client_model/go` | Apache-2.0 | https://github.com/prometheus/client_model/blob/v0.6.3/LICENSE |
 | `github.com/prometheus/common` | Apache-2.0 | https://github.com/prometheus/common/blob/v0.72.0/LICENSE |
 | `github.com/prometheus/procfs` | Apache-2.0 | https://github.com/prometheus/procfs/blob/v0.22.0/LICENSE |
+| `go.yaml.in/yaml/v4` | Apache-2.0 | https://github.com/yaml/go-yaml/blob/v4.0.0/LICENSE |
 | `golang.org/x/sys/unix` | BSD-3-Clause | https://cs.opensource.google/go/x/sys/+/v0.48.0:LICENSE |
 | `google.golang.org/protobuf` | BSD-3-Clause | https://github.com/protocolbuffers/protobuf-go/blob/v1.36.12/LICENSE |
-| `go.yaml.in/yaml/v4` | Apache-2.0 | https://github.com/yaml/go-yaml/blob/v4.0.0/LICENSE |
