@@ -42,19 +42,21 @@ Dependencies). No database driver, ever.
 | elbencho | GPL-3.0 | system package or image, compatibility matrix | `test/integration` |
 | aws cli v2, boto3, s5cmd, rclone, s3cmd | Apache-2.0 / MIT / GPL-2.0 (s3cmd) | compatibility matrix clients (`mc` dropped with MinIO, D-022) | `test/integration` |
 
-## Lifted code (planned for Phase 1; filled in with the real commit and notice at the lift)
+## Lifted code
+
+Status column: **lifted** rows are in the tree with their headers and modification lines; *planned* rows land in the feature that needs them.
 
 | Source repo | Path | Commit | License | Destination | Why the stdlib was not enough |
 | --- | --- | --- | --- | --- | --- |
-| github.com/blakegolliher/shunt | `internal/s3/op.go`, `classify.go` (+ tests) | `9b36d09ed109add4a2bedfe1dbfae6108038ee5b` | Apache-2.0 (LICENSE and NOTICE carried) | `internal/s3id/op.go`, `classify.go` | 95-operation classifier table with precedence and tests; extended by 18 operations (docs/OPERATIONS_TABLE.md) and rewritten to match a query bitmask instead of `url.Values` |
-| github.com/blakegolliher/shunt | `internal/s3/request.go` (+ test, `testdata/fuzz/FuzzParse`) | same | Apache-2.0 | `internal/s3id/parse.go` | Bucket and key extraction for both addressing styles with the fuzz corpus; extended with access key, source IP, list prefix |
-| github.com/blakegolliher/shunt | `internal/s3/errors.go` (+ test) | same | Apache-2.0 | `internal/proxy/s3error.go` | S3 error table and XML rendering; `TooManyRequests` and `Retry-After` added |
-| github.com/blakegolliher/shunt | `internal/sigv4/canonical.go` (`RawPath`, `RawQuery` only) | same | Apache-2.0 | `internal/s3id/raw.go` | Raw request-target preservation; the signing and verification code is not copied |
-| github.com/blakegolliher/shunt | `internal/proxy/handler.go` (passthrough path), `copy.go`, `headers.go` | same | Apache-2.0 | `internal/proxy/handler.go`, `copy.go`, `headers.go` | Streaming data path, pooled `io.CopyBuffer`, per-chunk deadlines, retry-before-bytes, `ErrAbortHandler` on short read; every resign, admission, directory, and `Via` path removed |
-| github.com/blakegolliher/shunt | `internal/upstream/cluster.go` (endpoints, `IsConnectError`, health) | same | Apache-2.0 | `internal/proxy/backend.go` | Backend pool with round-robin, passive marking, active checks |
-| github.com/blakegolliher/shunt | `internal/listener/listener.go` | same | Apache-2.0 | `internal/proxy/listener.go` | TLS listener with min version and `http/1.1` only; PROXY protocol and trusted XFF added |
-| github.com/blakegolliher/shunt | `internal/telemetry/metrics.go`, `accesslog.go`, `requestid.go`, `catalog_test.go` | same | Apache-2.0 | `internal/admin/metrics.go`, `internal/proxy/access.go` | Metrics scaffolding, catalog test, request ids, per-request `Access` record that becomes the showback input |
-| github.com/blakegolliher/shunt | `test/s3diff`, `test/e2e` compose and scripts, `test/bench` | same | Apache-2.0 | `test/s3diff`, `test/integration`, `bench/` | Byte-equivalence diff harness, backend compose, HDR latency harness |
+| github.com/blakegolliher/shunt | `internal/s3/op.go`, `classify.go`, `classify_test.go` | `9b36d09ed109add4a2bedfe1dbfae6108038ee5b` | Apache-2.0 (LICENSE and NOTICE carried) | `internal/s3id/op.go`, `classify.go`, `classify_test.go` | 95-operation classifier table with precedence and tests; extended by 18 operations (docs/OPERATIONS_TABLE.md), given classes, rewritten to match a query bitmask instead of `url.Values`, and indexed by (method, level) | **lifted 2026-11-09** |
+| github.com/blakegolliher/shunt | `internal/s3/request.go`, `request_test.go`, `testdata/fuzz/FuzzParse/*` | same | Apache-2.0 | `internal/s3id/parse.go`, `parse_test.go`, `testdata/fuzz/FuzzParse/*` | Bucket and key extraction for both addressing styles with the fuzz corpus; extended with access key, source IP and trusted X-Forwarded-For, list prefix, flags; `net.SplitHostPort` replaced by a byte-level port strip (it allocated an error for a bare host) | **lifted 2026-11-09** |
+| github.com/blakegolliher/shunt | `internal/s3/errors.go` (+ test) | same | Apache-2.0 | `internal/proxy/s3error.go` | S3 error table and XML rendering; `TooManyRequests` and `Retry-After` added | planned |
+| github.com/blakegolliher/shunt | `internal/sigv4/canonical.go` (`RawPath` only) | same | Apache-2.0 | `internal/s3id/parse.go` (`RawTarget`) | Raw request-target preservation, returning path and query as two substrings; `RawQuery` (a `url.Values` decode) is not needed and not copied; nothing from signing or verification is copied | **lifted 2026-11-09** |
+| github.com/blakegolliher/shunt | `internal/proxy/handler.go` (passthrough path), `copy.go`, `headers.go` | same | Apache-2.0 | `internal/proxy/handler.go`, `copy.go`, `headers.go` | Streaming data path, pooled `io.CopyBuffer`, per-chunk deadlines, retry-before-bytes, `ErrAbortHandler` on short read; every resign, admission, directory, and `Via` path removed | planned |
+| github.com/blakegolliher/shunt | `internal/upstream/cluster.go` (endpoints, `IsConnectError`, health) | same | Apache-2.0 | `internal/proxy/backend.go` | Backend pool with round-robin, passive marking, active checks | planned |
+| github.com/blakegolliher/shunt | `internal/listener/listener.go` | same | Apache-2.0 | `internal/proxy/listener.go` | TLS listener with min version and `http/1.1` only; PROXY protocol and trusted XFF added | planned |
+| github.com/blakegolliher/shunt | `internal/telemetry/metrics.go`, `accesslog.go`, `requestid.go`, `catalog_test.go` | same | Apache-2.0 | `internal/admin/metrics.go`, `internal/proxy/access.go` | Metrics scaffolding, catalog test, request ids, per-request `Access` record that becomes the showback input | planned |
+| github.com/blakegolliher/shunt | `test/s3diff`, `test/e2e` compose and scripts, `test/bench` | same | Apache-2.0 | `test/s3diff`, `test/integration`, `bench/` | Byte-equivalence diff harness, backend compose, HDR latency harness | planned |
 
 Not lifted: `internal/runtimecfg` (tollbooth's config is one `atomic.Pointer`), `internal/sigv4`
 signing and verification, `internal/s3/s3response`, `internal/sigv4/chunked`, anything under
