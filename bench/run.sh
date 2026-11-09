@@ -26,10 +26,10 @@ PROXY_ADDR=${PROXY_ADDR:-127.0.0.1:18000}
 ADMIN_ADDR=${ADMIN_ADDR:-127.0.0.1:19900}
 export GOTOOLCHAIN=${GOTOOLCHAIN:-auto}
 
-mkdir -p "$OUT"
+mkdir -p "$OUT" "$ROOT/bin"
 cd "$ROOT"
-go build -o "$OUT/nullbackend" ./bench/nullbackend/cmd/nullbackend
-go build -o "$OUT/loadgen" ./bench/loadgen
+go build -o bin/nullbackend ./bench/nullbackend/cmd/nullbackend
+go build -o bin/loadgen ./bench/loadgen
 [ -x bin/tollbooth ] || make build
 
 # Environment facts the specification asks every report to carry.
@@ -83,7 +83,7 @@ YAML
 } > "$CFG"
 bin/tollbooth check-config "$CFG"
 
-"$OUT/nullbackend" -listen "$NULL_ADDR" -size "$SIZE" > "$OUT/nullbackend.log" 2>&1 &
+bin/nullbackend -listen "$NULL_ADDR" -size "$SIZE" > "$OUT/nullbackend.log" 2>&1 &
 NULL_PID=$!
 bin/tollbooth serve --config "$CFG" > "$OUT/tollbooth.log" 2>&1 &
 PROXY_PID=$!
@@ -103,18 +103,23 @@ profile() { # profile NAME SECONDS: capture CPU and allocation profiles from the
 for sc in $SCENARIOS; do
   case $sc in
     raw)
-      # Added latency and small-op throughput: presigned 4 KiB GETs, direct versus proxied.
-      ( sleep "$(python3 -c "import sys; d=sys.argv[1]; print(float(d[:-1]) * (60 if d.endswith('m') else 1) + 2)" "$WARMUP")"; profile raw 10 ) &
+      # Added latency and small-op throughput: presigned 4 KiB GETs, direct versus proxied. The
+      # profile is taken inside the first proxied measurement: after the direct warm-up, the direct
+      # run, and the proxied warm-up.
+      ( sleep "$(python3 -c "
+import sys
+def secs(d): return float(d[:-1]) * (60 if d.endswith('m') else 1)
+print(2 * secs(sys.argv[1]) + secs(sys.argv[2]) + 2)" "$WARMUP" "$DURATION")"; profile raw 10 ) &
       PROF_PID=$!
-      "$OUT/loadgen" -mode raw -label get4k "${common[@]}" | tee "$OUT/raw.txt"
+      bin/loadgen -mode raw -label get4k "${common[@]}" | tee "$OUT/raw.txt"
       wait "$PROF_PID" ;;
     sdk)
       # Realistic mix with the SDK's own signing and retries.
-      "$OUT/loadgen" -mode sdk -ops GET=70,PUT=20,HEAD=10 -label mix "${common[@]}" | tee "$OUT/sdk.txt" ;;
+      bin/loadgen -mode sdk -ops GET=70,PUT=20,HEAD=10 -label mix "${common[@]}" | tee "$OUT/sdk.txt" ;;
     throttle)
       # The throttle path: every request to bucket load-throttle-0 at rate 500 per access key;
       # attempts and throttled attempts are counted by the SDK middleware.
-      "$OUT/loadgen" -mode sdk -ops GET=100 -bucket-base load-throttle- -buckets 1 -label throttle -proxied "http://$PROXY_ADDR" -concurrency "$CONCURRENCY" -keys 1 -prefixes 1 -duration "$DURATION" -warmup 5s -runs 1 -out "$OUT" \
+      bin/loadgen -mode sdk -ops GET=100 -bucket-base load-throttle- -buckets 1 -label throttle -proxied "http://$PROXY_ADDR" -concurrency "$CONCURRENCY" -keys 1 -prefixes 1 -duration "$DURATION" -warmup 5s -runs 1 -out "$OUT" \
         | tee "$OUT/throttle.txt" ;;
   esac
 done

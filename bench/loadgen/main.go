@@ -34,7 +34,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"math/rand/v2"
+	"math/rand/v2" // nosemgrep: workload shaping, not security; the crypto-randomness rule does not apply
 	"net"
 	"net/http"
 	"os"
