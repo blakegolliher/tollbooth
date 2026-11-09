@@ -103,9 +103,12 @@ func TestInflightCapUnderConcurrency(t *testing.T) {
 	r.cfg.Store(&c)
 	r.null.Stall.Store(true)
 	results := make(chan int, 8)
+	// The four requests that get a slot stall on the backend; a client timeout ends them, which
+	// cancels the proxy's backend requests, so the test does not wait for response_header_timeout.
+	client := &http.Client{Timeout: 2 * time.Second, Transport: &http.Transport{DisableKeepAlives: true}}
 	for i := 0; i < 8; i++ {
 		go func() {
-			resp, err := fresh().Get(r.front.URL + "/b/k") //nolint:noctx // test
+			resp, err := client.Get(r.front.URL + "/b/k") //nolint:noctx // test
 			if err != nil {
 				results <- -1
 				return
@@ -114,22 +117,38 @@ func TestInflightCapUnderConcurrency(t *testing.T) {
 			results <- resp.StatusCode
 		}()
 	}
-	refused := 0
-	deadline := time.After(3 * time.Second)
-	for refused < 4 {
+	refused, timedOut := 0, 0
+	deadline := time.After(10 * time.Second)
+	for refused+timedOut < 8 {
 		select {
 		case code := <-results:
-			if code == http.StatusServiceUnavailable {
+			switch code {
+			case http.StatusServiceUnavailable:
 				refused++
-			} else {
+				if refused == 4 {
+					if n := r.h.inflight.Load(); n != 4 {
+						t.Fatalf("in-flight gauge %d with four stalled requests, want 4", n)
+					}
+				}
+			case -1:
+				timedOut++
+			default:
 				t.Fatalf("unexpected status %d while the backend stalls", code)
 			}
 		case <-deadline:
-			t.Fatalf("only %d requests were refused by the cap", refused)
+			t.Fatalf("refused=%d timedOut=%d after 10 s", refused, timedOut)
 		}
 	}
-	if n := r.h.inflight.Load(); n != 4 {
-		t.Fatalf("in-flight gauge %d, want 4", n)
+	if refused != 4 || timedOut != 4 {
+		t.Fatalf("refused=%d timedOut=%d, want 4 and 4", refused, timedOut)
 	}
 	r.null.Stall.Store(false)
+	deadline = time.After(5 * time.Second)
+	for r.h.inflight.Load() != 0 {
+		select {
+		case <-deadline:
+			t.Fatalf("in-flight gauge stuck at %d after the clients left", r.h.inflight.Load())
+		case <-time.After(10 * time.Millisecond):
+		}
+	}
 }
