@@ -218,7 +218,7 @@ GCRA, per key: emission interval `T = 1/rate` seconds; tolerance `tau = (burst �
 
 Enforcement modes:
 
-- `slowdown`: HTTP 503, `Content-Type: application/xml`, body `<Error><Code>SlowDown</Code><Message>Please reduce your request rate.</Message><Resource>/bucket/key</Resource><RequestId>…</RequestId><HostId>…</HostId></Error>`, headers `Retry-After: <ceil(wait) seconds, min 1>`, `x-amz-retry-after: <ceil(wait) milliseconds>` (the exact wait, which aws-sdk-go-v2 honors; added at Phase 2, D-043), and `x-amz-request-id`. Every AWS SDK retries this with exponential backoff.
+- `slowdown`: HTTP 503, `Content-Type: application/xml`, body `<Error><Code>SlowDown</Code><Message>Please reduce your request rate.</Message><Resource>/bucket/key</Resource><RequestId>…</RequestId><HostId>…</HostId></Error>`, headers `Retry-After: <ceil(wait) seconds, min 1>`, `x-amz-retry-after: <ceil(wait) milliseconds>` (the exact wait, which aws-sdk-go-v2 honors with `AWS_NEW_RETRIES_2026=true`; added at Phase 2, D-043), and `x-amz-request-id`. Every AWS SDK retries this with exponential backoff.
 - `too_many_requests`: HTTP 429, same body shape with code `TooManyRequests`, same headers. For clients whose retry policy is keyed on 429.
 - There is no hold-and-forward mode in v1. If a customer needs smoothing beyond SDK backoff, that is a Phase 6 ADR with the queue bounds and client-timeout analysis it deserves.
 - Rule identifiers never appear in client-facing responses. Tenants should not learn each other's policy names, and there is no knob to change that.
