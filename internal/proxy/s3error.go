@@ -24,7 +24,9 @@ package proxy
 
 import (
 	"encoding/xml"
-	"math/rand/v2" // nosemgrep: request ids are opaque correlation ids, not secrets (D-041)
+	// Request ids are opaque correlation ids, not secrets (D-041); the crypto-randomness rule
+	// does not apply.
+	"math/rand/v2" // nosemgrep
 	"net/http"
 	"strconv"
 	"sync"
