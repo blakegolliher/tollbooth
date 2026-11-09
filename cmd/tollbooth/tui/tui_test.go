@@ -143,14 +143,16 @@ func drive(t *testing.T, m Model, msgs ...tea.Msg) Model {
 			return
 		}
 		// A batch holds the poll and the tick; frame tests run neither (the first poll is run
-		// explicitly below), so only direct results are applied. A bare tick (notice clearing,
-		// cursor blink) would block until it fires, so a command gets 250 ms to answer.
+		// explicitly below), so only direct results are applied. A bare tick (notice clearing)
+		// would block until it fires, so a command gets two seconds to answer: long enough for a
+		// reload or a save against the fixture under -race on a loaded runner (CI run 42703131849
+		// dropped a 250 ms budget), short enough that the 4 s and 8 s notice timers do not stall.
 		ch := make(chan tea.Msg, 1)
 		go func() { ch <- cmd() }()
 		var got tea.Msg
 		select {
 		case got = <-ch:
-		case <-time.After(250 * time.Millisecond):
+		case <-time.After(2 * time.Second):
 			return
 		}
 		switch msg := got.(type) {
@@ -164,8 +166,8 @@ func drive(t *testing.T, m Model, msgs ...tea.Msg) Model {
 			}
 		}
 	}
-	// First poll.
-	run(m.poll())
+	// First poll, synchronous and unbounded: every frame depends on it.
+	cur, _ = cur.Update(m.poll()())
 	for _, msg := range msgs {
 		var cmd tea.Cmd
 		cur, cmd = cur.Update(msg)
