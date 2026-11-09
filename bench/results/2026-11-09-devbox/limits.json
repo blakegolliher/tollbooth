@@ -1,0 +1,2638 @@
+{
+  "rules": [
+    {
+      "id": "rule-001",
+      "buckets": [
+        "other-1"
+      ],
+      "prefixes": [
+        "ckpt/",
+        "logs/"
+      ],
+      "ops": [
+        "READ",
+        "WRITE"
+      ],
+      "group_by": [
+        "access_key",
+        "bucket",
+        "prefix"
+      ],
+      "rate": 1000,
+      "burst": 2000,
+      "effective_rate": 1000,
+      "effective_burst": 2000,
+      "on_limit": "slowdown",
+      "live_keys": 0,
+      "denied": 0
+    },
+    {
+      "id": "rule-002",
+      "buckets": [
+        "other-2"
+      ],
+      "prefixes": [
+        "ckpt/",
+        "logs/"
+      ],
+      "ops": [
+        "READ",
+        "WRITE"
+      ],
+      "group_by": [
+        "access_key",
+        "bucket",
+        "prefix"
+      ],
+      "rate": 1000,
+      "burst": 2000,
+      "effective_rate": 1000,
+      "effective_burst": 2000,
+      "on_limit": "slowdown",
+      "live_keys": 0,
+      "denied": 0
+    },
+    {
+      "id": "rule-003",
+      "buckets": [
+        "other-3"
+      ],
+      "prefixes": [
+        "ckpt/",
+        "logs/"
+      ],
+      "ops": [
+        "READ",
+        "WRITE"
+      ],
+      "group_by": [
+        "access_key",
+        "bucket",
+        "prefix"
+      ],
+      "rate": 1000,
+      "burst": 2000,
+      "effective_rate": 1000,
+      "effective_burst": 2000,
+      "on_limit": "slowdown",
+      "live_keys": 0,
+      "denied": 0
+    },
+    {
+      "id": "rule-004",
+      "buckets": [
+        "other-4"
+      ],
+      "prefixes": [
+        "ckpt/",
+        "logs/"
+      ],
+      "ops": [
+        "READ",
+        "WRITE"
+      ],
+      "group_by": [
+        "access_key",
+        "bucket",
+        "prefix"
+      ],
+      "rate": 1000,
+      "burst": 2000,
+      "effective_rate": 1000,
+      "effective_burst": 2000,
+      "on_limit": "slowdown",
+      "live_keys": 0,
+      "denied": 0
+    },
+    {
+      "id": "rule-005",
+      "buckets": [
+        "other-5"
+      ],
+      "prefixes": [
+        "ckpt/",
+        "logs/"
+      ],
+      "ops": [
+        "READ",
+        "WRITE"
+      ],
+      "group_by": [
+        "access_key",
+        "bucket",
+        "prefix"
+      ],
+      "rate": 1000,
+      "burst": 2000,
+      "effective_rate": 1000,
+      "effective_burst": 2000,
+      "on_limit": "slowdown",
+      "live_keys": 0,
+      "denied": 0
+    },
+    {
+      "id": "rule-006",
+      "buckets": [
+        "other-6"
+      ],
+      "prefixes": [
+        "ckpt/",
+        "logs/"
+      ],
+      "ops": [
+        "READ",
+        "WRITE"
+      ],
+      "group_by": [
+        "access_key",
+        "bucket",
+        "prefix"
+      ],
+      "rate": 1000,
+      "burst": 2000,
+      "effective_rate": 1000,
+      "effective_burst": 2000,
+      "on_limit": "slowdown",
+      "live_keys": 0,
+      "denied": 0
+    },
+    {
+      "id": "rule-007",
+      "buckets": [
+        "other-7"
+      ],
+      "prefixes": [
+        "ckpt/",
+        "logs/"
+      ],
+      "ops": [
+        "READ",
+        "WRITE"
+      ],
+      "group_by": [
+        "access_key",
+        "bucket",
+        "prefix"
+      ],
+      "rate": 1000,
+      "burst": 2000,
+      "effective_rate": 1000,
+      "effective_burst": 2000,
+      "on_limit": "slowdown",
+      "live_keys": 0,
+      "denied": 0
+    },
+    {
+      "id": "rule-008",
+      "buckets": [
+        "other-8"
+      ],
+      "prefixes": [
+        "ckpt/",
+        "logs/"
+      ],
+      "ops": [
+        "READ",
+        "WRITE"
+      ],
+      "group_by": [
+        "access_key",
+        "bucket",
+        "prefix"
+      ],
+      "rate": 1000,
+      "burst": 2000,
+      "effective_rate": 1000,
+      "effective_burst": 2000,
+      "on_limit": "slowdown",
+      "live_keys": 0,
+      "denied": 0
+    },
+    {
+      "id": "rule-009",
+      "buckets": [
+        "other-9"
+      ],
+      "prefixes": [
+        "ckpt/",
+        "logs/"
+      ],
+      "ops": [
+        "READ",
+        "WRITE"
+      ],
+      "group_by": [
+        "access_key",
+        "bucket",
+        "prefix"
+      ],
+      "rate": 1000,
+      "burst": 2000,
+      "effective_rate": 1000,
+      "effective_burst": 2000,
+      "on_limit": "slowdown",
+      "live_keys": 0,
+      "denied": 0
+    },
+    {
+      "id": "rule-010",
+      "buckets": [
+        "other-10"
+      ],
+      "prefixes": [
+        "ckpt/",
+        "logs/"
+      ],
+      "ops": [
+        "READ",
+        "WRITE"
+      ],
+      "group_by": [
+        "access_key",
+        "bucket",
+        "prefix"
+      ],
+      "rate": 1000,
+      "burst": 2000,
+      "effective_rate": 1000,
+      "effective_burst": 2000,
+      "on_limit": "slowdown",
+      "live_keys": 0,
+      "denied": 0
+    },
+    {
+      "id": "rule-011",
+      "buckets": [
+        "other-11"
+      ],
+      "prefixes": [
+        "ckpt/",
+        "logs/"
+      ],
+      "ops": [
+        "READ",
+        "WRITE"
+      ],
+      "group_by": [
+        "access_key",
+        "bucket",
+        "prefix"
+      ],
+      "rate": 1000,
+      "burst": 2000,
+      "effective_rate": 1000,
+      "effective_burst": 2000,
+      "on_limit": "slowdown",
+      "live_keys": 0,
+      "denied": 0
+    },
+    {
+      "id": "rule-012",
+      "buckets": [
+        "other-12"
+      ],
+      "prefixes": [
+        "ckpt/",
+        "logs/"
+      ],
+      "ops": [
+        "READ",
+        "WRITE"
+      ],
+      "group_by": [
+        "access_key",
+        "bucket",
+        "prefix"
+      ],
+      "rate": 1000,
+      "burst": 2000,
+      "effective_rate": 1000,
+      "effective_burst": 2000,
+      "on_limit": "slowdown",
+      "live_keys": 0,
+      "denied": 0
+    },
+    {
+      "id": "rule-013",
+      "buckets": [
+        "other-13"
+      ],
+      "prefixes": [
+        "ckpt/",
+        "logs/"
+      ],
+      "ops": [
+        "READ",
+        "WRITE"
+      ],
+      "group_by": [
+        "access_key",
+        "bucket",
+        "prefix"
+      ],
+      "rate": 1000,
+      "burst": 2000,
+      "effective_rate": 1000,
+      "effective_burst": 2000,
+      "on_limit": "slowdown",
+      "live_keys": 0,
+      "denied": 0
+    },
+    {
+      "id": "rule-014",
+      "buckets": [
+        "other-14"
+      ],
+      "prefixes": [
+        "ckpt/",
+        "logs/"
+      ],
+      "ops": [
+        "READ",
+        "WRITE"
+      ],
+      "group_by": [
+        "access_key",
+        "bucket",
+        "prefix"
+      ],
+      "rate": 1000,
+      "burst": 2000,
+      "effective_rate": 1000,
+      "effective_burst": 2000,
+      "on_limit": "slowdown",
+      "live_keys": 0,
+      "denied": 0
+    },
+    {
+      "id": "rule-015",
+      "buckets": [
+        "other-15"
+      ],
+      "prefixes": [
+        "ckpt/",
+        "logs/"
+      ],
+      "ops": [
+        "READ",
+        "WRITE"
+      ],
+      "group_by": [
+        "access_key",
+        "bucket",
+        "prefix"
+      ],
+      "rate": 1000,
+      "burst": 2000,
+      "effective_rate": 1000,
+      "effective_burst": 2000,
+      "on_limit": "slowdown",
+      "live_keys": 0,
+      "denied": 0
+    },
+    {
+      "id": "rule-016",
+      "buckets": [
+        "other-16"
+      ],
+      "prefixes": [
+        "ckpt/",
+        "logs/"
+      ],
+      "ops": [
+        "READ",
+        "WRITE"
+      ],
+      "group_by": [
+        "access_key",
+        "bucket",
+        "prefix"
+      ],
+      "rate": 1000,
+      "burst": 2000,
+      "effective_rate": 1000,
+      "effective_burst": 2000,
+      "on_limit": "slowdown",
+      "live_keys": 0,
+      "denied": 0
+    },
+    {
+      "id": "rule-017",
+      "buckets": [
+        "other-17"
+      ],
+      "prefixes": [
+        "ckpt/",
+        "logs/"
+      ],
+      "ops": [
+        "READ",
+        "WRITE"
+      ],
+      "group_by": [
+        "access_key",
+        "bucket",
+        "prefix"
+      ],
+      "rate": 1000,
+      "burst": 2000,
+      "effective_rate": 1000,
+      "effective_burst": 2000,
+      "on_limit": "slowdown",
+      "live_keys": 0,
+      "denied": 0
+    },
+    {
+      "id": "rule-018",
+      "buckets": [
+        "other-18"
+      ],
+      "prefixes": [
+        "ckpt/",
+        "logs/"
+      ],
+      "ops": [
+        "READ",
+        "WRITE"
+      ],
+      "group_by": [
+        "access_key",
+        "bucket",
+        "prefix"
+      ],
+      "rate": 1000,
+      "burst": 2000,
+      "effective_rate": 1000,
+      "effective_burst": 2000,
+      "on_limit": "slowdown",
+      "live_keys": 0,
+      "denied": 0
+    },
+    {
+      "id": "rule-019",
+      "buckets": [
+        "other-19"
+      ],
+      "prefixes": [
+        "ckpt/",
+        "logs/"
+      ],
+      "ops": [
+        "READ",
+        "WRITE"
+      ],
+      "group_by": [
+        "access_key",
+        "bucket",
+        "prefix"
+      ],
+      "rate": 1000,
+      "burst": 2000,
+      "effective_rate": 1000,
+      "effective_burst": 2000,
+      "on_limit": "slowdown",
+      "live_keys": 0,
+      "denied": 0
+    },
+    {
+      "id": "rule-020",
+      "buckets": [
+        "other-20"
+      ],
+      "prefixes": [
+        "ckpt/",
+        "logs/"
+      ],
+      "ops": [
+        "READ",
+        "WRITE"
+      ],
+      "group_by": [
+        "access_key",
+        "bucket",
+        "prefix"
+      ],
+      "rate": 1000,
+      "burst": 2000,
+      "effective_rate": 1000,
+      "effective_burst": 2000,
+      "on_limit": "slowdown",
+      "live_keys": 0,
+      "denied": 0
+    },
+    {
+      "id": "rule-021",
+      "buckets": [
+        "other-21"
+      ],
+      "prefixes": [
+        "ckpt/",
+        "logs/"
+      ],
+      "ops": [
+        "READ",
+        "WRITE"
+      ],
+      "group_by": [
+        "access_key",
+        "bucket",
+        "prefix"
+      ],
+      "rate": 1000,
+      "burst": 2000,
+      "effective_rate": 1000,
+      "effective_burst": 2000,
+      "on_limit": "slowdown",
+      "live_keys": 0,
+      "denied": 0
+    },
+    {
+      "id": "rule-022",
+      "buckets": [
+        "other-22"
+      ],
+      "prefixes": [
+        "ckpt/",
+        "logs/"
+      ],
+      "ops": [
+        "READ",
+        "WRITE"
+      ],
+      "group_by": [
+        "access_key",
+        "bucket",
+        "prefix"
+      ],
+      "rate": 1000,
+      "burst": 2000,
+      "effective_rate": 1000,
+      "effective_burst": 2000,
+      "on_limit": "slowdown",
+      "live_keys": 0,
+      "denied": 0
+    },
+    {
+      "id": "rule-023",
+      "buckets": [
+        "other-23"
+      ],
+      "prefixes": [
+        "ckpt/",
+        "logs/"
+      ],
+      "ops": [
+        "READ",
+        "WRITE"
+      ],
+      "group_by": [
+        "access_key",
+        "bucket",
+        "prefix"
+      ],
+      "rate": 1000,
+      "burst": 2000,
+      "effective_rate": 1000,
+      "effective_burst": 2000,
+      "on_limit": "slowdown",
+      "live_keys": 0,
+      "denied": 0
+    },
+    {
+      "id": "rule-024",
+      "buckets": [
+        "other-24"
+      ],
+      "prefixes": [
+        "ckpt/",
+        "logs/"
+      ],
+      "ops": [
+        "READ",
+        "WRITE"
+      ],
+      "group_by": [
+        "access_key",
+        "bucket",
+        "prefix"
+      ],
+      "rate": 1000,
+      "burst": 2000,
+      "effective_rate": 1000,
+      "effective_burst": 2000,
+      "on_limit": "slowdown",
+      "live_keys": 0,
+      "denied": 0
+    },
+    {
+      "id": "rule-025",
+      "buckets": [
+        "other-25"
+      ],
+      "prefixes": [
+        "ckpt/",
+        "logs/"
+      ],
+      "ops": [
+        "READ",
+        "WRITE"
+      ],
+      "group_by": [
+        "access_key",
+        "bucket",
+        "prefix"
+      ],
+      "rate": 1000,
+      "burst": 2000,
+      "effective_rate": 1000,
+      "effective_burst": 2000,
+      "on_limit": "slowdown",
+      "live_keys": 0,
+      "denied": 0
+    },
+    {
+      "id": "rule-026",
+      "buckets": [
+        "other-26"
+      ],
+      "prefixes": [
+        "ckpt/",
+        "logs/"
+      ],
+      "ops": [
+        "READ",
+        "WRITE"
+      ],
+      "group_by": [
+        "access_key",
+        "bucket",
+        "prefix"
+      ],
+      "rate": 1000,
+      "burst": 2000,
+      "effective_rate": 1000,
+      "effective_burst": 2000,
+      "on_limit": "slowdown",
+      "live_keys": 0,
+      "denied": 0
+    },
+    {
+      "id": "rule-027",
+      "buckets": [
+        "other-27"
+      ],
+      "prefixes": [
+        "ckpt/",
+        "logs/"
+      ],
+      "ops": [
+        "READ",
+        "WRITE"
+      ],
+      "group_by": [
+        "access_key",
+        "bucket",
+        "prefix"
+      ],
+      "rate": 1000,
+      "burst": 2000,
+      "effective_rate": 1000,
+      "effective_burst": 2000,
+      "on_limit": "slowdown",
+      "live_keys": 0,
+      "denied": 0
+    },
+    {
+      "id": "rule-028",
+      "buckets": [
+        "other-28"
+      ],
+      "prefixes": [
+        "ckpt/",
+        "logs/"
+      ],
+      "ops": [
+        "READ",
+        "WRITE"
+      ],
+      "group_by": [
+        "access_key",
+        "bucket",
+        "prefix"
+      ],
+      "rate": 1000,
+      "burst": 2000,
+      "effective_rate": 1000,
+      "effective_burst": 2000,
+      "on_limit": "slowdown",
+      "live_keys": 0,
+      "denied": 0
+    },
+    {
+      "id": "rule-029",
+      "buckets": [
+        "other-29"
+      ],
+      "prefixes": [
+        "ckpt/",
+        "logs/"
+      ],
+      "ops": [
+        "READ",
+        "WRITE"
+      ],
+      "group_by": [
+        "access_key",
+        "bucket",
+        "prefix"
+      ],
+      "rate": 1000,
+      "burst": 2000,
+      "effective_rate": 1000,
+      "effective_burst": 2000,
+      "on_limit": "slowdown",
+      "live_keys": 0,
+      "denied": 0
+    },
+    {
+      "id": "rule-030",
+      "buckets": [
+        "other-30"
+      ],
+      "prefixes": [
+        "ckpt/",
+        "logs/"
+      ],
+      "ops": [
+        "READ",
+        "WRITE"
+      ],
+      "group_by": [
+        "access_key",
+        "bucket",
+        "prefix"
+      ],
+      "rate": 1000,
+      "burst": 2000,
+      "effective_rate": 1000,
+      "effective_burst": 2000,
+      "on_limit": "slowdown",
+      "live_keys": 0,
+      "denied": 0
+    },
+    {
+      "id": "rule-031",
+      "buckets": [
+        "other-31"
+      ],
+      "prefixes": [
+        "ckpt/",
+        "logs/"
+      ],
+      "ops": [
+        "READ",
+        "WRITE"
+      ],
+      "group_by": [
+        "access_key",
+        "bucket",
+        "prefix"
+      ],
+      "rate": 1000,
+      "burst": 2000,
+      "effective_rate": 1000,
+      "effective_burst": 2000,
+      "on_limit": "slowdown",
+      "live_keys": 0,
+      "denied": 0
+    },
+    {
+      "id": "rule-032",
+      "buckets": [
+        "other-32"
+      ],
+      "prefixes": [
+        "ckpt/",
+        "logs/"
+      ],
+      "ops": [
+        "READ",
+        "WRITE"
+      ],
+      "group_by": [
+        "access_key",
+        "bucket",
+        "prefix"
+      ],
+      "rate": 1000,
+      "burst": 2000,
+      "effective_rate": 1000,
+      "effective_burst": 2000,
+      "on_limit": "slowdown",
+      "live_keys": 0,
+      "denied": 0
+    },
+    {
+      "id": "rule-033",
+      "buckets": [
+        "other-33"
+      ],
+      "prefixes": [
+        "ckpt/",
+        "logs/"
+      ],
+      "ops": [
+        "READ",
+        "WRITE"
+      ],
+      "group_by": [
+        "access_key",
+        "bucket",
+        "prefix"
+      ],
+      "rate": 1000,
+      "burst": 2000,
+      "effective_rate": 1000,
+      "effective_burst": 2000,
+      "on_limit": "slowdown",
+      "live_keys": 0,
+      "denied": 0
+    },
+    {
+      "id": "rule-034",
+      "buckets": [
+        "other-34"
+      ],
+      "prefixes": [
+        "ckpt/",
+        "logs/"
+      ],
+      "ops": [
+        "READ",
+        "WRITE"
+      ],
+      "group_by": [
+        "access_key",
+        "bucket",
+        "prefix"
+      ],
+      "rate": 1000,
+      "burst": 2000,
+      "effective_rate": 1000,
+      "effective_burst": 2000,
+      "on_limit": "slowdown",
+      "live_keys": 0,
+      "denied": 0
+    },
+    {
+      "id": "rule-035",
+      "buckets": [
+        "other-35"
+      ],
+      "prefixes": [
+        "ckpt/",
+        "logs/"
+      ],
+      "ops": [
+        "READ",
+        "WRITE"
+      ],
+      "group_by": [
+        "access_key",
+        "bucket",
+        "prefix"
+      ],
+      "rate": 1000,
+      "burst": 2000,
+      "effective_rate": 1000,
+      "effective_burst": 2000,
+      "on_limit": "slowdown",
+      "live_keys": 0,
+      "denied": 0
+    },
+    {
+      "id": "rule-036",
+      "buckets": [
+        "other-36"
+      ],
+      "prefixes": [
+        "ckpt/",
+        "logs/"
+      ],
+      "ops": [
+        "READ",
+        "WRITE"
+      ],
+      "group_by": [
+        "access_key",
+        "bucket",
+        "prefix"
+      ],
+      "rate": 1000,
+      "burst": 2000,
+      "effective_rate": 1000,
+      "effective_burst": 2000,
+      "on_limit": "slowdown",
+      "live_keys": 0,
+      "denied": 0
+    },
+    {
+      "id": "rule-037",
+      "buckets": [
+        "other-37"
+      ],
+      "prefixes": [
+        "ckpt/",
+        "logs/"
+      ],
+      "ops": [
+        "READ",
+        "WRITE"
+      ],
+      "group_by": [
+        "access_key",
+        "bucket",
+        "prefix"
+      ],
+      "rate": 1000,
+      "burst": 2000,
+      "effective_rate": 1000,
+      "effective_burst": 2000,
+      "on_limit": "slowdown",
+      "live_keys": 0,
+      "denied": 0
+    },
+    {
+      "id": "rule-038",
+      "buckets": [
+        "other-38"
+      ],
+      "prefixes": [
+        "ckpt/",
+        "logs/"
+      ],
+      "ops": [
+        "READ",
+        "WRITE"
+      ],
+      "group_by": [
+        "access_key",
+        "bucket",
+        "prefix"
+      ],
+      "rate": 1000,
+      "burst": 2000,
+      "effective_rate": 1000,
+      "effective_burst": 2000,
+      "on_limit": "slowdown",
+      "live_keys": 0,
+      "denied": 0
+    },
+    {
+      "id": "rule-039",
+      "buckets": [
+        "other-39"
+      ],
+      "prefixes": [
+        "ckpt/",
+        "logs/"
+      ],
+      "ops": [
+        "READ",
+        "WRITE"
+      ],
+      "group_by": [
+        "access_key",
+        "bucket",
+        "prefix"
+      ],
+      "rate": 1000,
+      "burst": 2000,
+      "effective_rate": 1000,
+      "effective_burst": 2000,
+      "on_limit": "slowdown",
+      "live_keys": 0,
+      "denied": 0
+    },
+    {
+      "id": "rule-040",
+      "buckets": [
+        "other-40"
+      ],
+      "prefixes": [
+        "ckpt/",
+        "logs/"
+      ],
+      "ops": [
+        "READ",
+        "WRITE"
+      ],
+      "group_by": [
+        "access_key",
+        "bucket",
+        "prefix"
+      ],
+      "rate": 1000,
+      "burst": 2000,
+      "effective_rate": 1000,
+      "effective_burst": 2000,
+      "on_limit": "slowdown",
+      "live_keys": 0,
+      "denied": 0
+    },
+    {
+      "id": "rule-041",
+      "buckets": [
+        "other-41"
+      ],
+      "prefixes": [
+        "ckpt/",
+        "logs/"
+      ],
+      "ops": [
+        "READ",
+        "WRITE"
+      ],
+      "group_by": [
+        "access_key",
+        "bucket",
+        "prefix"
+      ],
+      "rate": 1000,
+      "burst": 2000,
+      "effective_rate": 1000,
+      "effective_burst": 2000,
+      "on_limit": "slowdown",
+      "live_keys": 0,
+      "denied": 0
+    },
+    {
+      "id": "rule-042",
+      "buckets": [
+        "other-42"
+      ],
+      "prefixes": [
+        "ckpt/",
+        "logs/"
+      ],
+      "ops": [
+        "READ",
+        "WRITE"
+      ],
+      "group_by": [
+        "access_key",
+        "bucket",
+        "prefix"
+      ],
+      "rate": 1000,
+      "burst": 2000,
+      "effective_rate": 1000,
+      "effective_burst": 2000,
+      "on_limit": "slowdown",
+      "live_keys": 0,
+      "denied": 0
+    },
+    {
+      "id": "rule-043",
+      "buckets": [
+        "other-43"
+      ],
+      "prefixes": [
+        "ckpt/",
+        "logs/"
+      ],
+      "ops": [
+        "READ",
+        "WRITE"
+      ],
+      "group_by": [
+        "access_key",
+        "bucket",
+        "prefix"
+      ],
+      "rate": 1000,
+      "burst": 2000,
+      "effective_rate": 1000,
+      "effective_burst": 2000,
+      "on_limit": "slowdown",
+      "live_keys": 0,
+      "denied": 0
+    },
+    {
+      "id": "rule-044",
+      "buckets": [
+        "other-44"
+      ],
+      "prefixes": [
+        "ckpt/",
+        "logs/"
+      ],
+      "ops": [
+        "READ",
+        "WRITE"
+      ],
+      "group_by": [
+        "access_key",
+        "bucket",
+        "prefix"
+      ],
+      "rate": 1000,
+      "burst": 2000,
+      "effective_rate": 1000,
+      "effective_burst": 2000,
+      "on_limit": "slowdown",
+      "live_keys": 0,
+      "denied": 0
+    },
+    {
+      "id": "rule-045",
+      "buckets": [
+        "other-45"
+      ],
+      "prefixes": [
+        "ckpt/",
+        "logs/"
+      ],
+      "ops": [
+        "READ",
+        "WRITE"
+      ],
+      "group_by": [
+        "access_key",
+        "bucket",
+        "prefix"
+      ],
+      "rate": 1000,
+      "burst": 2000,
+      "effective_rate": 1000,
+      "effective_burst": 2000,
+      "on_limit": "slowdown",
+      "live_keys": 0,
+      "denied": 0
+    },
+    {
+      "id": "rule-046",
+      "buckets": [
+        "other-46"
+      ],
+      "prefixes": [
+        "ckpt/",
+        "logs/"
+      ],
+      "ops": [
+        "READ",
+        "WRITE"
+      ],
+      "group_by": [
+        "access_key",
+        "bucket",
+        "prefix"
+      ],
+      "rate": 1000,
+      "burst": 2000,
+      "effective_rate": 1000,
+      "effective_burst": 2000,
+      "on_limit": "slowdown",
+      "live_keys": 0,
+      "denied": 0
+    },
+    {
+      "id": "rule-047",
+      "buckets": [
+        "other-47"
+      ],
+      "prefixes": [
+        "ckpt/",
+        "logs/"
+      ],
+      "ops": [
+        "READ",
+        "WRITE"
+      ],
+      "group_by": [
+        "access_key",
+        "bucket",
+        "prefix"
+      ],
+      "rate": 1000,
+      "burst": 2000,
+      "effective_rate": 1000,
+      "effective_burst": 2000,
+      "on_limit": "slowdown",
+      "live_keys": 0,
+      "denied": 0
+    },
+    {
+      "id": "rule-048",
+      "buckets": [
+        "other-48"
+      ],
+      "prefixes": [
+        "ckpt/",
+        "logs/"
+      ],
+      "ops": [
+        "READ",
+        "WRITE"
+      ],
+      "group_by": [
+        "access_key",
+        "bucket",
+        "prefix"
+      ],
+      "rate": 1000,
+      "burst": 2000,
+      "effective_rate": 1000,
+      "effective_burst": 2000,
+      "on_limit": "slowdown",
+      "live_keys": 0,
+      "denied": 0
+    },
+    {
+      "id": "rule-049",
+      "buckets": [
+        "other-49"
+      ],
+      "prefixes": [
+        "ckpt/",
+        "logs/"
+      ],
+      "ops": [
+        "READ",
+        "WRITE"
+      ],
+      "group_by": [
+        "access_key",
+        "bucket",
+        "prefix"
+      ],
+      "rate": 1000,
+      "burst": 2000,
+      "effective_rate": 1000,
+      "effective_burst": 2000,
+      "on_limit": "slowdown",
+      "live_keys": 0,
+      "denied": 0
+    },
+    {
+      "id": "rule-050",
+      "buckets": [
+        "other-50"
+      ],
+      "prefixes": [
+        "ckpt/",
+        "logs/"
+      ],
+      "ops": [
+        "READ",
+        "WRITE"
+      ],
+      "group_by": [
+        "access_key",
+        "bucket",
+        "prefix"
+      ],
+      "rate": 1000,
+      "burst": 2000,
+      "effective_rate": 1000,
+      "effective_burst": 2000,
+      "on_limit": "slowdown",
+      "live_keys": 0,
+      "denied": 0
+    },
+    {
+      "id": "rule-051",
+      "buckets": [
+        "other-51"
+      ],
+      "prefixes": [
+        "ckpt/",
+        "logs/"
+      ],
+      "ops": [
+        "READ",
+        "WRITE"
+      ],
+      "group_by": [
+        "access_key",
+        "bucket",
+        "prefix"
+      ],
+      "rate": 1000,
+      "burst": 2000,
+      "effective_rate": 1000,
+      "effective_burst": 2000,
+      "on_limit": "slowdown",
+      "live_keys": 0,
+      "denied": 0
+    },
+    {
+      "id": "rule-052",
+      "buckets": [
+        "other-52"
+      ],
+      "prefixes": [
+        "ckpt/",
+        "logs/"
+      ],
+      "ops": [
+        "READ",
+        "WRITE"
+      ],
+      "group_by": [
+        "access_key",
+        "bucket",
+        "prefix"
+      ],
+      "rate": 1000,
+      "burst": 2000,
+      "effective_rate": 1000,
+      "effective_burst": 2000,
+      "on_limit": "slowdown",
+      "live_keys": 0,
+      "denied": 0
+    },
+    {
+      "id": "rule-053",
+      "buckets": [
+        "other-53"
+      ],
+      "prefixes": [
+        "ckpt/",
+        "logs/"
+      ],
+      "ops": [
+        "READ",
+        "WRITE"
+      ],
+      "group_by": [
+        "access_key",
+        "bucket",
+        "prefix"
+      ],
+      "rate": 1000,
+      "burst": 2000,
+      "effective_rate": 1000,
+      "effective_burst": 2000,
+      "on_limit": "slowdown",
+      "live_keys": 0,
+      "denied": 0
+    },
+    {
+      "id": "rule-054",
+      "buckets": [
+        "other-54"
+      ],
+      "prefixes": [
+        "ckpt/",
+        "logs/"
+      ],
+      "ops": [
+        "READ",
+        "WRITE"
+      ],
+      "group_by": [
+        "access_key",
+        "bucket",
+        "prefix"
+      ],
+      "rate": 1000,
+      "burst": 2000,
+      "effective_rate": 1000,
+      "effective_burst": 2000,
+      "on_limit": "slowdown",
+      "live_keys": 0,
+      "denied": 0
+    },
+    {
+      "id": "rule-055",
+      "buckets": [
+        "other-55"
+      ],
+      "prefixes": [
+        "ckpt/",
+        "logs/"
+      ],
+      "ops": [
+        "READ",
+        "WRITE"
+      ],
+      "group_by": [
+        "access_key",
+        "bucket",
+        "prefix"
+      ],
+      "rate": 1000,
+      "burst": 2000,
+      "effective_rate": 1000,
+      "effective_burst": 2000,
+      "on_limit": "slowdown",
+      "live_keys": 0,
+      "denied": 0
+    },
+    {
+      "id": "rule-056",
+      "buckets": [
+        "other-56"
+      ],
+      "prefixes": [
+        "ckpt/",
+        "logs/"
+      ],
+      "ops": [
+        "READ",
+        "WRITE"
+      ],
+      "group_by": [
+        "access_key",
+        "bucket",
+        "prefix"
+      ],
+      "rate": 1000,
+      "burst": 2000,
+      "effective_rate": 1000,
+      "effective_burst": 2000,
+      "on_limit": "slowdown",
+      "live_keys": 0,
+      "denied": 0
+    },
+    {
+      "id": "rule-057",
+      "buckets": [
+        "other-57"
+      ],
+      "prefixes": [
+        "ckpt/",
+        "logs/"
+      ],
+      "ops": [
+        "READ",
+        "WRITE"
+      ],
+      "group_by": [
+        "access_key",
+        "bucket",
+        "prefix"
+      ],
+      "rate": 1000,
+      "burst": 2000,
+      "effective_rate": 1000,
+      "effective_burst": 2000,
+      "on_limit": "slowdown",
+      "live_keys": 0,
+      "denied": 0
+    },
+    {
+      "id": "rule-058",
+      "buckets": [
+        "other-58"
+      ],
+      "prefixes": [
+        "ckpt/",
+        "logs/"
+      ],
+      "ops": [
+        "READ",
+        "WRITE"
+      ],
+      "group_by": [
+        "access_key",
+        "bucket",
+        "prefix"
+      ],
+      "rate": 1000,
+      "burst": 2000,
+      "effective_rate": 1000,
+      "effective_burst": 2000,
+      "on_limit": "slowdown",
+      "live_keys": 0,
+      "denied": 0
+    },
+    {
+      "id": "rule-059",
+      "buckets": [
+        "other-59"
+      ],
+      "prefixes": [
+        "ckpt/",
+        "logs/"
+      ],
+      "ops": [
+        "READ",
+        "WRITE"
+      ],
+      "group_by": [
+        "access_key",
+        "bucket",
+        "prefix"
+      ],
+      "rate": 1000,
+      "burst": 2000,
+      "effective_rate": 1000,
+      "effective_burst": 2000,
+      "on_limit": "slowdown",
+      "live_keys": 0,
+      "denied": 0
+    },
+    {
+      "id": "rule-060",
+      "buckets": [
+        "other-60"
+      ],
+      "prefixes": [
+        "ckpt/",
+        "logs/"
+      ],
+      "ops": [
+        "READ",
+        "WRITE"
+      ],
+      "group_by": [
+        "access_key",
+        "bucket",
+        "prefix"
+      ],
+      "rate": 1000,
+      "burst": 2000,
+      "effective_rate": 1000,
+      "effective_burst": 2000,
+      "on_limit": "slowdown",
+      "live_keys": 0,
+      "denied": 0
+    },
+    {
+      "id": "rule-061",
+      "buckets": [
+        "other-61"
+      ],
+      "prefixes": [
+        "ckpt/",
+        "logs/"
+      ],
+      "ops": [
+        "READ",
+        "WRITE"
+      ],
+      "group_by": [
+        "access_key",
+        "bucket",
+        "prefix"
+      ],
+      "rate": 1000,
+      "burst": 2000,
+      "effective_rate": 1000,
+      "effective_burst": 2000,
+      "on_limit": "slowdown",
+      "live_keys": 0,
+      "denied": 0
+    },
+    {
+      "id": "rule-062",
+      "buckets": [
+        "other-62"
+      ],
+      "prefixes": [
+        "ckpt/",
+        "logs/"
+      ],
+      "ops": [
+        "READ",
+        "WRITE"
+      ],
+      "group_by": [
+        "access_key",
+        "bucket",
+        "prefix"
+      ],
+      "rate": 1000,
+      "burst": 2000,
+      "effective_rate": 1000,
+      "effective_burst": 2000,
+      "on_limit": "slowdown",
+      "live_keys": 0,
+      "denied": 0
+    },
+    {
+      "id": "rule-063",
+      "buckets": [
+        "other-63"
+      ],
+      "prefixes": [
+        "ckpt/",
+        "logs/"
+      ],
+      "ops": [
+        "READ",
+        "WRITE"
+      ],
+      "group_by": [
+        "access_key",
+        "bucket",
+        "prefix"
+      ],
+      "rate": 1000,
+      "burst": 2000,
+      "effective_rate": 1000,
+      "effective_burst": 2000,
+      "on_limit": "slowdown",
+      "live_keys": 0,
+      "denied": 0
+    },
+    {
+      "id": "rule-064",
+      "buckets": [
+        "other-64"
+      ],
+      "prefixes": [
+        "ckpt/",
+        "logs/"
+      ],
+      "ops": [
+        "READ",
+        "WRITE"
+      ],
+      "group_by": [
+        "access_key",
+        "bucket",
+        "prefix"
+      ],
+      "rate": 1000,
+      "burst": 2000,
+      "effective_rate": 1000,
+      "effective_burst": 2000,
+      "on_limit": "slowdown",
+      "live_keys": 0,
+      "denied": 0
+    },
+    {
+      "id": "rule-065",
+      "buckets": [
+        "other-65"
+      ],
+      "prefixes": [
+        "ckpt/",
+        "logs/"
+      ],
+      "ops": [
+        "READ",
+        "WRITE"
+      ],
+      "group_by": [
+        "access_key",
+        "bucket",
+        "prefix"
+      ],
+      "rate": 1000,
+      "burst": 2000,
+      "effective_rate": 1000,
+      "effective_burst": 2000,
+      "on_limit": "slowdown",
+      "live_keys": 0,
+      "denied": 0
+    },
+    {
+      "id": "rule-066",
+      "buckets": [
+        "other-66"
+      ],
+      "prefixes": [
+        "ckpt/",
+        "logs/"
+      ],
+      "ops": [
+        "READ",
+        "WRITE"
+      ],
+      "group_by": [
+        "access_key",
+        "bucket",
+        "prefix"
+      ],
+      "rate": 1000,
+      "burst": 2000,
+      "effective_rate": 1000,
+      "effective_burst": 2000,
+      "on_limit": "slowdown",
+      "live_keys": 0,
+      "denied": 0
+    },
+    {
+      "id": "rule-067",
+      "buckets": [
+        "other-67"
+      ],
+      "prefixes": [
+        "ckpt/",
+        "logs/"
+      ],
+      "ops": [
+        "READ",
+        "WRITE"
+      ],
+      "group_by": [
+        "access_key",
+        "bucket",
+        "prefix"
+      ],
+      "rate": 1000,
+      "burst": 2000,
+      "effective_rate": 1000,
+      "effective_burst": 2000,
+      "on_limit": "slowdown",
+      "live_keys": 0,
+      "denied": 0
+    },
+    {
+      "id": "rule-068",
+      "buckets": [
+        "other-68"
+      ],
+      "prefixes": [
+        "ckpt/",
+        "logs/"
+      ],
+      "ops": [
+        "READ",
+        "WRITE"
+      ],
+      "group_by": [
+        "access_key",
+        "bucket",
+        "prefix"
+      ],
+      "rate": 1000,
+      "burst": 2000,
+      "effective_rate": 1000,
+      "effective_burst": 2000,
+      "on_limit": "slowdown",
+      "live_keys": 0,
+      "denied": 0
+    },
+    {
+      "id": "rule-069",
+      "buckets": [
+        "other-69"
+      ],
+      "prefixes": [
+        "ckpt/",
+        "logs/"
+      ],
+      "ops": [
+        "READ",
+        "WRITE"
+      ],
+      "group_by": [
+        "access_key",
+        "bucket",
+        "prefix"
+      ],
+      "rate": 1000,
+      "burst": 2000,
+      "effective_rate": 1000,
+      "effective_burst": 2000,
+      "on_limit": "slowdown",
+      "live_keys": 0,
+      "denied": 0
+    },
+    {
+      "id": "rule-070",
+      "buckets": [
+        "other-70"
+      ],
+      "prefixes": [
+        "ckpt/",
+        "logs/"
+      ],
+      "ops": [
+        "READ",
+        "WRITE"
+      ],
+      "group_by": [
+        "access_key",
+        "bucket",
+        "prefix"
+      ],
+      "rate": 1000,
+      "burst": 2000,
+      "effective_rate": 1000,
+      "effective_burst": 2000,
+      "on_limit": "slowdown",
+      "live_keys": 0,
+      "denied": 0
+    },
+    {
+      "id": "rule-071",
+      "buckets": [
+        "other-71"
+      ],
+      "prefixes": [
+        "ckpt/",
+        "logs/"
+      ],
+      "ops": [
+        "READ",
+        "WRITE"
+      ],
+      "group_by": [
+        "access_key",
+        "bucket",
+        "prefix"
+      ],
+      "rate": 1000,
+      "burst": 2000,
+      "effective_rate": 1000,
+      "effective_burst": 2000,
+      "on_limit": "slowdown",
+      "live_keys": 0,
+      "denied": 0
+    },
+    {
+      "id": "rule-072",
+      "buckets": [
+        "other-72"
+      ],
+      "prefixes": [
+        "ckpt/",
+        "logs/"
+      ],
+      "ops": [
+        "READ",
+        "WRITE"
+      ],
+      "group_by": [
+        "access_key",
+        "bucket",
+        "prefix"
+      ],
+      "rate": 1000,
+      "burst": 2000,
+      "effective_rate": 1000,
+      "effective_burst": 2000,
+      "on_limit": "slowdown",
+      "live_keys": 0,
+      "denied": 0
+    },
+    {
+      "id": "rule-073",
+      "buckets": [
+        "other-73"
+      ],
+      "prefixes": [
+        "ckpt/",
+        "logs/"
+      ],
+      "ops": [
+        "READ",
+        "WRITE"
+      ],
+      "group_by": [
+        "access_key",
+        "bucket",
+        "prefix"
+      ],
+      "rate": 1000,
+      "burst": 2000,
+      "effective_rate": 1000,
+      "effective_burst": 2000,
+      "on_limit": "slowdown",
+      "live_keys": 0,
+      "denied": 0
+    },
+    {
+      "id": "rule-074",
+      "buckets": [
+        "other-74"
+      ],
+      "prefixes": [
+        "ckpt/",
+        "logs/"
+      ],
+      "ops": [
+        "READ",
+        "WRITE"
+      ],
+      "group_by": [
+        "access_key",
+        "bucket",
+        "prefix"
+      ],
+      "rate": 1000,
+      "burst": 2000,
+      "effective_rate": 1000,
+      "effective_burst": 2000,
+      "on_limit": "slowdown",
+      "live_keys": 0,
+      "denied": 0
+    },
+    {
+      "id": "rule-075",
+      "buckets": [
+        "other-75"
+      ],
+      "prefixes": [
+        "ckpt/",
+        "logs/"
+      ],
+      "ops": [
+        "READ",
+        "WRITE"
+      ],
+      "group_by": [
+        "access_key",
+        "bucket",
+        "prefix"
+      ],
+      "rate": 1000,
+      "burst": 2000,
+      "effective_rate": 1000,
+      "effective_burst": 2000,
+      "on_limit": "slowdown",
+      "live_keys": 0,
+      "denied": 0
+    },
+    {
+      "id": "rule-076",
+      "buckets": [
+        "other-76"
+      ],
+      "prefixes": [
+        "ckpt/",
+        "logs/"
+      ],
+      "ops": [
+        "READ",
+        "WRITE"
+      ],
+      "group_by": [
+        "access_key",
+        "bucket",
+        "prefix"
+      ],
+      "rate": 1000,
+      "burst": 2000,
+      "effective_rate": 1000,
+      "effective_burst": 2000,
+      "on_limit": "slowdown",
+      "live_keys": 0,
+      "denied": 0
+    },
+    {
+      "id": "rule-077",
+      "buckets": [
+        "other-77"
+      ],
+      "prefixes": [
+        "ckpt/",
+        "logs/"
+      ],
+      "ops": [
+        "READ",
+        "WRITE"
+      ],
+      "group_by": [
+        "access_key",
+        "bucket",
+        "prefix"
+      ],
+      "rate": 1000,
+      "burst": 2000,
+      "effective_rate": 1000,
+      "effective_burst": 2000,
+      "on_limit": "slowdown",
+      "live_keys": 0,
+      "denied": 0
+    },
+    {
+      "id": "rule-078",
+      "buckets": [
+        "other-78"
+      ],
+      "prefixes": [
+        "ckpt/",
+        "logs/"
+      ],
+      "ops": [
+        "READ",
+        "WRITE"
+      ],
+      "group_by": [
+        "access_key",
+        "bucket",
+        "prefix"
+      ],
+      "rate": 1000,
+      "burst": 2000,
+      "effective_rate": 1000,
+      "effective_burst": 2000,
+      "on_limit": "slowdown",
+      "live_keys": 0,
+      "denied": 0
+    },
+    {
+      "id": "rule-079",
+      "buckets": [
+        "other-79"
+      ],
+      "prefixes": [
+        "ckpt/",
+        "logs/"
+      ],
+      "ops": [
+        "READ",
+        "WRITE"
+      ],
+      "group_by": [
+        "access_key",
+        "bucket",
+        "prefix"
+      ],
+      "rate": 1000,
+      "burst": 2000,
+      "effective_rate": 1000,
+      "effective_burst": 2000,
+      "on_limit": "slowdown",
+      "live_keys": 0,
+      "denied": 0
+    },
+    {
+      "id": "rule-080",
+      "buckets": [
+        "other-80"
+      ],
+      "prefixes": [
+        "ckpt/",
+        "logs/"
+      ],
+      "ops": [
+        "READ",
+        "WRITE"
+      ],
+      "group_by": [
+        "access_key",
+        "bucket",
+        "prefix"
+      ],
+      "rate": 1000,
+      "burst": 2000,
+      "effective_rate": 1000,
+      "effective_burst": 2000,
+      "on_limit": "slowdown",
+      "live_keys": 0,
+      "denied": 0
+    },
+    {
+      "id": "rule-081",
+      "buckets": [
+        "other-81"
+      ],
+      "prefixes": [
+        "ckpt/",
+        "logs/"
+      ],
+      "ops": [
+        "READ",
+        "WRITE"
+      ],
+      "group_by": [
+        "access_key",
+        "bucket",
+        "prefix"
+      ],
+      "rate": 1000,
+      "burst": 2000,
+      "effective_rate": 1000,
+      "effective_burst": 2000,
+      "on_limit": "slowdown",
+      "live_keys": 0,
+      "denied": 0
+    },
+    {
+      "id": "rule-082",
+      "buckets": [
+        "other-82"
+      ],
+      "prefixes": [
+        "ckpt/",
+        "logs/"
+      ],
+      "ops": [
+        "READ",
+        "WRITE"
+      ],
+      "group_by": [
+        "access_key",
+        "bucket",
+        "prefix"
+      ],
+      "rate": 1000,
+      "burst": 2000,
+      "effective_rate": 1000,
+      "effective_burst": 2000,
+      "on_limit": "slowdown",
+      "live_keys": 0,
+      "denied": 0
+    },
+    {
+      "id": "rule-083",
+      "buckets": [
+        "other-83"
+      ],
+      "prefixes": [
+        "ckpt/",
+        "logs/"
+      ],
+      "ops": [
+        "READ",
+        "WRITE"
+      ],
+      "group_by": [
+        "access_key",
+        "bucket",
+        "prefix"
+      ],
+      "rate": 1000,
+      "burst": 2000,
+      "effective_rate": 1000,
+      "effective_burst": 2000,
+      "on_limit": "slowdown",
+      "live_keys": 0,
+      "denied": 0
+    },
+    {
+      "id": "rule-084",
+      "buckets": [
+        "other-84"
+      ],
+      "prefixes": [
+        "ckpt/",
+        "logs/"
+      ],
+      "ops": [
+        "READ",
+        "WRITE"
+      ],
+      "group_by": [
+        "access_key",
+        "bucket",
+        "prefix"
+      ],
+      "rate": 1000,
+      "burst": 2000,
+      "effective_rate": 1000,
+      "effective_burst": 2000,
+      "on_limit": "slowdown",
+      "live_keys": 0,
+      "denied": 0
+    },
+    {
+      "id": "rule-085",
+      "buckets": [
+        "other-85"
+      ],
+      "prefixes": [
+        "ckpt/",
+        "logs/"
+      ],
+      "ops": [
+        "READ",
+        "WRITE"
+      ],
+      "group_by": [
+        "access_key",
+        "bucket",
+        "prefix"
+      ],
+      "rate": 1000,
+      "burst": 2000,
+      "effective_rate": 1000,
+      "effective_burst": 2000,
+      "on_limit": "slowdown",
+      "live_keys": 0,
+      "denied": 0
+    },
+    {
+      "id": "rule-086",
+      "buckets": [
+        "other-86"
+      ],
+      "prefixes": [
+        "ckpt/",
+        "logs/"
+      ],
+      "ops": [
+        "READ",
+        "WRITE"
+      ],
+      "group_by": [
+        "access_key",
+        "bucket",
+        "prefix"
+      ],
+      "rate": 1000,
+      "burst": 2000,
+      "effective_rate": 1000,
+      "effective_burst": 2000,
+      "on_limit": "slowdown",
+      "live_keys": 0,
+      "denied": 0
+    },
+    {
+      "id": "rule-087",
+      "buckets": [
+        "other-87"
+      ],
+      "prefixes": [
+        "ckpt/",
+        "logs/"
+      ],
+      "ops": [
+        "READ",
+        "WRITE"
+      ],
+      "group_by": [
+        "access_key",
+        "bucket",
+        "prefix"
+      ],
+      "rate": 1000,
+      "burst": 2000,
+      "effective_rate": 1000,
+      "effective_burst": 2000,
+      "on_limit": "slowdown",
+      "live_keys": 0,
+      "denied": 0
+    },
+    {
+      "id": "rule-088",
+      "buckets": [
+        "other-88"
+      ],
+      "prefixes": [
+        "ckpt/",
+        "logs/"
+      ],
+      "ops": [
+        "READ",
+        "WRITE"
+      ],
+      "group_by": [
+        "access_key",
+        "bucket",
+        "prefix"
+      ],
+      "rate": 1000,
+      "burst": 2000,
+      "effective_rate": 1000,
+      "effective_burst": 2000,
+      "on_limit": "slowdown",
+      "live_keys": 0,
+      "denied": 0
+    },
+    {
+      "id": "rule-089",
+      "buckets": [
+        "other-89"
+      ],
+      "prefixes": [
+        "ckpt/",
+        "logs/"
+      ],
+      "ops": [
+        "READ",
+        "WRITE"
+      ],
+      "group_by": [
+        "access_key",
+        "bucket",
+        "prefix"
+      ],
+      "rate": 1000,
+      "burst": 2000,
+      "effective_rate": 1000,
+      "effective_burst": 2000,
+      "on_limit": "slowdown",
+      "live_keys": 0,
+      "denied": 0
+    },
+    {
+      "id": "rule-090",
+      "buckets": [
+        "other-90"
+      ],
+      "prefixes": [
+        "ckpt/",
+        "logs/"
+      ],
+      "ops": [
+        "READ",
+        "WRITE"
+      ],
+      "group_by": [
+        "access_key",
+        "bucket",
+        "prefix"
+      ],
+      "rate": 1000,
+      "burst": 2000,
+      "effective_rate": 1000,
+      "effective_burst": 2000,
+      "on_limit": "slowdown",
+      "live_keys": 0,
+      "denied": 0
+    },
+    {
+      "id": "rule-091",
+      "buckets": [
+        "other-91"
+      ],
+      "prefixes": [
+        "ckpt/",
+        "logs/"
+      ],
+      "ops": [
+        "READ",
+        "WRITE"
+      ],
+      "group_by": [
+        "access_key",
+        "bucket",
+        "prefix"
+      ],
+      "rate": 1000,
+      "burst": 2000,
+      "effective_rate": 1000,
+      "effective_burst": 2000,
+      "on_limit": "slowdown",
+      "live_keys": 0,
+      "denied": 0
+    },
+    {
+      "id": "rule-092",
+      "buckets": [
+        "other-92"
+      ],
+      "prefixes": [
+        "ckpt/",
+        "logs/"
+      ],
+      "ops": [
+        "READ",
+        "WRITE"
+      ],
+      "group_by": [
+        "access_key",
+        "bucket",
+        "prefix"
+      ],
+      "rate": 1000,
+      "burst": 2000,
+      "effective_rate": 1000,
+      "effective_burst": 2000,
+      "on_limit": "slowdown",
+      "live_keys": 0,
+      "denied": 0
+    },
+    {
+      "id": "rule-093",
+      "buckets": [
+        "other-93"
+      ],
+      "prefixes": [
+        "ckpt/",
+        "logs/"
+      ],
+      "ops": [
+        "READ",
+        "WRITE"
+      ],
+      "group_by": [
+        "access_key",
+        "bucket",
+        "prefix"
+      ],
+      "rate": 1000,
+      "burst": 2000,
+      "effective_rate": 1000,
+      "effective_burst": 2000,
+      "on_limit": "slowdown",
+      "live_keys": 0,
+      "denied": 0
+    },
+    {
+      "id": "rule-094",
+      "buckets": [
+        "other-94"
+      ],
+      "prefixes": [
+        "ckpt/",
+        "logs/"
+      ],
+      "ops": [
+        "READ",
+        "WRITE"
+      ],
+      "group_by": [
+        "access_key",
+        "bucket",
+        "prefix"
+      ],
+      "rate": 1000,
+      "burst": 2000,
+      "effective_rate": 1000,
+      "effective_burst": 2000,
+      "on_limit": "slowdown",
+      "live_keys": 0,
+      "denied": 0
+    },
+    {
+      "id": "rule-095",
+      "buckets": [
+        "other-95"
+      ],
+      "prefixes": [
+        "ckpt/",
+        "logs/"
+      ],
+      "ops": [
+        "READ",
+        "WRITE"
+      ],
+      "group_by": [
+        "access_key",
+        "bucket",
+        "prefix"
+      ],
+      "rate": 1000,
+      "burst": 2000,
+      "effective_rate": 1000,
+      "effective_burst": 2000,
+      "on_limit": "slowdown",
+      "live_keys": 0,
+      "denied": 0
+    },
+    {
+      "id": "rule-096",
+      "buckets": [
+        "other-96"
+      ],
+      "prefixes": [
+        "ckpt/",
+        "logs/"
+      ],
+      "ops": [
+        "READ",
+        "WRITE"
+      ],
+      "group_by": [
+        "access_key",
+        "bucket",
+        "prefix"
+      ],
+      "rate": 1000,
+      "burst": 2000,
+      "effective_rate": 1000,
+      "effective_burst": 2000,
+      "on_limit": "slowdown",
+      "live_keys": 0,
+      "denied": 0
+    },
+    {
+      "id": "rule-097",
+      "buckets": [
+        "other-97"
+      ],
+      "prefixes": [
+        "ckpt/",
+        "logs/"
+      ],
+      "ops": [
+        "READ",
+        "WRITE"
+      ],
+      "group_by": [
+        "access_key",
+        "bucket",
+        "prefix"
+      ],
+      "rate": 1000,
+      "burst": 2000,
+      "effective_rate": 1000,
+      "effective_burst": 2000,
+      "on_limit": "slowdown",
+      "live_keys": 0,
+      "denied": 0
+    },
+    {
+      "id": "rule-098",
+      "buckets": [
+        "other-98"
+      ],
+      "prefixes": [
+        "ckpt/",
+        "logs/"
+      ],
+      "ops": [
+        "READ",
+        "WRITE"
+      ],
+      "group_by": [
+        "access_key",
+        "bucket",
+        "prefix"
+      ],
+      "rate": 1000,
+      "burst": 2000,
+      "effective_rate": 1000,
+      "effective_burst": 2000,
+      "on_limit": "slowdown",
+      "live_keys": 0,
+      "denied": 0
+    },
+    {
+      "id": "rule-099",
+      "buckets": [
+        "other-99"
+      ],
+      "prefixes": [
+        "ckpt/",
+        "logs/"
+      ],
+      "ops": [
+        "READ",
+        "WRITE"
+      ],
+      "group_by": [
+        "access_key",
+        "bucket",
+        "prefix"
+      ],
+      "rate": 1000,
+      "burst": 2000,
+      "effective_rate": 1000,
+      "effective_burst": 2000,
+      "on_limit": "slowdown",
+      "live_keys": 0,
+      "denied": 0
+    },
+    {
+      "id": "rule-100",
+      "buckets": [
+        "other-100"
+      ],
+      "prefixes": [
+        "ckpt/",
+        "logs/"
+      ],
+      "ops": [
+        "READ",
+        "WRITE"
+      ],
+      "group_by": [
+        "access_key",
+        "bucket",
+        "prefix"
+      ],
+      "rate": 1000,
+      "burst": 2000,
+      "effective_rate": 1000,
+      "effective_burst": 2000,
+      "on_limit": "slowdown",
+      "live_keys": 0,
+      "denied": 0
+    },
+    {
+      "id": "wide-read",
+      "ops": [
+        "READ"
+      ],
+      "group_by": [
+        "access_key",
+        "bucket"
+      ],
+      "rate": 1000000000,
+      "burst": 1000000000,
+      "effective_rate": 1000000000,
+      "effective_burst": 1000000000,
+      "on_limit": "slowdown",
+      "live_keys": 1,
+      "denied": 0
+    },
+    {
+      "id": "throttle",
+      "buckets": [
+        "load-throttle-0"
+      ],
+      "group_by": [
+        "access_key"
+      ],
+      "rate": 500,
+      "burst": 500,
+      "effective_rate": 500,
+      "effective_burst": 500,
+      "on_limit": "slowdown",
+      "live_keys": 1,
+      "denied": 175
+    }
+  ],
+  "live_keys": 2
+}

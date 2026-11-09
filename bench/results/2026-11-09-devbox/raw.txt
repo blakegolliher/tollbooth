@@ -1,0 +1,18 @@
+run 1/3 direct  warm-up 10s
+run 1/3 direct  measuring 20s … 117803 requests, 5890 req/s, p50 773 µs, p99 10101 µs, p99.9 26509 µs, errors 0
+run 1/3 proxied warm-up 10s
+run 1/3 proxied measuring 20s … 40420 requests, 2021 req/s, p50 3047 µs, p99 17400 µs, p99.9 38404 µs, errors 0
+run 2/3 direct  warm-up 10s
+run 2/3 direct  measuring 20s … 125677 requests, 6284 req/s, p50 808 µs, p99 7959 µs, p99.9 18825 µs, errors 0
+run 2/3 proxied warm-up 10s
+run 2/3 proxied measuring 20s … 43888 requests, 2194 req/s, p50 2869 µs, p99 14950 µs, p99.9 33292 µs, errors 0
+run 3/3 direct  warm-up 10s
+run 3/3 direct  measuring 20s … 122905 requests, 6145 req/s, p50 817 µs, p99 8151 µs, p99.9 18596 µs, errors 0
+run 3/3 proxied warm-up 10s
+run 3/3 proxied measuring 20s … 46709 requests, 2335 req/s, p50 2710 µs, p99 14270 µs, p99.9 32129 µs, errors 0
+
+median        req/s     p50 µs     p90 µs     p99 µs   p99.9 µs     max µs   errors   attempts  throttled
+direct         6284        808       2652       7959      18825      57606        0          0          0
+proxied        2194       2869       7111      14950      33292      55509        0          0          0
+added                     2061       4458       6992      14467
+wrote bench/results/2026-11-09-devbox/20261109T142222Z-raw-get4k.json

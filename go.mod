@@ -3,6 +3,7 @@ module github.com/blakegolliher/tollbooth
 go 1.27.3
 
 require (
+	github.com/HdrHistogram/hdrhistogram-go v1.4.0
 	github.com/aws/aws-sdk-go-v2 v1.47.8
 	github.com/aws/aws-sdk-go-v2/credentials v1.20.16
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.114.9

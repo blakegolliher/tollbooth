@@ -1,0 +1,418 @@
+node_id: bench
+listen: {address: 127.0.0.1:18000}
+admin: {address: 127.0.0.1:19900, pprof: true}
+backend:
+  scheme: http
+  endpoints: [127.0.0.1:19000]
+showback: {dir: bench/results/2026-11-09-devbox/showback}
+logging: {level: warn}
+rate_limits:
+  rules:
+    - id: rule-001
+      match: {ops: [READ, WRITE], buckets: [other-1], prefixes: [ckpt/, logs/]}
+      group_by: [access_key, bucket, prefix]
+      limit: {rate: 1000, burst: 2000}
+    - id: rule-002
+      match: {ops: [READ, WRITE], buckets: [other-2], prefixes: [ckpt/, logs/]}
+      group_by: [access_key, bucket, prefix]
+      limit: {rate: 1000, burst: 2000}
+    - id: rule-003
+      match: {ops: [READ, WRITE], buckets: [other-3], prefixes: [ckpt/, logs/]}
+      group_by: [access_key, bucket, prefix]
+      limit: {rate: 1000, burst: 2000}
+    - id: rule-004
+      match: {ops: [READ, WRITE], buckets: [other-4], prefixes: [ckpt/, logs/]}
+      group_by: [access_key, bucket, prefix]
+      limit: {rate: 1000, burst: 2000}
+    - id: rule-005
+      match: {ops: [READ, WRITE], buckets: [other-5], prefixes: [ckpt/, logs/]}
+      group_by: [access_key, bucket, prefix]
+      limit: {rate: 1000, burst: 2000}
+    - id: rule-006
+      match: {ops: [READ, WRITE], buckets: [other-6], prefixes: [ckpt/, logs/]}
+      group_by: [access_key, bucket, prefix]
+      limit: {rate: 1000, burst: 2000}
+    - id: rule-007
+      match: {ops: [READ, WRITE], buckets: [other-7], prefixes: [ckpt/, logs/]}
+      group_by: [access_key, bucket, prefix]
+      limit: {rate: 1000, burst: 2000}
+    - id: rule-008
+      match: {ops: [READ, WRITE], buckets: [other-8], prefixes: [ckpt/, logs/]}
+      group_by: [access_key, bucket, prefix]
+      limit: {rate: 1000, burst: 2000}
+    - id: rule-009
+      match: {ops: [READ, WRITE], buckets: [other-9], prefixes: [ckpt/, logs/]}
+      group_by: [access_key, bucket, prefix]
+      limit: {rate: 1000, burst: 2000}
+    - id: rule-010
+      match: {ops: [READ, WRITE], buckets: [other-10], prefixes: [ckpt/, logs/]}
+      group_by: [access_key, bucket, prefix]
+      limit: {rate: 1000, burst: 2000}
+    - id: rule-011
+      match: {ops: [READ, WRITE], buckets: [other-11], prefixes: [ckpt/, logs/]}
+      group_by: [access_key, bucket, prefix]
+      limit: {rate: 1000, burst: 2000}
+    - id: rule-012
+      match: {ops: [READ, WRITE], buckets: [other-12], prefixes: [ckpt/, logs/]}
+      group_by: [access_key, bucket, prefix]
+      limit: {rate: 1000, burst: 2000}
+    - id: rule-013
+      match: {ops: [READ, WRITE], buckets: [other-13], prefixes: [ckpt/, logs/]}
+      group_by: [access_key, bucket, prefix]
+      limit: {rate: 1000, burst: 2000}
+    - id: rule-014
+      match: {ops: [READ, WRITE], buckets: [other-14], prefixes: [ckpt/, logs/]}
+      group_by: [access_key, bucket, prefix]
+      limit: {rate: 1000, burst: 2000}
+    - id: rule-015
+      match: {ops: [READ, WRITE], buckets: [other-15], prefixes: [ckpt/, logs/]}
+      group_by: [access_key, bucket, prefix]
+      limit: {rate: 1000, burst: 2000}
+    - id: rule-016
+      match: {ops: [READ, WRITE], buckets: [other-16], prefixes: [ckpt/, logs/]}
+      group_by: [access_key, bucket, prefix]
+      limit: {rate: 1000, burst: 2000}
+    - id: rule-017
+      match: {ops: [READ, WRITE], buckets: [other-17], prefixes: [ckpt/, logs/]}
+      group_by: [access_key, bucket, prefix]
+      limit: {rate: 1000, burst: 2000}
+    - id: rule-018
+      match: {ops: [READ, WRITE], buckets: [other-18], prefixes: [ckpt/, logs/]}
+      group_by: [access_key, bucket, prefix]
+      limit: {rate: 1000, burst: 2000}
+    - id: rule-019
+      match: {ops: [READ, WRITE], buckets: [other-19], prefixes: [ckpt/, logs/]}
+      group_by: [access_key, bucket, prefix]
+      limit: {rate: 1000, burst: 2000}
+    - id: rule-020
+      match: {ops: [READ, WRITE], buckets: [other-20], prefixes: [ckpt/, logs/]}
+      group_by: [access_key, bucket, prefix]
+      limit: {rate: 1000, burst: 2000}
+    - id: rule-021
+      match: {ops: [READ, WRITE], buckets: [other-21], prefixes: [ckpt/, logs/]}
+      group_by: [access_key, bucket, prefix]
+      limit: {rate: 1000, burst: 2000}
+    - id: rule-022
+      match: {ops: [READ, WRITE], buckets: [other-22], prefixes: [ckpt/, logs/]}
+      group_by: [access_key, bucket, prefix]
+      limit: {rate: 1000, burst: 2000}
+    - id: rule-023
+      match: {ops: [READ, WRITE], buckets: [other-23], prefixes: [ckpt/, logs/]}
+      group_by: [access_key, bucket, prefix]
+      limit: {rate: 1000, burst: 2000}
+    - id: rule-024
+      match: {ops: [READ, WRITE], buckets: [other-24], prefixes: [ckpt/, logs/]}
+      group_by: [access_key, bucket, prefix]
+      limit: {rate: 1000, burst: 2000}
+    - id: rule-025
+      match: {ops: [READ, WRITE], buckets: [other-25], prefixes: [ckpt/, logs/]}
+      group_by: [access_key, bucket, prefix]
+      limit: {rate: 1000, burst: 2000}
+    - id: rule-026
+      match: {ops: [READ, WRITE], buckets: [other-26], prefixes: [ckpt/, logs/]}
+      group_by: [access_key, bucket, prefix]
+      limit: {rate: 1000, burst: 2000}
+    - id: rule-027
+      match: {ops: [READ, WRITE], buckets: [other-27], prefixes: [ckpt/, logs/]}
+      group_by: [access_key, bucket, prefix]
+      limit: {rate: 1000, burst: 2000}
+    - id: rule-028
+      match: {ops: [READ, WRITE], buckets: [other-28], prefixes: [ckpt/, logs/]}
+      group_by: [access_key, bucket, prefix]
+      limit: {rate: 1000, burst: 2000}
+    - id: rule-029
+      match: {ops: [READ, WRITE], buckets: [other-29], prefixes: [ckpt/, logs/]}
+      group_by: [access_key, bucket, prefix]
+      limit: {rate: 1000, burst: 2000}
+    - id: rule-030
+      match: {ops: [READ, WRITE], buckets: [other-30], prefixes: [ckpt/, logs/]}
+      group_by: [access_key, bucket, prefix]
+      limit: {rate: 1000, burst: 2000}
+    - id: rule-031
+      match: {ops: [READ, WRITE], buckets: [other-31], prefixes: [ckpt/, logs/]}
+      group_by: [access_key, bucket, prefix]
+      limit: {rate: 1000, burst: 2000}
+    - id: rule-032
+      match: {ops: [READ, WRITE], buckets: [other-32], prefixes: [ckpt/, logs/]}
+      group_by: [access_key, bucket, prefix]
+      limit: {rate: 1000, burst: 2000}
+    - id: rule-033
+      match: {ops: [READ, WRITE], buckets: [other-33], prefixes: [ckpt/, logs/]}
+      group_by: [access_key, bucket, prefix]
+      limit: {rate: 1000, burst: 2000}
+    - id: rule-034
+      match: {ops: [READ, WRITE], buckets: [other-34], prefixes: [ckpt/, logs/]}
+      group_by: [access_key, bucket, prefix]
+      limit: {rate: 1000, burst: 2000}
+    - id: rule-035
+      match: {ops: [READ, WRITE], buckets: [other-35], prefixes: [ckpt/, logs/]}
+      group_by: [access_key, bucket, prefix]
+      limit: {rate: 1000, burst: 2000}
+    - id: rule-036
+      match: {ops: [READ, WRITE], buckets: [other-36], prefixes: [ckpt/, logs/]}
+      group_by: [access_key, bucket, prefix]
+      limit: {rate: 1000, burst: 2000}
+    - id: rule-037
+      match: {ops: [READ, WRITE], buckets: [other-37], prefixes: [ckpt/, logs/]}
+      group_by: [access_key, bucket, prefix]
+      limit: {rate: 1000, burst: 2000}
+    - id: rule-038
+      match: {ops: [READ, WRITE], buckets: [other-38], prefixes: [ckpt/, logs/]}
+      group_by: [access_key, bucket, prefix]
+      limit: {rate: 1000, burst: 2000}
+    - id: rule-039
+      match: {ops: [READ, WRITE], buckets: [other-39], prefixes: [ckpt/, logs/]}
+      group_by: [access_key, bucket, prefix]
+      limit: {rate: 1000, burst: 2000}
+    - id: rule-040
+      match: {ops: [READ, WRITE], buckets: [other-40], prefixes: [ckpt/, logs/]}
+      group_by: [access_key, bucket, prefix]
+      limit: {rate: 1000, burst: 2000}
+    - id: rule-041
+      match: {ops: [READ, WRITE], buckets: [other-41], prefixes: [ckpt/, logs/]}
+      group_by: [access_key, bucket, prefix]
+      limit: {rate: 1000, burst: 2000}
+    - id: rule-042
+      match: {ops: [READ, WRITE], buckets: [other-42], prefixes: [ckpt/, logs/]}
+      group_by: [access_key, bucket, prefix]
+      limit: {rate: 1000, burst: 2000}
+    - id: rule-043
+      match: {ops: [READ, WRITE], buckets: [other-43], prefixes: [ckpt/, logs/]}
+      group_by: [access_key, bucket, prefix]
+      limit: {rate: 1000, burst: 2000}
+    - id: rule-044
+      match: {ops: [READ, WRITE], buckets: [other-44], prefixes: [ckpt/, logs/]}
+      group_by: [access_key, bucket, prefix]
+      limit: {rate: 1000, burst: 2000}
+    - id: rule-045
+      match: {ops: [READ, WRITE], buckets: [other-45], prefixes: [ckpt/, logs/]}
+      group_by: [access_key, bucket, prefix]
+      limit: {rate: 1000, burst: 2000}
+    - id: rule-046
+      match: {ops: [READ, WRITE], buckets: [other-46], prefixes: [ckpt/, logs/]}
+      group_by: [access_key, bucket, prefix]
+      limit: {rate: 1000, burst: 2000}
+    - id: rule-047
+      match: {ops: [READ, WRITE], buckets: [other-47], prefixes: [ckpt/, logs/]}
+      group_by: [access_key, bucket, prefix]
+      limit: {rate: 1000, burst: 2000}
+    - id: rule-048
+      match: {ops: [READ, WRITE], buckets: [other-48], prefixes: [ckpt/, logs/]}
+      group_by: [access_key, bucket, prefix]
+      limit: {rate: 1000, burst: 2000}
+    - id: rule-049
+      match: {ops: [READ, WRITE], buckets: [other-49], prefixes: [ckpt/, logs/]}
+      group_by: [access_key, bucket, prefix]
+      limit: {rate: 1000, burst: 2000}
+    - id: rule-050
+      match: {ops: [READ, WRITE], buckets: [other-50], prefixes: [ckpt/, logs/]}
+      group_by: [access_key, bucket, prefix]
+      limit: {rate: 1000, burst: 2000}
+    - id: rule-051
+      match: {ops: [READ, WRITE], buckets: [other-51], prefixes: [ckpt/, logs/]}
+      group_by: [access_key, bucket, prefix]
+      limit: {rate: 1000, burst: 2000}
+    - id: rule-052
+      match: {ops: [READ, WRITE], buckets: [other-52], prefixes: [ckpt/, logs/]}
+      group_by: [access_key, bucket, prefix]
+      limit: {rate: 1000, burst: 2000}
+    - id: rule-053
+      match: {ops: [READ, WRITE], buckets: [other-53], prefixes: [ckpt/, logs/]}
+      group_by: [access_key, bucket, prefix]
+      limit: {rate: 1000, burst: 2000}
+    - id: rule-054
+      match: {ops: [READ, WRITE], buckets: [other-54], prefixes: [ckpt/, logs/]}
+      group_by: [access_key, bucket, prefix]
+      limit: {rate: 1000, burst: 2000}
+    - id: rule-055
+      match: {ops: [READ, WRITE], buckets: [other-55], prefixes: [ckpt/, logs/]}
+      group_by: [access_key, bucket, prefix]
+      limit: {rate: 1000, burst: 2000}
+    - id: rule-056
+      match: {ops: [READ, WRITE], buckets: [other-56], prefixes: [ckpt/, logs/]}
+      group_by: [access_key, bucket, prefix]
+      limit: {rate: 1000, burst: 2000}
+    - id: rule-057
+      match: {ops: [READ, WRITE], buckets: [other-57], prefixes: [ckpt/, logs/]}
+      group_by: [access_key, bucket, prefix]
+      limit: {rate: 1000, burst: 2000}
+    - id: rule-058
+      match: {ops: [READ, WRITE], buckets: [other-58], prefixes: [ckpt/, logs/]}
+      group_by: [access_key, bucket, prefix]
+      limit: {rate: 1000, burst: 2000}
+    - id: rule-059
+      match: {ops: [READ, WRITE], buckets: [other-59], prefixes: [ckpt/, logs/]}
+      group_by: [access_key, bucket, prefix]
+      limit: {rate: 1000, burst: 2000}
+    - id: rule-060
+      match: {ops: [READ, WRITE], buckets: [other-60], prefixes: [ckpt/, logs/]}
+      group_by: [access_key, bucket, prefix]
+      limit: {rate: 1000, burst: 2000}
+    - id: rule-061
+      match: {ops: [READ, WRITE], buckets: [other-61], prefixes: [ckpt/, logs/]}
+      group_by: [access_key, bucket, prefix]
+      limit: {rate: 1000, burst: 2000}
+    - id: rule-062
+      match: {ops: [READ, WRITE], buckets: [other-62], prefixes: [ckpt/, logs/]}
+      group_by: [access_key, bucket, prefix]
+      limit: {rate: 1000, burst: 2000}
+    - id: rule-063
+      match: {ops: [READ, WRITE], buckets: [other-63], prefixes: [ckpt/, logs/]}
+      group_by: [access_key, bucket, prefix]
+      limit: {rate: 1000, burst: 2000}
+    - id: rule-064
+      match: {ops: [READ, WRITE], buckets: [other-64], prefixes: [ckpt/, logs/]}
+      group_by: [access_key, bucket, prefix]
+      limit: {rate: 1000, burst: 2000}
+    - id: rule-065
+      match: {ops: [READ, WRITE], buckets: [other-65], prefixes: [ckpt/, logs/]}
+      group_by: [access_key, bucket, prefix]
+      limit: {rate: 1000, burst: 2000}
+    - id: rule-066
+      match: {ops: [READ, WRITE], buckets: [other-66], prefixes: [ckpt/, logs/]}
+      group_by: [access_key, bucket, prefix]
+      limit: {rate: 1000, burst: 2000}
+    - id: rule-067
+      match: {ops: [READ, WRITE], buckets: [other-67], prefixes: [ckpt/, logs/]}
+      group_by: [access_key, bucket, prefix]
+      limit: {rate: 1000, burst: 2000}
+    - id: rule-068
+      match: {ops: [READ, WRITE], buckets: [other-68], prefixes: [ckpt/, logs/]}
+      group_by: [access_key, bucket, prefix]
+      limit: {rate: 1000, burst: 2000}
+    - id: rule-069
+      match: {ops: [READ, WRITE], buckets: [other-69], prefixes: [ckpt/, logs/]}
+      group_by: [access_key, bucket, prefix]
+      limit: {rate: 1000, burst: 2000}
+    - id: rule-070
+      match: {ops: [READ, WRITE], buckets: [other-70], prefixes: [ckpt/, logs/]}
+      group_by: [access_key, bucket, prefix]
+      limit: {rate: 1000, burst: 2000}
+    - id: rule-071
+      match: {ops: [READ, WRITE], buckets: [other-71], prefixes: [ckpt/, logs/]}
+      group_by: [access_key, bucket, prefix]
+      limit: {rate: 1000, burst: 2000}
+    - id: rule-072
+      match: {ops: [READ, WRITE], buckets: [other-72], prefixes: [ckpt/, logs/]}
+      group_by: [access_key, bucket, prefix]
+      limit: {rate: 1000, burst: 2000}
+    - id: rule-073
+      match: {ops: [READ, WRITE], buckets: [other-73], prefixes: [ckpt/, logs/]}
+      group_by: [access_key, bucket, prefix]
+      limit: {rate: 1000, burst: 2000}
+    - id: rule-074
+      match: {ops: [READ, WRITE], buckets: [other-74], prefixes: [ckpt/, logs/]}
+      group_by: [access_key, bucket, prefix]
+      limit: {rate: 1000, burst: 2000}
+    - id: rule-075
+      match: {ops: [READ, WRITE], buckets: [other-75], prefixes: [ckpt/, logs/]}
+      group_by: [access_key, bucket, prefix]
+      limit: {rate: 1000, burst: 2000}
+    - id: rule-076
+      match: {ops: [READ, WRITE], buckets: [other-76], prefixes: [ckpt/, logs/]}
+      group_by: [access_key, bucket, prefix]
+      limit: {rate: 1000, burst: 2000}
+    - id: rule-077
+      match: {ops: [READ, WRITE], buckets: [other-77], prefixes: [ckpt/, logs/]}
+      group_by: [access_key, bucket, prefix]
+      limit: {rate: 1000, burst: 2000}
+    - id: rule-078
+      match: {ops: [READ, WRITE], buckets: [other-78], prefixes: [ckpt/, logs/]}
+      group_by: [access_key, bucket, prefix]
+      limit: {rate: 1000, burst: 2000}
+    - id: rule-079
+      match: {ops: [READ, WRITE], buckets: [other-79], prefixes: [ckpt/, logs/]}
+      group_by: [access_key, bucket, prefix]
+      limit: {rate: 1000, burst: 2000}
+    - id: rule-080
+      match: {ops: [READ, WRITE], buckets: [other-80], prefixes: [ckpt/, logs/]}
+      group_by: [access_key, bucket, prefix]
+      limit: {rate: 1000, burst: 2000}
+    - id: rule-081
+      match: {ops: [READ, WRITE], buckets: [other-81], prefixes: [ckpt/, logs/]}
+      group_by: [access_key, bucket, prefix]
+      limit: {rate: 1000, burst: 2000}
+    - id: rule-082
+      match: {ops: [READ, WRITE], buckets: [other-82], prefixes: [ckpt/, logs/]}
+      group_by: [access_key, bucket, prefix]
+      limit: {rate: 1000, burst: 2000}
+    - id: rule-083
+      match: {ops: [READ, WRITE], buckets: [other-83], prefixes: [ckpt/, logs/]}
+      group_by: [access_key, bucket, prefix]
+      limit: {rate: 1000, burst: 2000}
+    - id: rule-084
+      match: {ops: [READ, WRITE], buckets: [other-84], prefixes: [ckpt/, logs/]}
+      group_by: [access_key, bucket, prefix]
+      limit: {rate: 1000, burst: 2000}
+    - id: rule-085
+      match: {ops: [READ, WRITE], buckets: [other-85], prefixes: [ckpt/, logs/]}
+      group_by: [access_key, bucket, prefix]
+      limit: {rate: 1000, burst: 2000}
+    - id: rule-086
+      match: {ops: [READ, WRITE], buckets: [other-86], prefixes: [ckpt/, logs/]}
+      group_by: [access_key, bucket, prefix]
+      limit: {rate: 1000, burst: 2000}
+    - id: rule-087
+      match: {ops: [READ, WRITE], buckets: [other-87], prefixes: [ckpt/, logs/]}
+      group_by: [access_key, bucket, prefix]
+      limit: {rate: 1000, burst: 2000}
+    - id: rule-088
+      match: {ops: [READ, WRITE], buckets: [other-88], prefixes: [ckpt/, logs/]}
+      group_by: [access_key, bucket, prefix]
+      limit: {rate: 1000, burst: 2000}
+    - id: rule-089
+      match: {ops: [READ, WRITE], buckets: [other-89], prefixes: [ckpt/, logs/]}
+      group_by: [access_key, bucket, prefix]
+      limit: {rate: 1000, burst: 2000}
+    - id: rule-090
+      match: {ops: [READ, WRITE], buckets: [other-90], prefixes: [ckpt/, logs/]}
+      group_by: [access_key, bucket, prefix]
+      limit: {rate: 1000, burst: 2000}
+    - id: rule-091
+      match: {ops: [READ, WRITE], buckets: [other-91], prefixes: [ckpt/, logs/]}
+      group_by: [access_key, bucket, prefix]
+      limit: {rate: 1000, burst: 2000}
+    - id: rule-092
+      match: {ops: [READ, WRITE], buckets: [other-92], prefixes: [ckpt/, logs/]}
+      group_by: [access_key, bucket, prefix]
+      limit: {rate: 1000, burst: 2000}
+    - id: rule-093
+      match: {ops: [READ, WRITE], buckets: [other-93], prefixes: [ckpt/, logs/]}
+      group_by: [access_key, bucket, prefix]
+      limit: {rate: 1000, burst: 2000}
+    - id: rule-094
+      match: {ops: [READ, WRITE], buckets: [other-94], prefixes: [ckpt/, logs/]}
+      group_by: [access_key, bucket, prefix]
+      limit: {rate: 1000, burst: 2000}
+    - id: rule-095
+      match: {ops: [READ, WRITE], buckets: [other-95], prefixes: [ckpt/, logs/]}
+      group_by: [access_key, bucket, prefix]
+      limit: {rate: 1000, burst: 2000}
+    - id: rule-096
+      match: {ops: [READ, WRITE], buckets: [other-96], prefixes: [ckpt/, logs/]}
+      group_by: [access_key, bucket, prefix]
+      limit: {rate: 1000, burst: 2000}
+    - id: rule-097
+      match: {ops: [READ, WRITE], buckets: [other-97], prefixes: [ckpt/, logs/]}
+      group_by: [access_key, bucket, prefix]
+      limit: {rate: 1000, burst: 2000}
+    - id: rule-098
+      match: {ops: [READ, WRITE], buckets: [other-98], prefixes: [ckpt/, logs/]}
+      group_by: [access_key, bucket, prefix]
+      limit: {rate: 1000, burst: 2000}
+    - id: rule-099
+      match: {ops: [READ, WRITE], buckets: [other-99], prefixes: [ckpt/, logs/]}
+      group_by: [access_key, bucket, prefix]
+      limit: {rate: 1000, burst: 2000}
+    - id: rule-100
+      match: {ops: [READ, WRITE], buckets: [other-100], prefixes: [ckpt/, logs/]}
+      group_by: [access_key, bucket, prefix]
+      limit: {rate: 1000, burst: 2000}
+    - id: wide-read
+      match: {ops: [READ]}
+      group_by: [access_key, bucket]
+      limit: {rate: 1000000000, burst: 1000000000}
+    - id: throttle
+      match: {buckets: [load-throttle-0]}
+      group_by: [access_key]
+      limit: {rate: 500, burst: 500}

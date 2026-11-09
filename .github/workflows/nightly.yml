@@ -50,9 +50,13 @@ jobs:
             exit 0
           fi
           make bench-compare
+      - name: gated limiter measurements (1,000,000 keys; 60 s unique-key flood)
+        run: TOLLBOOTH_BIG=1 go test -count=1 -run 'TestDecisionLatencyAtOneMillionKeys|TestUniqueKeyFlood' -v ./internal/limiter/ 2>&1 | tee test/bench/big.txt
       - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: bench
-          path: test/bench/new.txt
+          path: |
+            test/bench/new.txt
+            test/bench/big.txt
           if-no-files-found: ignore

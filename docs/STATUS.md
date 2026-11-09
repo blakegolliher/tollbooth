@@ -1,10 +1,9 @@
 # STATUS
 
-Current phase: **1 (Passthrough), gate report written** (`docs/reports/gate-1.md`), awaiting
-Fable's review and Blake's decision. Merged into `phase-1`: #2 identity and classifier, #4 config,
-#5 proxy, admin, null backend, #6 serve, check-config, version. Open: #7 byte-equivalence harness,
-#8 client compatibility matrix and this report. CI on the final commit: all five jobs green; Garage
-and versitygw byte-equivalence 293 cases, 0 diffs each; client matrix 122 cells, 0 failures.
+Current phase: **2 (Rate limiting), gate report written** (`docs/reports/gate-2.md`), awaiting
+Fable's review and Blake's decision. Open, stacked on `phase-2`: #10 limiter, #11 handler and admin
+routes, #12 `rules` verbs, #13 e2e and client throttling rows, #14 bench harness and baseline. Phase 1
+passed (Blake, 2026-11-09: #7 and #8 merged, Phase 2 started; #9 brings `phase-1` to `main`).
 
 ## Phases
 
@@ -12,11 +11,38 @@ and versitygw byte-equivalence 293 cases, 0 diffs each; client matrix 122 cells,
 | --- | --- | --- | --- |
 | 0 Design | `docs/DESIGN.md`; ADR-0001, ADR-0002 (open decisions) and ADR-0003 (TUI in one binary); shunt's op table checked against the API reference (`docs/OPERATIONS_TABLE.md`); repo scaffold, `Makefile`, CI skeleton, `THIRD_PARTY_NOTICES.md`; `docs/CONFIG.md` | Fable approves the design and ADRs; every requirement maps to a `DESIGN.md` section or an explicit deferral | **pass, 2026-11-08** (first review: pass with fixes; fixes applied; second review: pass); tagged `phase-0` |
 | 1 Passthrough | transparent proxy lifted from shunt + TLS, PROXY protocol, trusted XFF; identity; classifier; backend pool; admin health/ready/metrics; null and recording backends | byte-equivalence green; compat matrix 100% on Garage and versitygw; fuzz 1 CPU-hour clean; `-race` clean | **report written 2026-11-09**: byte-equivalence 0 diffs on Garage and versitygw; compat matrix 0 failures; fuzz 1 CPU-hour + 20 min clean; race clean; coverage 92.1% |
-| 2 Rate limiting | rules, matchers, GCRA, single pass, both modes, `Expect: 100-continue` measured, hot reload, limiter metrics, `/admin/limits`, `rules *` verbs | limiter suite green (fake clock); 10 µs p99; reload under load zero failures; SDKs complete work under 1 req/s | not started |
+| 2 Rate limiting | rules, matchers, GCRA, single pass, both modes, `Expect: 100-continue` measured, hot reload, limiter metrics, `/admin/limits`, `rules *` verbs | limiter suite green (fake clock); 10 µs p99; reload under load zero failures; SDKs complete work under 1 req/s | **report written 2026-11-09**: limiter suite 25 tests green; p99 4.7 µs at 1,000,000 keys; 20 reloads under load, slowest 0.60 ms, 0 failed; SDK completion by retry mode (D-044) |
 | 3 Showback | aggregator, snapshot and seal, NDJSON, `usage` verbs, `/admin/usage`, dimensions and cap, restart, multi-node sum | reconciliation exact; rollover tests; kill between snapshots loses ≤ `flush_interval`; verify detects a removed hour | not started |
 | 4 Operator surface | remaining verbs, shared admin client, `/admin/status`, `/admin/limits/test`, `/admin/backends`, `tollbooth tui` | parity test; CLI goldens ×3 formats; `teatest` goldens; runbook tasks from the TUI and CLI alone | not started |
 | 5 Hardening and v0.1.0 | bench runs with profiles, tuning, 24 h soak, caps, `OPERATIONS.md`, systemd, container, `CHANGELOG.md`, tag | all performance targets met or ADR'd; soak flat | not started |
 | 6 Backlog | shaping, cluster limits, bandwidth, Parquet, OpenTelemetry, connection caps, rule editing, drain, web UI | each starts with an ADR | not scheduled |
+
+## Phase 2 record
+
+Shipped: everything in the Phase 2 row, plus `x-amz-retry-after` on throttle responses (D-043),
+`/admin/limits/test` and `/admin/config` (D-039, D-040), the shared `admin.Client`, the bench
+harness of ADR-0002 (`bench/loadgen`, `bench/run.sh`, `make bench-e2e`) and the first regression
+baseline from the fixed CI runner, the e2e SDK throttling suite (`test/e2e`), the client-tool
+throttling rows (`test/integration/throttle.sh`, `docs/THROTTLE.md`), the 1,000,000-key and 60 s
+flood measurements, D-036 through D-044.
+
+Cut: nothing. `config show/reload/diff` stay in Phase 4 as the specification places them.
+
+Findings: aws cli v2 and boto3 in their default retry mode do not complete a 200-object sync at
+twice the rule's rate (80/200 and 190/200); adaptive mode completes, as do s5cmd, rclone, and
+s3cmd with defaults; the Go SDK as shipped ignores both Retry-After headers and honors
+`x-amz-retry-after` only with `AWS_NEW_RETRIES_2026=true` (D-044). The throttled path allocated
+differently under `-race` until request ids left `crypto/rand` (D-041). CodeQL flagged the access
+key in the throttle debug line; it is gone from logs at every level (D-042).
+
+Bench numbers (dev box, 2 vCPUs shared by generator, backend, and proxy; indicative): limiter
+decision p99 4.7 µs at 1,000,000 keys with 100 rules; 226 B per key; 100-rule decision 980 ns
+(335 ns on the CI runner); reload under load slowest 0.60 ms; startup to ready 65–78 ms; added
+latency p50 2.1 ms and proxied throughput 2,194 req/s against direct 6,284 at concurrency 8, which
+measure the box, not the proxy (44% of proxy CPU is socket syscalls, `limiter.Decide` 1.25%). The
+reference-node run is Phase 5.
+
+Gate result: pending.
 
 ## Phase 1 record
 
@@ -35,7 +61,8 @@ Bench numbers (dev box, 2 vCPUs, indicative): classifier 98 ns, identity 310–6
 observation 172 ns, handler alone 5.1 µs and 7 allocations per 4 KiB GetObject, all zero-allocation
 on the decision paths. The reference-node run is Phase 5.
 
-Gate result: pending.
+Gate result: **pass** (Blake, 2026-11-09: #7 and #8 merged and Phase 2 started; Fable's written
+grading, if any, is not recorded here).
 
 ## Phase 0 record
 

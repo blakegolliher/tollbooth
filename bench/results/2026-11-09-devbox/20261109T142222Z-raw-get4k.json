@@ -1,0 +1,176 @@
+{
+  "mode": "raw",
+  "options": {},
+  "environment": {
+    "cpu": "AMD EPYC 7402P 24-Core Processor",
+    "go": "go1.27.3",
+    "gogc": "",
+    "gomaxprocs": "2",
+    "gomemlimit": "",
+    "host": "sts-workshop",
+    "kernel": "Linux version 5.14.0-570.17.1.el9_6.x86_64 (mockbuild@iad1-prod-build001.bld.equ.rockylinux.org) (gcc (GCC) 11.5.0 20240719 (Red Hat 11.5.0-5), GNU ld version 2.35.2-63.el9) #1 SMP PREEMPT_DYNAMIC Fri May 23 22:47:01 UTC 2025",
+    "num_cpu": "2"
+  },
+  "runs": [
+    {
+      "target": "direct",
+      "index": 1,
+      "seconds": 20.000616359,
+      "requests": 117803,
+      "rps": 5889.968483245782,
+      "bytes": 482521088,
+      "status": {
+        "200": 117803
+      },
+      "errors": 0,
+      "latency_us": {
+        "max": 75628.543,
+        "p50": 772.607,
+        "p90": 2752.511,
+        "p99": 10100.735,
+        "p99.9": 26509.311
+      }
+    },
+    {
+      "target": "proxied",
+      "index": 1,
+      "seconds": 20.001778989,
+      "requests": 40420,
+      "rps": 2020.820249150289,
+      "bytes": 165560320,
+      "status": {
+        "200": 40420
+      },
+      "errors": 0,
+      "latency_us": {
+        "max": 89391.103,
+        "p50": 3047.423,
+        "p90": 7749.631,
+        "p99": 17399.807,
+        "p99.9": 38404.095
+      }
+    },
+    {
+      "target": "direct",
+      "index": 2,
+      "seconds": 20.000288179,
+      "requests": 125677,
+      "rps": 6283.759457624163,
+      "bytes": 514772992,
+      "status": {
+        "200": 125677
+      },
+      "errors": 0,
+      "latency_us": {
+        "max": 57606.143,
+        "p50": 807.935,
+        "p90": 2652.159,
+        "p99": 7958.527,
+        "p99.9": 18825.215
+      }
+    },
+    {
+      "target": "proxied",
+      "index": 2,
+      "seconds": 20.004832465,
+      "requests": 43888,
+      "rps": 2193.8699100222634,
+      "bytes": 179765248,
+      "status": {
+        "200": 43888
+      },
+      "errors": 0,
+      "latency_us": {
+        "max": 55508.991,
+        "p50": 2869.247,
+        "p90": 7110.655,
+        "p99": 14950.399,
+        "p99.9": 33292.287
+      }
+    },
+    {
+      "target": "direct",
+      "index": 3,
+      "seconds": 20.000413712,
+      "requests": 122905,
+      "rps": 6145.122884446061,
+      "bytes": 503418880,
+      "status": {
+        "200": 122905
+      },
+      "errors": 0,
+      "latency_us": {
+        "max": 59506.687,
+        "p50": 816.639,
+        "p90": 2738.175,
+        "p99": 8151.039,
+        "p99.9": 18595.839
+      }
+    },
+    {
+      "target": "proxied",
+      "index": 3,
+      "seconds": 20.001404664,
+      "requests": 46709,
+      "rps": 2335.285985392331,
+      "bytes": 191320064,
+      "status": {
+        "200": 46709
+      },
+      "errors": 0,
+      "latency_us": {
+        "max": 64061.439,
+        "p50": 2709.503,
+        "p90": 6717.439,
+        "p99": 14270.463,
+        "p99.9": 32129.023
+      }
+    }
+  ],
+  "median": {
+    "direct": {
+      "target": "direct",
+      "index": 2,
+      "seconds": 20.000288179,
+      "requests": 125677,
+      "rps": 6283.759457624163,
+      "bytes": 514772992,
+      "status": {
+        "200": 125677
+      },
+      "errors": 0,
+      "latency_us": {
+        "max": 57606.143,
+        "p50": 807.935,
+        "p90": 2652.159,
+        "p99": 7958.527,
+        "p99.9": 18825.215
+      }
+    },
+    "proxied": {
+      "target": "proxied",
+      "index": 2,
+      "seconds": 20.004832465,
+      "requests": 43888,
+      "rps": 2193.8699100222634,
+      "bytes": 179765248,
+      "status": {
+        "200": 43888
+      },
+      "errors": 0,
+      "latency_us": {
+        "max": 55508.991,
+        "p50": 2869.247,
+        "p90": 7110.655,
+        "p99": 14950.399,
+        "p99.9": 33292.287
+      }
+    }
+  },
+  "added_latency_us": {
+    "p50": 2061.312,
+    "p90": 4458.495999999999,
+    "p99": 6991.871999999999,
+    "p99.9": 14467.071999999996
+  }
+}
