@@ -122,6 +122,9 @@ func (c *Config) Validate() error { //nolint:gocritic // one function, one pass 
 	}
 	positive("proxy.drain_timeout", int64(c.Proxy.DrainTimeout))
 	positive("cluster.node_count", int64(c.Cluster.NodeCount))
+	if c.Cluster.NodeCount > MaxNodeCount {
+		bad("cluster.node_count", "must be at most %d, got %d", MaxNodeCount, c.Cluster.NodeCount)
+	}
 
 	if !validMode(c.RateLimits.DefaultOnLimit) {
 		bad("rate_limits.default_on_limit", "must be %s or %s, got %q", ModeSlowDown, ModeTooManyRequests, c.RateLimits.DefaultOnLimit)
@@ -173,11 +176,15 @@ func (c *Config) Validate() error { //nolint:gocritic // one function, one pass 
 			}
 			seenDim[g] = true
 		}
-		if r.Limit.Rate < 0 {
+		switch {
+		case r.Limit.Rate < 0:
 			bad(key+".limit.rate", "must be >= 0, got %v", r.Limit.Rate)
-		}
-		if r.Limit.Rate > 0 && r.Limit.Burst < 1 {
+		case r.Limit.Rate > 0 && (r.Limit.Rate < MinRate || r.Limit.Rate > MaxRate):
+			bad(key+".limit.rate", "must be 0 or between %g and %g requests per second, got %v", MinRate, MaxRate, r.Limit.Rate)
+		case r.Limit.Rate > 0 && r.Limit.Burst < 1:
 			bad(key+".limit.burst", "must be >= 1, got %d", r.Limit.Burst)
+		case r.Limit.Rate > 0 && float64(r.Limit.Burst)/r.Limit.Rate > MaxRefillSeconds:
+			bad(key+".limit.burst", "%d at rate %v takes %.0f s to refill; the bound is %g s (D-037)", r.Limit.Burst, r.Limit.Rate, float64(r.Limit.Burst)/r.Limit.Rate, MaxRefillSeconds)
 		}
 		if !validMode(r.OnLimit) {
 			bad(key+".on_limit", "must be %s or %s, got %q", ModeSlowDown, ModeTooManyRequests, r.OnLimit)

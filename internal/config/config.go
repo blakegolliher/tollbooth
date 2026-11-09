@@ -205,6 +205,16 @@ const (
 	DefaultThrottleSample        = 100
 )
 
+// Bounds on the limiter arithmetic (D-037): with these, every GCRA quantity (emission interval,
+// tolerance, theoretical arrival time) stays inside int64 nanoseconds for a 30-year process
+// lifetime on up to MaxNodeCount nodes.
+const (
+	MinRate          = 1e-6 // one request every ~11.6 days
+	MaxRate          = 1e9  // requests per second
+	MaxRefillSeconds = 1e9  // burst / rate: a bucket refills within ~31.7 years
+	MaxNodeCount     = 1024
+)
+
 // DefaultDimensions is showback.dimensions when unset.
 var DefaultDimensions = []string{DimAccessKey, DimBucket, DimPrefix, DimOperation, DimStatusClass}
 
