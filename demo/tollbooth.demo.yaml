@@ -1,0 +1,50 @@
+# tollbooth demo configuration (demo/run.sh fills the @PLACEHOLDERS@ and writes demo/state/tollbooth.yaml).
+# Four rules that each show one behavior; docs/CONFIG.md documents every key.
+
+node_id: demo-a01
+base_domains: []
+
+listen:
+  address: "@PROXY_ADDR@"
+
+backend:
+  scheme: @BACKEND_SCHEME@
+  endpoints: [@BACKEND@]
+  health_check: {interval: 1s, timeout: 1s}
+
+rate_limits:
+  default_on_limit: slowdown
+  rules:
+    # Tenant A may read 2 requests per second per bucket (low so hand-typed commands trip it); the
+    # third in a second gets 503 SlowDown with Retry-After, the SDK backs off, nothing is dropped.
+    - id: tenant-a-reads
+      match: {access_keys: [DEMO-TENANT-A], ops: [READ]}
+      group_by: [access_key, bucket]
+      limit: {rate: 2, burst: 2}
+    # A listing storm from one client address: one LIST per second, answered with 429 instead.
+    - id: list-storm-per-client
+      match: {ops: [LIST]}
+      group_by: [source_ip]
+      limit: {rate: 1, burst: 1}
+      on_limit: too_many_requests
+    # Writes are limited per bucket with headroom: visible in `rules list`, never hit in the demo.
+    - id: writes-per-bucket
+      match: {ops: [WRITE]}
+      group_by: [bucket]
+      limit: {rate: 500, burst: 1000}
+    # A frozen bucket: rate 0 blocks every request to it (incident response, a stop button).
+    - id: frozen-bucket
+      match: {buckets: [frozen]}
+      limit: {rate: 0}
+
+showback:
+  dir: @SHOWBACK_DIR@
+  flush_interval: 10s                 # demo: rows appear within ten seconds (production default 60s)
+  dimensions: [access_key, bucket, prefix, operation, status_class]
+
+admin:
+  address: @ADMIN_ADDR@
+  pprof: true
+
+logging:
+  level: info

@@ -13,3 +13,4 @@
 /test/integration/bin/
 /test/integration/.venv/
 /bench/results/*/showback/
+/demo/state/
