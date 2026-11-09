@@ -207,8 +207,15 @@ struct shunt allocates per request is not used.
 - Response headers are copied into `w.Header()` (slices shared, not cloned; hop-by-hop dropped;
   nothing added). When the backend sent no `Content-Type`, `w.Header()["Content-Type"] = nil`
   disables net/http's sniffing so the client sees none. `w.WriteHeader(resp.StatusCode)` follows
-  at once; the first body chunk carries the headers out. No explicit `Flush` (it would cost a
-  syscall per small response; `docs/DECISIONS.md` D-006).
+  at once, and **every copied chunk is flushed** (`ResponseController.Flush` inside
+  `deadlineWriter.Write`). net/http buffers 4 KiB; without the flush a trickle response, such as
+  `CompleteMultipartUpload` on a large object (headers, then whitespace for minutes),
+  `SelectObjectContent`, or a slow list stream, would reach the client only when the buffer filled
+  or the response ended. For chunks ≥ 4 KiB the flush costs nothing (the write goes through
+  anyway); for small chunks it is exactly the syscall transparency requires, and transparency
+  outranks latency. `TestTrickleResponseReachesClient`: the backend sends headers, then one byte
+  per second; the client sees the headers and the first byte within 1.5 s (`docs/DECISIONS.md`
+  D-006, revised at Gate 0).
 - Body: `io.CopyBuffer(deadlineWriter{w}, progressReader{resp.Body}, pooled buffer)`.
   `deadlineWriter` hides `ReaderFrom` so the pooled buffer is used, pushes the write deadline
   forward on every write, and counts bytes. The buffer comes from a `sync.Pool` of
@@ -254,6 +261,7 @@ so the forwarded path allocates nothing for it.
 | `Content-Length`, chunked, `aws-chunked` with trailers pass through | s3diff `aws-chunked` and trailer cases |
 | Decision before body; throttled `Expect: 100-continue` sends zero body bytes inside 1 s | `TestExpectContinueThrottled` with the recording backend and a client with a 1 s expect timeout |
 | Short body never complete | `TestBackendDiesMidGetContentLength`, `TestBackendDiesMidGetChunked` (asserts no `0\r\n\r\n`) |
+| Trickle responses reach the client as they arrive | `TestTrickleResponseReachesClient` (headers then one byte per second; headers and first byte seen within 1.5 s) |
 | Keys and access keys not logged above debug | `TestLogRedaction` over a captured `slog` handler |
 
 ## 5. Rate limiting (`internal/limiter`)
@@ -355,7 +363,7 @@ failed requests) pin this.
 
 ### 5.5 Deny sampler (`/admin/limits/top`)
 
-Per rule, a fixed ring of 4,096 `{key, at int64}` entries written under a per-rule mutex on each
+Per rule, a fixed ring of 1,024 `{key, at int64}` entries written under a per-rule mutex on each
 denial. `GET /admin/limits/top?n=20` reads the rings, counts entries within the last 60 s by key,
 and returns the top n with the rule id and the key's dimensions. The ring holds cloned strings
 only. Allowed requests never touch it.
@@ -383,9 +391,12 @@ type hourTable struct {
 }
 ```
 
-`Record(id, status, bytesIn, bytesOut, completedAt)`:
+`Record(id, status, bytesIn, bytesOut)`:
 
-1. `h = completedAt.Unix() / 3600`. Load `cur := agg.cur.Load()`.
+1. `h = time.Now().Unix() / 3600`, read **inside** `Record`, not from a timestamp taken earlier
+   in the handler: a request that completed at 10:59:59.999 whose `Record` runs at 11:00:00.001
+   must land in hour 11, the hour the sealer is working in, or it would be a spurious
+   `showback_clock_skew_total`. Load `cur := agg.cur.Load()`.
 2. If `h > cur.hour`: build a new `hourTable{hour: h}` and `CompareAndSwap(cur, new)`; on failure
    another request did it first, reload. If `h < cur.hour` (wall clock stepped back): count into
    `cur` and increment `showback_clock_skew_total`.
@@ -525,9 +536,11 @@ decision and the showback increment at steady state. The seven, by name:
 Everything else is pooled (copy buffer), pre-resolved (metric handles, §9.3), or a struct value
 that does not escape (`RequestIdentity`, the limiter decision, the outcome record). Enforcement:
 `TestHandlerAllocations` in `internal/proxy` runs `testing.AllocsPerRun` over a warmed-up 4 KiB
-`GetObject` against the null backend, subtracts the `net/http` baseline measured the same way
-without the handler, and **fails if the difference exceeds 7**; `BenchmarkHandlerGetObject`
-`-benchmem` records the absolute number for the committed baseline. The limiter and showback
+`GetObject` with `httptest.NewRecorder` as the `ResponseWriter` and a fake `RoundTripper` that
+returns a canned response, so no sockets or goroutines are involved, the `net/http` baseline is
+near zero, and the seven are counted directly; it **fails above 7**. Differencing two noisy
+end-to-end measurements was rejected as flaky (Gate 0). `BenchmarkHandlerGetObject` `-benchmem`
+against the null backend records the absolute end-to-end number for the committed baseline. The limiter and showback
 microbenchmarks assert exactly 0 allocs/op. If Gate 1 finds one of the seven avoidable (for
 example by embedding the readers in one per-request struct), the table shrinks and the test's
 bound follows it; it never grows without an ADR.
@@ -552,13 +565,15 @@ and the cardinality is fixed by construction, which is what the cardinality test
 | Limiter key + TAT in a Go map | ~96 B key/value + ~30 B map overhead + ~60 B cloned strings ≈ 190 B | 1,000,000 keys ≈ 190 MiB | measured at Gate 2; `docs/OPERATIONS.md` sizing |
 | Showback tuple + row | ~80 B key + 8 B pointer + 48 B row (with allocator header) + ~30 B map + ~60 B strings ≈ 230 B | 250,000 tuples ≈ 55 MiB; the specification expects 350–450 B measured | measured at Gate 3 |
 | Snapshot scratch | rows slice, reused | ~30 MiB transient | one writer goroutine |
-| Copy buffers | `copy_buffer_bytes` × in-flight bodies | 10,000 × 256 KiB = 2.5 GiB worst case | `sync.Pool`; real in-flight bodies are far fewer; the Phase 5 soak measures RSS and the cap in `docs/OPERATIONS.md` is set from it |
-| Deny rings | 4,096 × ~100 B per rule | 100 rules ≈ 40 MiB | only rules that deny fill theirs |
+| Copy buffers | `copy_buffer_bytes` × in-flight bodies | defaults 4,096 × 128 KiB = **512 MiB** worst case | `sync.Pool`; the defaults bound it at half the 1 GiB target; `check-config` warns when `max_inflight × copy_buffer_bytes` exceeds half of `GOMEMLIMIT` (D-024) |
+| Deny rings | 1,024 × ~100 B per rule | 100 rules ≈ 10 MiB | only rules that deny fill theirs |
 
 Target: ≤ 1 GiB RSS with `GOMEMLIMIT=1GiB` at 1,000,000 keys and 250,000 tuples. The copy-buffer
-row is the one that can break it under a flood of concurrent large bodies; if the soak shows it,
-`listen.max_inflight` and `proxy.copy_buffer_bytes` are the knobs and `docs/OPERATIONS.md` says
-how to size them.
+row is the one that can break it under a flood of concurrent large bodies, so its budget is
+decided now rather than discovered in the Phase 5 soak: `listen.max_inflight` defaults to 4,096
+and `proxy.copy_buffer_bytes` to 131,072, bounding it at 512 MiB; an operator who raises either
+is warned by `check-config` when the product exceeds half of `GOMEMLIMIT`, and
+`docs/OPERATIONS.md` gives the sizing rule. The soak confirms the sum, it does not set it.
 
 ## 10. Concurrency
 
@@ -605,7 +620,7 @@ Every category in docs/SPEC.md (Test plan) maps to a package and a phase:
 | 3 | Limiter | `internal/limiter` with an injected clock | 2 |
 | 4 | Fuzzing | `FuzzParse`, `FuzzClassify` (`internal/s3id`, shunt's corpus as seed), `FuzzConfig`, `FuzzNDJSON` | 1–3 |
 | 5 | Byte-equivalence | `test/s3diff` + `bench/recordbackend` | 1 |
-| 6 | Client compatibility | `test/integration` (Garage, versitygw, and MinIO run as pinned static binaries downloaded by `test/integration/backends.sh`, no container runtime), `docs/COMPAT.md` | 1 |
+| 6 | Client compatibility | `test/integration` (Garage and versitygw run as pinned static binaries downloaded by `test/integration/backends.sh`, no container runtime; MinIO and `mc` dropped, D-022), `docs/COMPAT.md` | 1 |
 | 7 | Throttling behavior | `test/e2e` with each SDK | 2 |
 | 8 | Showback correctness | `internal/showback` (injected clock) + reconciliation in `test/e2e` | 3 |
 | 9 | Chaos and resilience | `test/e2e` + null backend fault injection | 1–5 |
