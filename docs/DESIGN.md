@@ -247,7 +247,8 @@ Body is the S3 error XML from shunt's `internal/s3/errors.go` table (lifted, plu
 `TooManyRequests`), with `Resource` set to the raw path (S3 itself echoes it), a freshly generated
 `x-amz-request-id`, `Content-Type: application/xml`, `Content-Length`, and, on the throttle
 responses, `Retry-After` (whole seconds, rounded up, at least 1) and `x-amz-retry-after`
-(milliseconds, rounded up; the exact GCRA wait, which aws-sdk-go-v2 honors, D-043). Rule
+(milliseconds, rounded up; the exact GCRA wait, which aws-sdk-go-v2 honors with its 2026 retry
+behavior on, D-043). Rule
 identifiers never appear. The request id is generated only on this path, so the forwarded path
 allocates nothing for it.
 
