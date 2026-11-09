@@ -76,7 +76,8 @@ showback:
 
 admin:
   address: 127.0.0.1:9900
-  token: ""                         # optional bearer token for /admin/*
+  token_file: ""                    # preferred: file holding the bearer token for /admin/*
+  token: ""                         # inline alternative for labs; redacted in config show
   pprof: false
 
 logging:

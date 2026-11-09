@@ -109,7 +109,8 @@ Every listed match condition must hold (AND); an omitted condition matches anyth
 | Key | Type | Default | Meaning |
 | --- | --- | --- | --- |
 | `admin.address` | string | `127.0.0.1:9900` | Admin listener: health, metrics, reload, limits, usage. Separate server, separate connection pool. Bind to localhost or a management interface. |
-| `admin.token` | string | `""` | Optional bearer token required on every `/admin/*` route (`/healthz`, `/readyz`, `/metrics` stay open). Redacted in `GET /admin/config`. The CLI and TUI read it from here when `--token` and `TOLLBOOTH_TOKEN` are unset. |
+| `admin.token_file` | path | `""` | **Preferred.** File holding the bearer token required on every `/admin/*` route (`/healthz`, `/readyz`, `/metrics` stay open); trailing whitespace trimmed; re-read on reload. The CLI and TUI read it from here when `--token` and `TOLLBOOTH_TOKEN` are unset. |
+| `admin.token` | string | `""` | Inline alternative to `token_file` for labs. Mutually exclusive with `token_file`. Redacted to `"<redacted>"` in `GET /admin/config` and `tollbooth config show` (asserted by `TestConfigShowRedactsToken`). |
 | `admin.pprof` | bool | `false` | Serve `/debug/pprof/*` on the admin listener. |
 
 ## `logging`
@@ -137,6 +138,7 @@ document what breaks when flipped.
 - `node_id`, `showback.dir`, `backend.scheme`, `backend.endpoints` are required.
 - Rule ids are unique; `group_by: [prefix]` needs `match.prefixes`; `match.ops` names must exist; CIDRs parse; `on_limit` and `default_on_limit` are one of the two modes.
 - `listen.tls.cert` and `listen.tls.key` are set together, the files exist, and the pair loads.
+- `admin.token` and `admin.token_file` are not both set; a `token_file` must exist and be non-empty.
 - `backend.tls.*` is rejected with `scheme: http`.
 - `showback.dimensions` contains `operation` and `status_class`; `showback.prefixes` keys are valid bucket names and prefixes are non-empty.
 - Warnings (exit 0, printed): a backend endpoint host not in `base_domains`; `insecure_skip_verify: true`; `showback.retention_days: 0`.
