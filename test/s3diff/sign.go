@@ -376,8 +376,8 @@ func (t *target) rawPutExpect(ctx context.Context, bucket, key string, payload [
 	if !good {
 		signer.sk = "not-the-secret"
 	}
-	if err = signer.signV4(ctx, req, unsignedPayload, time.Now().UTC()); err != nil {
-		return err
+	if serr := signer.signV4(ctx, req, unsignedPayload, time.Now().UTC()); serr != nil {
+		return serr
 	}
 	// A transport of its own, so the 100-continue timeout is the SDK's 1 s and the connection is
 	// not reused after a refused body.
