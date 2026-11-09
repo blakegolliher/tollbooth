@@ -166,7 +166,7 @@ rate_limits:
 	id := getObject("AKIAREVOKED", "b", "k")
 	for i := 0; i < 100; i++ {
 		d := l.Decide(id, int64(i)*second, true)
-		if d.Allowed || d.RetryAfter != 1 || d.Rule.ID != "frozen" {
+		if d.Allowed || d.RetryAfter != 1 || d.Wait != second || d.Rule.ID != "frozen" {
 			t.Fatalf("attempt %d: %+v", i, d)
 		}
 	}
@@ -411,8 +411,11 @@ func TestFractionalRate(t *testing.T) {
 		t.Fatalf("burst defaults to max(1, ceil(0.5)) = 1; admitted %d", got)
 	}
 	d := l.Decide(id, 0, true)
-	if d.Allowed || d.RetryAfter != 2 {
-		t.Fatalf("T = 2 s so Retry-After is 2: %+v", d)
+	if d.Allowed || d.RetryAfter != 2 || d.Wait != 2*second {
+		t.Fatalf("T = 2 s so Retry-After is 2 and the wait is 2 s: %+v", d)
+	}
+	if d := l.Decide(id, 500*ms, true); d.Allowed || d.RetryAfter != 2 || d.Wait != 1500*ms {
+		t.Fatalf("half a second later the wait is 1.5 s, Retry-After still rounds up to 2: %+v", d)
 	}
 	if d := l.Decide(id, 2*second, true); !d.Allowed {
 		t.Fatalf("one request every two seconds: %+v", d)

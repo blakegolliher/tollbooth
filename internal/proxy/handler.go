@@ -105,7 +105,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		h.inflight.Add(-1)
 		o.proxyError = true
 		o.err = "inflight cap"
-		writeS3Error(w, CodeSlowDown, o.id.RawPath, 1)
+		writeS3Error(w, CodeSlowDown, o.id.RawPath, time.Second)
 		o.headersSent = true
 		return
 	}
@@ -159,7 +159,8 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 // throttle answers a denied request with the denying rule's mode: 503 SlowDown or 429
-// TooManyRequests, the S3 error body, Retry-After, and a request id. Nothing of the body is read;
+// TooManyRequests, the S3 error body, Retry-After in seconds, x-amz-retry-after in milliseconds
+// (D-043), and a request id. Nothing of the body is read;
 // Go's server then discards up to 256 KiB of it to keep the connection, closes it past that or
 // when the client sent Expect: 100-continue (D-005). The decision is logged at debug, one in
 // logging.throttle_sample.
@@ -170,7 +171,7 @@ func (h *Handler) throttle(w http.ResponseWriter, r *http.Request, o *outcome, d
 	if d.Mode == limiter.ModeTooManyRequests {
 		code = CodeTooManyRequests
 	}
-	rid := writeS3Error(w, code, o.id.RawPath, d.RetryAfter)
+	rid := writeS3Error(w, code, o.id.RawPath, time.Duration(d.Wait))
 	o.headersSent = true
 	o.status = errorTable[code].status
 	if h.Log != nil && h.Log.Enabled(r.Context(), slog.LevelDebug) {

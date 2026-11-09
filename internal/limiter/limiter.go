@@ -130,7 +130,8 @@ func (l *Limiter) Apply(cfg *config.Config) error {
 type Decision struct {
 	Allowed    bool
 	Mode       Mode  // the denying rule's response mode
-	RetryAfter int   // seconds, ≥ 1 when denied
+	RetryAfter int   // seconds, ≥ 1 when denied: ceil(Wait), for Retry-After
+	Wait       int64 // nanoseconds until the denying rule would admit one request, for x-amz-retry-after
 	Rule       *Rule // the denying rule; nil when allowed
 	Matched    int   // rules that matched the request
 	Overflow   bool  // a matching rule had no state because limiter.max_keys was reached
@@ -252,6 +253,7 @@ func (l *Limiter) evaluate(rs *RuleSet, id *s3id.RequestIdentity, now int64, con
 		d.Allowed = false
 		d.Rule = r
 		d.Mode = r.mode
+		d.Wait = wait
 		d.RetryAfter = retryAfter(wait)
 		if consume {
 			r.stats.denied.Add(1)

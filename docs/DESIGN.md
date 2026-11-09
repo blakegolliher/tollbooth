@@ -245,9 +245,11 @@ Only four: `503 SlowDown` (throttle, in-flight cap), `429 TooManyRequests` (thro
 `503 ServiceUnavailable` (no backend reachable), `400 InvalidURI` (unforwardable request-target).
 Body is the S3 error XML from shunt's `internal/s3/errors.go` table (lifted, plus
 `TooManyRequests`), with `Resource` set to the raw path (S3 itself echoes it), a freshly generated
-`x-amz-request-id`, `Content-Type: application/xml`, `Content-Length`, and `Retry-After` on the
-throttle responses. Rule identifiers never appear. The request id is generated only on this path,
-so the forwarded path allocates nothing for it.
+`x-amz-request-id`, `Content-Type: application/xml`, `Content-Length`, and, on the throttle
+responses, `Retry-After` (whole seconds, rounded up, at least 1) and `x-amz-retry-after`
+(milliseconds, rounded up; the exact GCRA wait, which aws-sdk-go-v2 honors, D-043). Rule
+identifiers never appear. The request id is generated only on this path, so the forwarded path
+allocates nothing for it.
 
 ### 4.9 Invariants and the tests that pin them
 
@@ -573,9 +575,10 @@ bound follows it; it never grows without an ADR.
 Denied path (throttle): stages 2–5, then the XML body is written from a pooled byte slice with
 `Retry-After` and a request id (128 random bits from `math/rand/v2`, formatted on the stack).
 Measured 2026-11-09 by `TestThrottledAllocations` (pinned at the measured value, D-041):
-**4 allocations** in both build modes, the request-id string, the `Content-Length` string, and the
-two single-value header slices that vary (`Content-Length`, `X-Amz-Request-Id`); `Content-Type` and
-small `Retry-After` values are shared slices; no body read, nothing per body byte. A throttle storm
+**6 allocations** in both build modes, the request-id, `Content-Length`, and `x-amz-retry-after`
+strings and the three single-value header slices that vary (`Content-Length`, `X-Amz-Request-Id`,
+`X-Amz-Retry-After`); `Content-Type` and small `Retry-After` values are shared slices; no body read,
+nothing per body byte. A throttle storm
 allocates less per request than a forwarded request and does none of its I/O.
 
 ### 9.3 Pre-resolved metric handles
