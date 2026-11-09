@@ -308,8 +308,8 @@ func TestThrottleLogSampled(t *testing.T) {
 	if lines != 3 {
 		t.Fatalf("9 denials with throttle_sample 3 logged %d lines:\n%s", lines, buf.String())
 	}
-	if s := buf.String(); !strings.Contains(s, `"rule":"rule-secret-name"`) || !strings.Contains(s, `"bucket":"frozen"`) || !strings.Contains(s, `"retry_after":1`) {
-		t.Fatalf("log fields:\n%s", s)
+	if s := buf.String(); !strings.Contains(s, `"rule":"rule-secret-name"`) || !strings.Contains(s, `"bucket":"frozen"`) || !strings.Contains(s, `"retry_after":1`) || strings.Contains(s, "access_key") {
+		t.Fatalf("log fields (no access key at any level, D-042):\n%s", s)
 	}
 	// At info nothing is logged for a denial.
 	info := &syncBuf{}

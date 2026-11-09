@@ -175,9 +175,11 @@ func (h *Handler) throttle(w http.ResponseWriter, r *http.Request, o *outcome, d
 	o.status = errorTable[code].status
 	if h.Log != nil && h.Log.Enabled(r.Context(), slog.LevelDebug) {
 		if n := h.throttleSeq.Add(1); cfg.Logging.ThrottleSample <= 1 || n%uint64(cfg.Logging.ThrottleSample) == 1 {
+			// No access key here, even at debug: it comes from the Authorization header, and the
+			// place to see who is throttled is rules top (D-042).
 			h.Log.Debug("throttled", "rule", o.rule, "operation", o.id.Op.String(), "op_class", o.id.Class.String(),
 				"status", o.status, "retry_after", d.RetryAfter, "request_id", rid,
-				"access_key", o.id.AccessKey, "bucket", o.id.Bucket, "source_ip", o.id.SourceIP.String())
+				"bucket", o.id.Bucket, "source_ip", o.id.SourceIP.String())
 		}
 	}
 }

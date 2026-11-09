@@ -24,7 +24,7 @@ package proxy
 
 import (
 	"encoding/xml"
-	"math/rand/v2"
+	"math/rand/v2" // nosemgrep: go.lang.security.audit.crypto.math_random.math-random-used -- request ids are opaque correlation ids, not secrets (D-041)
 	"net/http"
 	"strconv"
 	"sync"
