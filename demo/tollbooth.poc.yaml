@@ -1,0 +1,52 @@
+# tollbooth POC configuration: in front of a real S3 endpoint (a VAST cluster, Garage, versitygw, …).
+# Copy to /etc/tollbooth/tollbooth.yaml, fill the three @FIELDS@, then:
+#   tollbooth check-config /etc/tollbooth/tollbooth.yaml
+#   systemctl enable --now tollbooth           (deploy/tollbooth.service)
+# Point clients at this host's :8443 instead of the S3 endpoint. Nothing else changes for them:
+# the proxy adds no headers and rewrites nothing. docs/OPERATIONS.md §1 and §2 have the detail.
+
+node_id: @NODE_ID@                    # e.g. tb-a01; stable across restarts, appears in showback files
+base_domains: []                      # set to [s3.customer.example] if clients use bucket.s3.customer.example
+
+listen:
+  address: ":8443"
+  tls:
+    cert: ""                          # set both for TLS termination; empty = plaintext
+    key: ""
+
+backend:
+  scheme: https                       # or http
+  endpoints:                          # every S3 VIP of the cluster, round-robin with health checks
+    - @S3_ENDPOINT_1@
+    - @S3_ENDPOINT_2@
+  tls:
+    ca_bundle: ""                     # the cluster's CA, or empty for the system roots
+    insecure_skip_verify: false
+
+rate_limits:
+  default_on_limit: slowdown
+  rules:
+    # Start with observation only (no rules) if the POC is about showback; add rules one at a time.
+    # Each rule is one line of intent; `tollbooth rules test` answers "what would happen to this request".
+    - id: per-key-reads
+      match: {ops: [READ]}
+      group_by: [access_key]
+      limit: {rate: 2000, burst: 4000}
+    - id: list-storm-per-client
+      match: {ops: [LIST]}
+      group_by: [source_ip]
+      limit: {rate: 50, burst: 200}
+      on_limit: too_many_requests
+
+showback:
+  dir: /var/lib/tollbooth/showback    # persistent: one NDJSON file per hour per node
+  flush_interval: 60s
+  dimensions: [access_key, bucket, prefix, operation, status_class]
+  # prefixes: {training-data: [ckpt/, logs/]}   # optional per-bucket prefix roll-up
+
+admin:
+  address: 127.0.0.1:9900             # management network only; `tollbooth tui` and the CLI talk to it
+  token_file: /etc/tollbooth/admin.token
+
+logging:
+  level: info
