@@ -4,12 +4,12 @@ Every admin route has a CLI verb and a TUI screen; a test over the admin route t
 registered route is missing from this file (test plan category 12). Both the CLI and the TUI go
 through `internal/admin`'s client, so parity is structural. Neither writes the config file.
 
-Phase 2 state: `/healthz`, `/readyz`, `/metrics`, `/debug/pprof/`, `POST /admin/reload`,
-`GET /admin/config`, `GET /admin/limits`, `GET /admin/limits/top`, and `POST /admin/limits/test` are
-served (`internal/admin`); the route table `admin.Routes` lists every planned route with its phase.
-The CLI verbs in place are `serve`, `check-config`, `version`, and the `rules` verbs; `status`,
-`config`, `backends`, `usage`, `doctor`, and `tui` exit 2 with a pointer to STATUS.md until their
-phase.
+Phase 3 state: `/healthz`, `/readyz`, `/metrics`, `/debug/pprof/`, `POST /admin/reload`,
+`GET /admin/config`, `GET /admin/limits`, `GET /admin/limits/top`, `POST /admin/limits/test`, and
+`GET /admin/usage` are served (`internal/admin`); the route table `admin.Routes` lists every planned
+route with its phase. The CLI verbs in place are `serve`, `check-config`, `version`, the `rules`
+verbs, and the `usage` verbs (`query`, `top`, `verify`); `status`, `config`, `backends`, `doctor`,
+and `tui` exit 2 with a pointer to STATUS.md until Phase 4.
 
 | Admin route | CLI verb | TUI screen (key) | Phase |
 | --- | --- | --- | --- |
@@ -21,7 +21,7 @@ phase.
 | `GET /admin/limits` | `rules list`, `rules show <id>` | Limits (`2`) | 2 |
 | `GET /admin/limits/top?n=` | `rules top [--n] [--window]` | Limits (`2`) detail pane | 2 |
 | `POST /admin/limits/test` | `rules test --access-key --bucket --key --ip --op` | Limits (`2`), key `t` | 2 (D-039) |
-| `GET /admin/usage?…` | `usage query`, `usage top` (files or this node) | Usage (`3`) | 3 |
+| `GET /admin/usage?from=&to=&group_by=&where=&format=` | `usage query`, `usage top` (files or this node; same code path) | Usage (`3`) | 3 |
 | `GET /admin/status` | `status` | Overview (`1`) | 4 |
 | `GET /admin/backends` | `backends list` | Backends (`4`) | 4 |
 | `GET /debug/pprof/*` (only with `admin.pprof: true`) | — (operator uses `go tool pprof`; documented in OPERATIONS.md) | — (exempt: diagnostic, not an operator function) | 1 |

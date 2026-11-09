@@ -1,9 +1,8 @@
 # STATUS
 
-Current phase: **2 (Rate limiting), gate passed** (Fable, 2026-11-09; `docs/reports/gate-2.md`).
-Close-out in flight: the Gate 2 fix-ups, then #15 (`p2/e2e` → `phase-2`), then #16 (`phase-2` →
-`main`), then the `phase-1` and `phase-2` tags. Phase 3 (Showback) starts on `phase-3` when Blake
-says so.
+Current phase: **3 (Showback), in progress** on `phase-3` (started 2026-11-09 on Blake's go after
+Gate 2 passed; `phase-1` and `phase-2` tagged). Branch `p3/showback`: aggregator, snapshot and
+seal, restart, NDJSON reader, query and verify, `/admin/usage`, `usage` verbs.
 
 ## Phases
 
@@ -12,7 +11,7 @@ says so.
 | 0 Design | `docs/DESIGN.md`; ADR-0001, ADR-0002 (open decisions) and ADR-0003 (TUI in one binary); shunt's op table checked against the API reference (`docs/OPERATIONS_TABLE.md`); repo scaffold, `Makefile`, CI skeleton, `THIRD_PARTY_NOTICES.md`; `docs/CONFIG.md` | Fable approves the design and ADRs; every requirement maps to a `DESIGN.md` section or an explicit deferral | **pass, 2026-11-08** (first review: pass with fixes; fixes applied; second review: pass); tagged `phase-0` |
 | 1 Passthrough | transparent proxy lifted from shunt + TLS, PROXY protocol, trusted XFF; identity; classifier; backend pool; admin health/ready/metrics; null and recording backends | byte-equivalence green; compat matrix 100% on Garage and versitygw; fuzz 1 CPU-hour clean; `-race` clean | **report written 2026-11-09**: byte-equivalence 0 diffs on Garage and versitygw; compat matrix 0 failures; fuzz 1 CPU-hour + 20 min clean; race clean; coverage 92.1% |
 | 2 Rate limiting | rules, matchers, GCRA, single pass, both modes, `Expect: 100-continue` measured, hot reload, limiter metrics, `/admin/limits`, `rules *` verbs | limiter suite green (fake clock); 10 µs p99; reload under load zero failures; SDKs complete work under 1 req/s | **report written 2026-11-09**: limiter suite 25 tests green; p99 4.7 µs at 1,000,000 keys; 20 reloads under load, slowest 0.60 ms, 0 failed; SDK completion by retry mode (D-044) |
-| 3 Showback | aggregator, snapshot and seal, NDJSON, `usage` verbs, `/admin/usage`, dimensions and cap, restart, multi-node sum | reconciliation exact; rollover tests; kill between snapshots loses ≤ `flush_interval`; verify detects a removed hour | not started |
+| 3 Showback | aggregator, snapshot and seal, NDJSON, `usage` verbs, `/admin/usage`, dimensions and cap, restart, multi-node sum | reconciliation exact; rollover tests; kill between snapshots loses ≤ `flush_interval`; verify detects a removed hour | in progress |
 | 4 Operator surface | remaining verbs, shared admin client, `/admin/status`, `/admin/limits/test`, `/admin/backends`, `tollbooth tui` | parity test; CLI goldens ×3 formats; `teatest` goldens; runbook tasks from the TUI and CLI alone | not started |
 | 5 Hardening and v0.1.0 | bench runs with profiles, tuning, 24 h soak, caps, `OPERATIONS.md`, systemd, container, `CHANGELOG.md`, tag | all performance targets met or ADR'd; soak flat | not started |
 | 6 Backlog | shaping, cluster limits, bandwidth, Parquet, OpenTelemetry, connection caps, rule editing, drain, web UI | each starts with an ADR | not scheduled |
