@@ -1,16 +1,18 @@
 # STATUS
 
-Current phase: **0 (Design), gate passed with fixes.** Fable's review (2026-11-08) answered all
-eight questions and named three blocking fixes; all are applied below and the branch is tagged
-`phase-0`. **Phase 1 has not started**: Fable asked to read `docs/DECISIONS.md` before it begins,
-and D-022 (MinIO frozen at its last binary release) is raised for Blake.
+Current phase: **0 (Design) passed; Phase 1 cleared to start.** Fable's second review (2026-11-08)
+graded Gate 0 **pass** after reading the report, all decisions, DESIGN.md, the op-table
+reconciliation, the ADRs, CONFIG.md, the lint and CI config, the backend script, and the deps
+ledger. Five corrections (none blocking) are folded into the design below; the Phase 0 PR from
+`phase-0` into `main` is the phase-close step. Phase 1 begins on branch `phase-1` once the PR is
+merged.
 
 ## Phases
 
 | Phase | Deliverables | Gate | State |
 | --- | --- | --- | --- |
-| 0 Design | `docs/DESIGN.md`; ADR-0001, ADR-0002 (open decisions) and ADR-0003 (TUI in one binary); shunt's op table checked against the API reference (`docs/OPERATIONS_TABLE.md`); repo scaffold, `Makefile`, CI skeleton, `THIRD_PARTY_NOTICES.md`; `docs/CONFIG.md` | Fable approves the design and ADRs; every requirement maps to a `DESIGN.md` section or an explicit deferral | **pass with fixes, 2026-11-08**; fixes applied the same day; tagged `phase-0` |
-| 1 Passthrough | transparent proxy lifted from shunt + TLS, PROXY protocol, trusted XFF; identity; classifier; backend pool; admin health/ready/metrics; null and recording backends | byte-equivalence green; compat matrix 100% on Garage, versitygw, MinIO; fuzz 1 CPU-hour clean; `-race` clean | not started |
+| 0 Design | `docs/DESIGN.md`; ADR-0001, ADR-0002 (open decisions) and ADR-0003 (TUI in one binary); shunt's op table checked against the API reference (`docs/OPERATIONS_TABLE.md`); repo scaffold, `Makefile`, CI skeleton, `THIRD_PARTY_NOTICES.md`; `docs/CONFIG.md` | Fable approves the design and ADRs; every requirement maps to a `DESIGN.md` section or an explicit deferral | **pass, 2026-11-08** (first review: pass with fixes; fixes applied; second review: pass); tagged `phase-0` |
+| 1 Passthrough | transparent proxy lifted from shunt + TLS, PROXY protocol, trusted XFF; identity; classifier; backend pool; admin health/ready/metrics; null and recording backends | byte-equivalence green; compat matrix 100% on Garage and versitygw; fuzz 1 CPU-hour clean; `-race` clean | cleared to start |
 | 2 Rate limiting | rules, matchers, GCRA, single pass, both modes, `Expect: 100-continue` measured, hot reload, limiter metrics, `/admin/limits`, `rules *` verbs | limiter suite green (fake clock); 10 µs p99; reload under load zero failures; SDKs complete work under 1 req/s | not started |
 | 3 Showback | aggregator, snapshot and seal, NDJSON, `usage` verbs, `/admin/usage`, dimensions and cap, restart, multi-node sum | reconciliation exact; rollover tests; kill between snapshots loses ≤ `flush_interval`; verify detects a removed hour | not started |
 | 4 Operator surface | remaining verbs, shared admin client, `/admin/status`, `/admin/limits/test`, `/admin/backends`, `tollbooth tui` | parity test; CLI goldens ×3 formats; `teatest` goldens; runbook tasks from the TUI and CLI alone | not started |
@@ -51,6 +53,20 @@ Fixes applied:
 Also: the seven allocations are named in `docs/DESIGN.md` §9 and `TestHandlerAllocations` will
 enforce the bound exactly (D-023); `docs/SPEC.md` wording changed to `map[key]int64`;
 `docs/CONTEXT.md` added.
+
+Corrections from the second review, carried into the design (none blocked the start):
+
+- D-006 revised: every copied chunk is flushed, so trickle responses reach the client;
+  `TestTrickleResponseReachesClient` added to the invariants.
+- D-024: copy-buffer budget decided now; `listen.max_inflight` 4,096 and
+  `proxy.copy_buffer_bytes` 128 KiB bound it at 512 MiB; `check-config` warns past half of
+  `GOMEMLIMIT`. The specification's 10,000 default is updated.
+- D-025: the showback hour is read from the clock inside `Record`.
+- D-023 refined: `TestHandlerAllocations` counts against `httptest.NewRecorder` and a fake
+  `RoundTripper`, not by differencing end-to-end runs.
+- D-019: deny ring 1,024 per rule.
+- D-022 decided: MinIO out of CI, `mc` out of the compat matrix; Garage and versitygw in CI, VAST
+  in the lab. The specification's rows are edited to match.
 
 ## ADRs
 

@@ -225,3 +225,23 @@ enforces the bound exactly (D-023).
 Re-validation after the fixes: `go vet ./...` clean on go 1.27.3; `bash -n` on both scripts; the
 CI workflow parses. Phase 1 waits on Fable reading `docs/DECISIONS.md` and on Blake's answer to
 D-022.
+
+## Gate 0 verdict (appended 2026-11-08, second review)
+
+**Pass. Phase 1 may start.** Fable read the report, all decisions, `DESIGN.md` end to end, the
+op-table reconciliation, the ADRs, `CONFIG.md`, the lint and CI config, the backend fetch script,
+and the deps ledger, and retracted the two earlier flags (the arithmetic closes; the doubted API
+names are real and linked). Corrections carried into Phase 1, all applied in this branch before
+the phase-close PR:
+
+| Correction | Applied |
+| --- | --- |
+| D-006 was a defect: flush after every copied chunk, or trickle responses stall in net/http's 4 KiB buffer | DESIGN §4.6 rewritten; `TestTrickleResponseReachesClient` added (§4.9); D-006 revised |
+| Decide the copy-buffer budget now: `max_inflight` 4,096 × `copy_buffer_bytes` 128 KiB = 512 MiB; `check-config` warns past half of `GOMEMLIMIT` | CONFIG.md defaults, example config, DESIGN §9.4, SPEC default, D-024 |
+| §6.1: derive the hour from the clock inside `Record`, not from `completedAt` | DESIGN §6.1, D-025 |
+| `TestHandlerAllocations`: count against `httptest.NewRecorder` and a fake `RoundTripper`, not by differencing | DESIGN §9, D-023 |
+| Deny ring 1,024 per rule | DESIGN §5.5, §9.4, D-019 |
+| D-022: drop MinIO from CI and `mc` from the compat matrix | `backends.sh`, CONTEXT.md, deps.md, Makefile, CI, SPEC rows, D-022 decided |
+
+The specification was edited in three places as a result: `map[key]int64` (first review), the
+in-flight default, and the compat-matrix and CI backend lists. Each edit is named in the PR.
