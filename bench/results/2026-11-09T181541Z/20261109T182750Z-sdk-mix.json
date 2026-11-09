@@ -1,0 +1,184 @@
+{
+  "mode": "sdk",
+  "options": {},
+  "environment": {
+    "cpu": "AMD EPYC 7402P 24-Core Processor",
+    "go": "go1.27.3",
+    "gogc": "",
+    "gomaxprocs": "2",
+    "gomemlimit": "",
+    "host": "sts-workshop",
+    "kernel": "Linux version 5.14.0-570.17.1.el9_6.x86_64 (mockbuild@iad1-prod-build001.bld.equ.rockylinux.org) (gcc (GCC) 11.5.0 20240719 (Red Hat 11.5.0-5), GNU ld version 2.35.2-63.el9) #1 SMP PREEMPT_DYNAMIC Fri May 23 22:47:01 UTC 2025",
+    "num_cpu": "2"
+  },
+  "runs": [
+    {
+      "target": "direct",
+      "index": 1,
+      "seconds": 30.002403392,
+      "requests": 87105,
+      "rps": 2903.2674103444037,
+      "bytes": 320606208,
+      "status": {
+        "200": 87105
+      },
+      "errors": 0,
+      "attempts": 87105,
+      "latency_us": {
+        "max": 89325.567,
+        "p50": 9322.495,
+        "p90": 22298.623,
+        "p99": 38731.775,
+        "p99.9": 58261.503
+      }
+    },
+    {
+      "target": "proxied",
+      "index": 1,
+      "seconds": 30.004090729,
+      "requests": 48202,
+      "rps": 1606.5142728491712,
+      "bytes": 177881088,
+      "status": {
+        "200": 48202
+      },
+      "errors": 0,
+      "attempts": 48202,
+      "latency_us": {
+        "max": 111017.983,
+        "p50": 18300.927,
+        "p90": 34406.399,
+        "p99": 59310.079,
+        "p99.9": 82313.215
+      }
+    },
+    {
+      "target": "direct",
+      "index": 2,
+      "seconds": 30.006671575,
+      "requests": 90002,
+      "rps": 2999.3996426776303,
+      "bytes": 332447744,
+      "status": {
+        "200": 90002
+      },
+      "errors": 0,
+      "attempts": 90002,
+      "latency_us": {
+        "max": 79429.631,
+        "p50": 8790.015,
+        "p90": 22265.855,
+        "p99": 39256.063,
+        "p99.9": 57311.231
+      }
+    },
+    {
+      "target": "proxied",
+      "index": 2,
+      "seconds": 30.002092199,
+      "requests": 45996,
+      "rps": 1533.0930821395548,
+      "bytes": 169082880,
+      "status": {
+        "200": 45996
+      },
+      "errors": 0,
+      "attempts": 45996,
+      "latency_us": {
+        "max": 185204.735,
+        "p50": 18808.831,
+        "p90": 36765.695,
+        "p99": 67633.151,
+        "p99.9": 101711.871
+      }
+    },
+    {
+      "target": "direct",
+      "index": 3,
+      "seconds": 30.019224778,
+      "requests": 89057,
+      "rps": 2966.665550446414,
+      "bytes": 328994816,
+      "status": {
+        "200": 89057
+      },
+      "errors": 0,
+      "attempts": 89057,
+      "latency_us": {
+        "max": 85786.623,
+        "p50": 9093.119,
+        "p90": 21970.943,
+        "p99": 37748.735,
+        "p99.9": 54231.039
+      }
+    },
+    {
+      "target": "proxied",
+      "index": 3,
+      "seconds": 30.00806789,
+      "requests": 47795,
+      "rps": 1592.7383320779338,
+      "bytes": 175919104,
+      "status": {
+        "200": 47795
+      },
+      "errors": 0,
+      "attempts": 47795,
+      "latency_us": {
+        "max": 141819.903,
+        "p50": 18268.159,
+        "p90": 35061.759,
+        "p99": 63012.863,
+        "p99.9": 96206.847
+      }
+    }
+  ],
+  "median": {
+    "direct": {
+      "target": "direct",
+      "index": 3,
+      "seconds": 30.019224778,
+      "requests": 89057,
+      "rps": 2966.665550446414,
+      "bytes": 328994816,
+      "status": {
+        "200": 89057
+      },
+      "errors": 0,
+      "attempts": 89057,
+      "latency_us": {
+        "max": 85786.623,
+        "p50": 9093.119,
+        "p90": 21970.943,
+        "p99": 37748.735,
+        "p99.9": 54231.039
+      }
+    },
+    "proxied": {
+      "target": "proxied",
+      "index": 1,
+      "seconds": 30.004090729,
+      "requests": 48202,
+      "rps": 1606.5142728491712,
+      "bytes": 177881088,
+      "status": {
+        "200": 48202
+      },
+      "errors": 0,
+      "attempts": 48202,
+      "latency_us": {
+        "max": 111017.983,
+        "p50": 18300.927,
+        "p90": 34406.399,
+        "p99": 59310.079,
+        "p99.9": 82313.215
+      }
+    }
+  },
+  "added_latency_us": {
+    "p50": 9207.807999999999,
+    "p90": 12435.455999999998,
+    "p99": 21561.343999999997,
+    "p99.9": 28082.176
+  }
+}
