@@ -45,14 +45,18 @@ import (
 	"github.com/blakegolliher/tollbooth/internal/config"
 	"github.com/blakegolliher/tollbooth/internal/limiter"
 	"github.com/blakegolliher/tollbooth/internal/proxy"
+	"github.com/blakegolliher/tollbooth/internal/showback"
 )
 
 // rig is the proxy in-process in front of one null backend, with the rules of a YAML tail.
 type rig struct {
-	nb      *nullbackend.Server
-	front   *httptest.Server
-	lim     *limiter.Limiter
-	metrics *admin.Metrics
+	nb        *nullbackend.Server
+	front     *httptest.Server
+	lim       *limiter.Limiter
+	beURL     string
+	sb        *showback.Aggregator
+	published *atomic.Pointer[config.Config]
+	metrics   *admin.Metrics
 	// accepted counts TCP connections the proxy accepted, for the reconnect-cost measurement.
 	accepted atomic.Int64
 }
@@ -62,13 +66,18 @@ func start(t *testing.T, tail string) *rig {
 	r := &rig{nb: nullbackend.New(4096)}
 	be := httptest.NewServer(r.nb)
 	t.Cleanup(be.Close)
-	y := "node_id: e2e\nbackend: {scheme: http, endpoints: [" + strings.TrimPrefix(be.URL, "http://") + "]}\nshowback: {dir: /tmp/tb-e2e}\n" + tail
+	r.beURL = be.URL
+	y := "node_id: e2e\nbackend: {scheme: http, endpoints: [" + strings.TrimPrefix(be.URL, "http://") + "]}\n" + tail
+	if !strings.Contains(tail, "showback:") {
+		y += "showback: {dir: /tmp/tb-e2e}\n"
+	}
 	c, err := config.Parse([]byte(y))
 	if err != nil {
 		t.Fatal(err)
 	}
 	published := &atomic.Pointer[config.Config]{}
 	published.Store(c)
+	r.published = published
 	r.metrics = admin.NewMetrics()
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
 	pool, err := proxy.NewPool(&c.Backend, r.metrics, log)
@@ -79,7 +88,8 @@ func start(t *testing.T, tail string) *rig {
 	if err := r.lim.Apply(c); err != nil {
 		t.Fatal(err)
 	}
-	h := proxy.New(published, pool, r.metrics, r.lim, nil, log)
+	r.sb = showback.NewAggregator(c, &r.metrics.Showback)
+	h := proxy.New(published, pool, r.metrics, r.lim, r.sb, nil, log)
 	r.front = httptest.NewUnstartedServer(h)
 	r.front.Config = proxy.NewServer(h, &c.Listen, r.metrics, log)
 	r.front.Listener = &countingListener{Listener: r.front.Listener, n: &r.accepted}
