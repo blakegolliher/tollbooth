@@ -73,6 +73,34 @@ jobs:
         with:
           sarif_file: semgrep.sarif
 
+  release:
+    # The release artifacts and the container image build on every PR, so a broken Dockerfile or
+    # unit file is caught before a tag. Nothing is published from CI; tags are cut by hand.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: release artifacts
+        run: make release
+      - name: systemd unit verifies
+        # The unit names /usr/local/bin/tollbooth; verify it against the binary just built so a
+        # typo in a directive or a missing executable fails the job instead of being swallowed.
+        run: |
+          make build
+          mkdir -p run/unit
+          sed "s#/usr/local/bin/tollbooth#$PWD/bin/tollbooth#g" deploy/tollbooth.service > run/unit/tollbooth.service
+          systemd-analyze verify --man=no run/unit/tollbooth.service
+      - name: container image
+        run: make image
+      - uses: actions/upload-artifact@v7
+        with:
+          name: dist
+          path: dist/
+          if-no-files-found: error
+
   integration:
     # Backends are pinned static binaries (Garage, versitygw) fetched and verified by
     # test/integration/backends.sh; no container runtime. MinIO is not used (D-022). Phase 1 adds the
