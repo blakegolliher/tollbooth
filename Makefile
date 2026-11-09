@@ -55,10 +55,16 @@ test: ## unit tests, full output in run/test.log
 	@mkdir -p $(RUN)
 	$(GO) test $(PKGS) > $(RUN)/test.log 2>&1; rc=$$?; cat $(RUN)/test.log; exit $$rc
 
-race: ## unit tests under the race detector with coverage, full output in run/race.log
+# Coverage counts statements in the product packages (internal/ and cmd/) from every test in the
+# tree, so a package exercised through another's tests (bench/nullbackend by internal/proxy) is
+# credited where it runs. Test and bench tooling (test/, bench/) is not part of the floor.
+COVERPKG := ./internal/...,./cmd/...
+race: ## unit tests under the race detector with coverage (85% floor over internal/ and cmd/), full output in run/race.log
 	@mkdir -p $(RUN)
-	$(GO) test -race -count=1 -coverprofile=$(RUN)/cover.out $(PKGS) > $(RUN)/race.log 2>&1; rc=$$?; cat $(RUN)/race.log; \
-	  $(GO) tool cover -func=$(RUN)/cover.out > $(RUN)/cover.txt 2>&1; tail -1 $(RUN)/cover.txt; exit $$rc
+	$(GO) test -race -count=1 -coverpkg=$(COVERPKG) -coverprofile=$(RUN)/cover.out $(PKGS) > $(RUN)/race.log 2>&1; rc=$$?; cat $(RUN)/race.log; \
+	  $(GO) tool cover -func=$(RUN)/cover.out > $(RUN)/cover.txt 2>&1; tail -1 $(RUN)/cover.txt; \
+	  pct=$$(tail -1 $(RUN)/cover.txt | awk '{print $$NF}' | tr -d '%'); \
+	  awk -v p="$$pct" 'BEGIN { if (p+0 < 85) { print "coverage " p "% is below the 85% floor (docs/SPEC.md, Test plan)"; exit 1 } }' || rc=1; exit $$rc
 
 # Runs every Fuzz* function in the tree for FUZZ_TIME each. The corpus under testdata/fuzz is committed.
 fuzz: ## run every fuzz target for FUZZ_TIME (default 60s), full output in run/fuzz.log

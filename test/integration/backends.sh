@@ -33,20 +33,29 @@ fetch_verified() { # url sha256 dest
   local code rc
   code=$(curl -sfL --retry 8 --retry-delay 5 --retry-all-errors --max-time 600 -o "$tmp" -w '%{http_code}' "$url") || rc=$?
   if [ "${rc:-0}" -ne 0 ]; then
-    echo "backends: download failed (curl exit $rc, last HTTP status ${code:-none}): $url" >&2; rm -f "$tmp"; exit 1
+    echo "backends: download failed (curl exit $rc, last HTTP status ${code:-none}): $url" >&2; rm -f "$tmp"; return 1
   fi
-  echo "$sha  $tmp" | sha256sum -c --quiet - || { rm -f "$tmp"; echo "backends: checksum mismatch for $url" >&2; exit 1; }
+  echo "$sha  $tmp" | sha256sum -c --quiet - || { rm -f "$tmp"; echo "backends: checksum mismatch for $url" >&2; return 1; }
   mv "$tmp" "$dest"
 }
 
 fetch() {
   if [ ! -x "$BIN/garage" ]; then
-    fetch_verified "$GARAGE_URL" "$GARAGE_SHA256" "$BIN/garage"; chmod +x "$BIN/garage"
+    fetch_verified "$GARAGE_URL" "$GARAGE_SHA256" "$BIN/garage" || exit 1 # Garage has no second source
+    chmod +x "$BIN/garage"
   fi
   if [ ! -x "$BIN/versitygw" ]; then
-    fetch_verified "$VERSITYGW_URL" "$VERSITYGW_SHA256" "$BIN/versitygw.tar.gz"
-    tar -xzf "$BIN/versitygw.tar.gz" -C "$BIN" --strip-components=1 "versitygw_${VERSITYGW_VERSION}_Linux_x86_64/versitygw"
-    rm -f "$BIN/versitygw.tar.gz"
+    # GitHub's release CDN returns 504s for minutes at a time (seen three times on 2026-11-09).
+    # When the pinned tarball cannot be fetched, build the same tag from source through the Go
+    # module proxy, which the checksum database verifies; the binary differs byte-wise from the
+    # release but is the same code (versitygw is Apache-2.0).
+    if (set +e; fetch_verified "$VERSITYGW_URL" "$VERSITYGW_SHA256" "$BIN/versitygw.tar.gz"); then
+      tar -xzf "$BIN/versitygw.tar.gz" -C "$BIN" --strip-components=1 "versitygw_${VERSITYGW_VERSION}_Linux_x86_64/versitygw"
+      rm -f "$BIN/versitygw.tar.gz"
+    else
+      echo "backends: versitygw release download failed; building ${VERSITYGW_VERSION} from source with go install" >&2
+      GOTOOLCHAIN=auto GOFLAGS=-mod=mod GOBIN="$BIN" go install "github.com/versity/versitygw@${VERSITYGW_VERSION}"
+    fi
   fi
   echo "backends: garage ${GARAGE_VERSION}, versitygw ${VERSITYGW_VERSION} in $BIN"
 }

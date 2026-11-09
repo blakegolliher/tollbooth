@@ -815,22 +815,29 @@ func TestBackendAnswersBeforeReadingBody(t *testing.T) {
 		_, _ = w.Write([]byte(`<Error><Code>AccessDenied</Code></Error>`))
 	}), time.Second)
 	body := bytes.Repeat([]byte("p"), 8<<20)
+	outcomes := map[string]int{}
 	for i := 0; i < 3; i++ {
 		req, _ := http.NewRequest(http.MethodPut, r.front.URL+"/b/k", bytes.NewReader(body))
 		start := time.Now()
 		resp, err := fresh().Do(req)
-		if err != nil {
-			t.Fatalf("attempt %d: %v", i, err)
-		}
-		io.Copy(io.Discard, resp.Body) //nolint:errcheck // test
-		resp.Body.Close()              //nolint:errcheck // test
-		if resp.StatusCode != http.StatusForbidden && resp.StatusCode != http.StatusServiceUnavailable {
+		switch {
+		case err != nil:
+			// The same race one hop earlier: the proxy answered and closed while the client was
+			// still writing, and the client's transport reported the write error instead of the
+			// response, exactly as it would against a backend that closes early.
+			outcomes["transport error"]++
+		case resp.StatusCode == http.StatusForbidden || resp.StatusCode == http.StatusServiceUnavailable:
+			outcomes[resp.Status]++
+			io.Copy(io.Discard, resp.Body) //nolint:errcheck // test
+			resp.Body.Close()              //nolint:errcheck // test
+		default:
 			t.Fatalf("attempt %d: status %d", i, resp.StatusCode)
 		}
 		if d := time.Since(start); d > 5*time.Second {
 			t.Fatalf("attempt %d took %v", i, d)
 		}
 	}
+	t.Logf("without Expect: %v", outcomes)
 	// With Expect: 100-continue the 403 arrives before any body byte and is relayed every time.
 	for i := 0; i < 3; i++ {
 		req, _ := http.NewRequest(http.MethodPut, r.front.URL+"/b/k", bytes.NewReader(body))

@@ -21,7 +21,9 @@ S5CMD_URL="https://github.com/peak/s5cmd/releases/download/v${S5CMD_VERSION}/s5c
 S5CMD_SHA256=de0fdbfa3aceae55e069ba81a0fc17b2026567637603734a387b2fca06c299b4
 
 RCLONE_VERSION=v1.76.0
-RCLONE_URL="https://github.com/rclone/rclone/releases/download/${RCLONE_VERSION}/rclone-${RCLONE_VERSION}-linux-amd64.zip"
+# rclone's own download host first; GitHub's release CDN is the fallback (it 504s intermittently).
+RCLONE_URL="https://downloads.rclone.org/${RCLONE_VERSION}/rclone-${RCLONE_VERSION}-linux-amd64.zip"
+RCLONE_URL2="https://github.com/rclone/rclone/releases/download/${RCLONE_VERSION}/rclone-${RCLONE_VERSION}-linux-amd64.zip"
 RCLONE_SHA256=b00f00b3266c3764413afe599d3ec316f6f43b3e0ea8a0bc1d186d2133e46df7
 
 ELBENCHO_VERSION=v3.3-3
@@ -53,10 +55,14 @@ fetch() {
   if [ ! -x "$BIN/s5cmd" ]; then
     if fetch_verified "$S5CMD_URL" "$S5CMD_SHA256" "$BIN/s5cmd.tar.gz"; then
       tar -xzf "$BIN/s5cmd.tar.gz" -C "$BIN" s5cmd && rm -f "$BIN/s5cmd.tar.gz"
-    else missing=1; fi
+    else
+      # Same tag from source through the module proxy when the release CDN is down (s5cmd is MIT).
+      echo "clients: s5cmd release download failed; building ${S5CMD_VERSION} from source" >&2
+      GOTOOLCHAIN=auto GOFLAGS=-mod=mod GOBIN="$BIN" go install "github.com/peak/s5cmd/v2@v${S5CMD_VERSION}" || missing=1
+    fi
   fi
   if [ ! -x "$BIN/rclone" ]; then
-    if fetch_verified "$RCLONE_URL" "$RCLONE_SHA256" "$BIN/rclone.zip"; then
+    if fetch_verified "$RCLONE_URL" "$RCLONE_SHA256" "$BIN/rclone.zip" || fetch_verified "$RCLONE_URL2" "$RCLONE_SHA256" "$BIN/rclone.zip"; then
       unzip -q -o -j "$BIN/rclone.zip" "rclone-${RCLONE_VERSION}-linux-amd64/rclone" -d "$BIN" && rm -f "$BIN/rclone.zip"
       chmod +x "$BIN/rclone"
     else missing=1; fi
