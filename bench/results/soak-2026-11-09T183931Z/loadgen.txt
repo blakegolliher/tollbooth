@@ -1,0 +1,5 @@
+run 1/1 proxied measuring 24h0m0s … 69465616 requests, 804 req/s, p50 2466 µs, p99 31965 µs, p99.9 55181 µs, errors 7304, attempts 69481672, throttled 0
+
+median        req/s     p50 µs     p90 µs     p99 µs   p99.9 µs     max µs   errors   attempts  throttled
+proxied         804       2466      12378      31965      55181   15057551     7304   69481672          0
+wrote bench/results/soak-2026-11-09T183931Z/20261110T184001Z-sdk-soak.json

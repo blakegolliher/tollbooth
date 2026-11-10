@@ -1,0 +1,3 @@
+make[1]: Entering directory '/tmp/claude-31337/-home-vastdata-projects-tollbooth/5617172b-9a56-474f-812e-295b803df285/scratchpad/wt-soak'
+go build -trimpath -ldflags '-s -w -X main.version=phase-4-74-gcca1c4b-dirty -X main.commit=cca1c4b -X main.date=2026-11-10T18:54:52Z' -o /tmp/claude-31337/-home-vastdata-projects-tollbooth/5617172b-9a56-474f-812e-295b803df285/scratchpad/wt-soak/bin/tollbooth ./cmd/tollbooth
+make[1]: Leaving directory '/tmp/claude-31337/-home-vastdata-projects-tollbooth/5617172b-9a56-474f-812e-295b803df285/scratchpad/wt-soak'

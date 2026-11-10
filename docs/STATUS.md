@@ -1,8 +1,9 @@
 # STATUS
 
-Current phase: **5 (Hardening and v0.1.0), in progress** on `phase-5` (started 2026-11-09 on
-Blake's go after Gate 4 passed; `phase-4` tagged and in `main`). Branch `p5/release`: systemd unit,
-container image, `make release`, `CHANGELOG.md`, the soak harness, the runbook, ADR-0005.
+Current phase: **5 (Hardening and v0.1.0), at its gate** on `phase-5` (started 2026-11-09 on
+Blake's go after Gate 4 passed; `phase-4` tagged and in `main`). PRs #24 and #26 to #35 are merged;
+`p5/soak` (PR #25) carries the 24 h soak's results and the final `docs/reports/gate-5.md`. Stopped
+at Gate 5: the tag and Phase 6 wait for Blake.
 
 ## Phases
 
@@ -13,12 +14,13 @@ container image, `make release`, `CHANGELOG.md`, the soak harness, the runbook, 
 | 2 Rate limiting | rules, matchers, GCRA, single pass, both modes, `Expect: 100-continue` measured, hot reload, limiter metrics, `/admin/limits`, `rules *` verbs | limiter suite green (fake clock); 10 µs p99; reload under load zero failures; SDKs complete work under 1 req/s | **report written 2026-11-09**: limiter suite 25 tests green; p99 4.7 µs at 1,000,000 keys; 20 reloads under load, slowest 0.60 ms, 0 failed; SDK completion by retry mode (D-044) |
 | 3 Showback | aggregator, snapshot and seal, NDJSON, `usage` verbs, `/admin/usage`, dimensions and cap, restart, multi-node sum | reconciliation exact; rollover tests; kill between snapshots loses ≤ `flush_interval`; verify detects a removed hour | **report written 2026-11-09**: reconciliation exact; 19 clock-injected tests green; Record 198 ns, 0 allocs; 257 B per tuple |
 | 4 Operator surface | remaining verbs, shared admin client, `/admin/status`, `/admin/limits/test`, `/admin/backends`, `tollbooth tui` | parity test; CLI goldens ×3 formats; `teatest` goldens; runbook tasks from the TUI and CLI alone | **report written 2026-11-09**: parity test green; 38 CLI goldens ×3 formats; 30 TUI frames at 80×24 and 120×40; two runbook tasks |
-| 5 Hardening and v0.1.0 | bench runs with profiles, tuning, 24 h soak, caps, `OPERATIONS.md`, systemd, container, `CHANGELOG.md`, tag | all performance targets met or ADR'd; soak flat | in progress |
+| 5 Hardening and v0.1.0 | bench runs with profiles, tuning, 24 h soak, caps, `OPERATIONS.md`, systemd, container, `CHANGELOG.md`, tag | all performance targets met or ADR'd; soak flat | **report written 2026-11-10**: soak 24 h, 69.5 M requests, memory flat, 0 unexplained errors; four end-to-end performance rows unverified without the reference node (ADR-0005); gate pending |
 | 6 Backlog | shaping, cluster limits, bandwidth, Parquet, OpenTelemetry, connection caps, drain, web UI, observe-only rules, live per-key rates (rule editing moved to Phase 5: ADR-0006, ADR-0007) | each starts with an ADR | not scheduled |
 
 ## Phase 5 record (in progress)
 
-Shipped so far (PR #24, `p5/release` → `phase-5`): `deploy/tollbooth.service`, `deploy/Dockerfile`
+Shipped (PR #24, `p5/release` → `phase-5`, merged 2026-11-09; the soak results and the final report
+follow on `p5/soak`): `deploy/tollbooth.service`, `deploy/Dockerfile`
 and `.dockerignore`, `make release` and `make image`, the CI `release` job (artifacts, unit verify,
 image), `CHANGELOG.md`, the null backend's fault-injection listener, `loadgen -rate`, the soak
 harness (`make soak`, D-056), `bench/crosscheck.sh` (elbencho, ADR-0005), the full
@@ -49,11 +51,17 @@ failed the client throttling stage: `test/integration/throttle.sh` still read `i
 versitygw binaries and so had not run on the dev box. Fixed, and the script was then run locally
 against the null backend (aws cli rows: 68 denials in default retry mode, 6 in adaptive).
 
-Running: the 24 h soak, started 2026-11-09T18:40Z at 804 req/s (half of the calibrated 1,608 req/s
-peak at concurrency 16), chaos every 10 min, under `bench/results/soak-2026-11-09T183931Z/`; it
-ends 2026-11-10T18:40Z and its report fills in gate-5.md §3 row 9 and §4's memory row.
+The 24 h soak ended 2026-11-10T18:40Z: 24.00 h at 804 req/s (half of the calibrated 1,608 req/s
+peak at concurrency 16), 69,520,214 requests, 141 fault steps, RSS 27 to 37 MiB with a slope of
+−0.19 MiB/h over the second half, 0 error events outside a fault window, p50 2.5 ms and p99 32 ms
+through the proxy on the shared box (`bench/results/soak-2026-11-09T183931Z/`). It ran the build
+of PR #24; the final build passes the six-minute soak smoke (246,314 requests, 12 fault steps, 0
+unexplained errors). G2 on the final build: all ten steps exit 0, race coverage 89.8%, fuzz 6 × 60
+s clean, s3diff 293 cases 0 diffs.
 
-Pending Blake: ADR-0005 (what v0.1.0 claims; stay on Go; elbencho as cross-check) and the tag.
+Pending Blake: the eight questions of `docs/reports/gate-5.md` §6: ADR-0005 (what v0.1.0 claims;
+stay on Go; elbencho as cross-check), who tags, the dev-box soak and whether to rerun it on the
+final build, the specification amendments, and the resolver finding.
 Cut: nothing; the reference-node measurements are deferred, not cut (ADR-0005).
 
 Findings: the first soak smoke was voided by a stale null backend from an interrupted `bench/run.sh`
@@ -66,7 +74,7 @@ cases 0 diffs; bench raw 4 KiB GET direct 7,065 versus proxied 2,243 req/s at co
 (contention, ADR-0005); soak smoke 223,770 requests, 11 chaos steps, 0 unexplained errors, RSS 23
 to 34 MiB.
 
-Gate result: pending (report draft written 2026-11-09; final after the soak).
+Gate result: pending (final report written 2026-11-10; Blake decides).
 
 ## Phase 4 record
 

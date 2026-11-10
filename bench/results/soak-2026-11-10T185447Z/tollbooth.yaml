@@ -1,0 +1,17 @@
+node_id: soak
+listen: {address: 127.0.0.1:18000}
+admin: {address: 127.0.0.1:19900, pprof: true}
+backend:
+  scheme: http
+  endpoints: [127.0.0.1:19000]
+  health_check: {interval: 1s, timeout: 500ms}
+showback: {dir: /tmp/claude-31337/-home-vastdata-projects-tollbooth/5617172b-9a56-474f-812e-295b803df285/scratchpad/wt-soak/bench/results/soak-2026-11-10T185447Z/showback, flush_interval: 60s}
+logging: {level: warn}
+limits:
+  - name: wide-read
+    operation: [GetObject, HeadObject]
+    limit_per_second: 500021479
+    per: [access_key, bucket]
+  - name: frozen
+    bucket: load-frozen-0
+    blocked: true

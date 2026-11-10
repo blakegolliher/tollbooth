@@ -1,0 +1,5 @@
+run 1/1 proxied measuring 6m0s … 231851 requests, 638 req/s, p50 3811 µs, p99 24773 µs, p99.9 2300576 µs, errors 290, attempts 232481, throttled 0
+
+median        req/s     p50 µs     p90 µs     p99 µs   p99.9 µs     max µs   errors   attempts  throttled
+proxied         638       3811      11387      24773    2300576   19293798      290     232481          0
+wrote /tmp/claude-31337/-home-vastdata-projects-tollbooth/5617172b-9a56-474f-812e-295b803df285/scratchpad/wt-soak/bench/results/soak-2026-11-10T185447Z/20261110T190108Z-sdk-soak.json

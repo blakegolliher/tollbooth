@@ -1,0 +1,8 @@
+{
+  "ok": false,
+  "error": "bogus: unknown key",
+  "at": "2026-11-10T11:57:13.258993686-07:00",
+  "generation": 1,
+  "rules": 0,
+  "duration_ms": 0.316488
+}

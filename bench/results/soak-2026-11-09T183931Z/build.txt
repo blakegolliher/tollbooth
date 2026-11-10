@@ -1,0 +1,1 @@
+go build -trimpath -ldflags '-s -w -X main.version=phase-4-16-g40264aa -X main.commit=40264aa -X main.date=2026-11-09T18:39:34Z' -o /home/vastdata/projects/tollbooth/bin/tollbooth ./cmd/tollbooth

@@ -312,6 +312,7 @@ The proxy fails open and never fails closed; there is no knob for the other way.
 | All backends unreachable | `503 ServiceUnavailable` with the S3 body; SDKs retry | `backend_up` all 0, `requests_total{result="error"}` |
 | One backend down | routed around; a dial or TLS failure before any request byte is retried on another endpoint | `backend_up{endpoint}` 0, `backend_retries_total` |
 | Backend slow to answer | the request waits up to `backend.response_header_timeout` (300 s, a long list is legitimate) | `backend_ttfb_seconds` tail |
+| The resolver stops answering, endpoints given by name | the health probe resolves the name on every check, fails, and marks the endpoint down, so `/readyz` reports not ready; requests keep being served on the backend connections already open (observed 2026-11-10: 100 req/s, 0 errors, for the length of a DNS outage), and one that needs a new connection needs the resolver too | `backend_up` 0 and `backends list` showing `lookup …: i/o timeout` while `requests_total` still counts 2xx. Where a load balancer acts on `/readyz`, list `backend.endpoints` by address |
 | Backend resets mid-download | the client connection is closed (the response was partially written); bytes actually sent are charged | `backend_errors_total{kind="reset"}` |
 | Client disconnects mid-upload | the backend request is cancelled; bytes read are charged | `bytes_total{direction="in"}` |
 | Limiter fault | fail open, forward | `limiter_errors_total` |
