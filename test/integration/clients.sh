@@ -79,8 +79,28 @@ fetch() {
     else missing=1; fi
   fi
   if [ ! -x "$VENV/bin/python" ] || ! "$VENV/bin/python" -c "import boto3, awscrt" 2>/dev/null; then
-    # botocore[crt] brings the CRC32C and CRC64NVME implementations boto3 needs for the checksum leg.
-    if python3 -m venv "$VENV" && "$VENV/bin/pip" install -q "boto3==$BOTO3_VERSION" "botocore[crt]" "s3cmd==$S3CMD_VERSION"; then :; else missing=1; fi
+    # The pinned boto3 needs Python 3.10 or newer. A host's `python3` can be older (RHEL 9's is
+    # 3.9, where pip answers with every version it does know, several screens of them). `python3`
+    # builds the environment when it is new enough, as it always has in CI; otherwise the newest
+    # other interpreter on the PATH that is, and an environment built by an older interpreter is
+    # rebuilt. pip's own output goes to a log; the outcome is one line.
+    local py="" cand
+    for cand in python3 python3.13 python3.12 python3.11 python3.10; do
+      if command -v "$cand" >/dev/null && "$cand" -c 'import sys; sys.exit(0 if sys.version_info >= (3, 10) else 1)' 2>/dev/null; then py=$cand; break; fi
+    done
+    if [ -z "$py" ]; then
+      echo "clients: boto3 $BOTO3_VERSION and s3cmd need Python 3.10 or newer; this host has only $(python3 --version 2>&1). Install one (for example python3.12) and run again; until then the boto3 and s3cmd cells fail as not installed" >&2
+      missing=1
+    else
+      rm -rf "$VENV"
+      # botocore[crt] brings the CRC32C and CRC64NVME implementations boto3 needs for the checksum leg.
+      if "$py" -m venv "$VENV" && "$VENV/bin/pip" install -q --disable-pip-version-check "boto3==$BOTO3_VERSION" "botocore[crt]" "s3cmd==$S3CMD_VERSION" > "$HERE/.venv-install.log" 2>&1; then
+        echo "clients: python environment built with $("$VENV/bin/python" --version 2>&1)"
+      else
+        echo "clients: installing boto3 $BOTO3_VERSION and s3cmd $S3CMD_VERSION with $py failed: $(tail -1 "$HERE/.venv-install.log" | cut -c1-200) (full output in $HERE/.venv-install.log)" >&2
+        missing=1
+      fi
+    fi
   fi
   command -v aws >/dev/null || { echo "clients: aws cli v2 is expected on the runner image" >&2; missing=1; }
   echo "clients: aws $(aws --version 2>&1 | cut -d' ' -f1), boto3 $BOTO3_VERSION, s3cmd $S3CMD_VERSION, s5cmd $S5CMD_VERSION, rclone $RCLONE_VERSION, elbencho $ELBENCHO_VERSION (missing=$missing)"
