@@ -2,8 +2,9 @@
 
 Current phase: **5 (Hardening and v0.1.0), closing its gate** on `phase-5` (started 2026-11-09 on
 Blake's go after Gate 4 passed; `phase-4` tagged and in `main`). PRs #24 and #26 to #35 are merged;
-the final `docs/reports/gate-5.md` is in. Blake answered its questions on 2026-11-10; three items
-remain before the v0.1.0 tag (below), then the tag, then Phase 6 on his word.
+the final `docs/reports/gate-5.md` is in. Blake answered its questions on 2026-11-10 and the three
+things he asked for before the v0.1.0 tag are done (below). Next: his merge of `phase-5` into
+`main`, the tag, then Phase 6 on his word.
 
 ## Phases
 
@@ -86,9 +87,14 @@ cases 0 diffs; bench raw 4 KiB GET direct 7,065 versus proxied 2,243 req/s at co
 (contention, ADR-0005); soak smoke 223,770 requests, 11 chaos steps, 0 unexplained errors, RSS 23
 to 34 MiB.
 
-Gate result: **pass on three conditions** (Blake, 2026-11-10), all before the tag: the
-health-check fix with its ADR, the VAST client matrix, the benchmark-gate correction. Phase 6
-starts after them and the tag, on Blake's word, one ADR per item.
+Gate result: **pass; the three conditions are met** (Blake's answers, 2026-11-10): the resolver
+fix (ADR-0008, PR #37), the benchmark-gate correction (D-063, PR #37), and the client matrix
+against a VAST cluster (PRs #36, #38, #40; `docs/COMPAT-vast.md`: byte-equivalence 184 cases with 0
+diffs, 48 client cells with 43 passing, 0 failures, and 5 gaps that are the cluster's own). That
+run also moved the health probe's default timeout from 2 s to 5 s (D-064, PR #39): VAST answers
+the unsigned probe after 2.0 s. Remaining before the tag: Blake merges `phase-5` into `main` and
+says so; then the changelog's 0.1.0 entry and the `phase-5` and `v0.1.0` tags. Phase 6 starts
+after that, on Blake's word, one ADR per item.
 
 ## Phase 4 record
 
