@@ -14,3 +14,4 @@
 /test/integration/.venv/
 /bench/results/*/showback/
 /demo/state/
+__pycache__/
