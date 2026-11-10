@@ -45,9 +45,10 @@ go build -o bin/loadgen ./bench/loadgen
 } > "$OUT/env.txt"
 cat "$OUT/env.txt"
 
-# Config: RULES rules on the READ class list that never match the load (distinct buckets), one
-# wide READ rule keyed by access key, bucket, and prefix with a rate the load cannot reach, and
-# one throttle rule on bucket load-throttle for the throttle scenario.
+# Config: RULES rules that name the load's operations but never match it (distinct buckets), so
+# every request walks them; one wide GetObject and HeadObject rule counted per access key and
+# bucket with a limit the load cannot reach; and one throttle rule on bucket load-throttle for the
+# throttle scenario.
 CFG=$OUT/tollbooth.yaml
 {
   cat <<YAML
