@@ -114,7 +114,9 @@ ok ok ok ok ok ok ok ok
 $ export AWS_RETRY_MODE=standard AWS_MAX_ATTEMPTS=1
 ```
 
-Say: nothing is dropped; the client slows to the rate it was given. The limiter decision costs
+Say: these eight complete, because the client's own retries absorb the SlowDown. A client that
+stays far above its limit eventually gets SlowDown back from its SDK; which tools and retry modes
+cope, and at what overload, is measured in `docs/OPERATIONS.md` §9. The limiter decision costs
 under 5 µs at a million live keys; it adds no latency a client can measure.
 
 Who is being throttled, right now:
@@ -294,19 +296,27 @@ s3 ls s3://$LOAD_BUCKET/                            # real listing, through the 
 ```
 
 1. **Put your key on a rule.** `tb tui --config $TOLLBOOTH_DEMO_CONFIG`, `5`, `e`, `i`: on the
-   `tenant-a-reads` rule change `access_keys: [DEMO-TENANT-A]` to `access_keys: [<your key>]` and
+   `tenant-a-reads` rule change the match to `match: {access_keys: [<your key>]}` and
    `rate: 2, burst: 2` to something above the load you are about to run, say `rate: 200, burst: 200`;
-   `esc`, `ctrl+r`. The bottom line says `reloaded: generation 2`.
+   `esc`, `ctrl+r`. The bottom line says `reloaded: generation 2`. Dropping `ops: [READ]` from the
+   match makes the rule cover every operation of the key; with it the rule sees only GET and HEAD,
+   80 of the load's 100 requests per second, and the PUTs pass under `writes-per-bucket`.
 2. **Start traffic.** In another shell, `demo/run.sh load 100`: 100 requests per second of GET,
    PUT, and HEAD against `$LOAD_BUCKET` as your key, after seeding 200 small objects so the reads
    find something. `6` in the TUI: the request line climbs to 100/s, the backend TTFB line shows
    the cluster's answer time, throttles stay at zero. Give it a minute of history.
 3. **Lower the limit.** `5`, `e`, `i`, change `rate: 200, burst: 200` to `rate: 30, burst: 30`,
-   `esc`, `ctrl+r`. Back on `6`: within two polls the throttle line rises, the request line (what
-   completes) drops to about 30/s, and `denied per second, by rule` shows `tenant-a-reads`
-   carrying the difference. The generator keeps running: its SDK honors `Retry-After` and backs
-   off, nothing is lost, the cluster sees 30/s. `2` shows the rule with live keys and the denied
-   count; `enter` on it shows your key as the one being held.
+   `esc`, `ctrl+r`. Back on `6`, within two polls the `throttled` line rises. The `req` line counts
+   every request the proxy answers, throttled ones included, so it stays near the offered rate, or
+   above it because the client retries; the gap between the two lines, about 30/s, is what reaches
+   the cluster. `denied per second, by rule` shows `tenant-a-reads`. `2` shows the rule with live
+   keys and the denied count; `enter` on it shows your key as the one being held.
+   Two things to say out loud. The generator's SDK retries a SlowDown with its own backoff (it
+   does not read `Retry-After` by default, D-043), and with the offered rate this far above the
+   limit some operations use up their retries and fail with SlowDown: that is what a tenant over
+   its limit should see, and `demo/state/loadgen.log` counts them as errors at the end of the run.
+   And lower the burst with the rate: the burst is the bucket, so `rate: 30, burst: 250` would pass
+   about four seconds of traffic before the limit bites.
 4. **Raise it again** the same way and watch the lines cross back. `demo/run.sh load 300` restarts
    the generator at another rate; `demo/run.sh stop` ends the load and the proxy.
 5. **Showback** (`3`, or `tb usage query --config $TOLLBOOTH_DEMO_CONFIG --group-by access_key,bucket`)
