@@ -46,6 +46,7 @@ changed on disk since it was loaded.
 - Polls every 2 s (`--interval`); 80×24 minimum; keyboard only; honors `NO_COLOR` and `TERM=dumb`;
   shows the last state under a staleness banner when the admin API is unreachable. Read-only except
   the Config editor's explicit save (ADR-0006).
-- `?` help on every screen; `q` quits; `1`–`6` switch screens. Graphs (`6`): braille line charts
+- `?` help on every screen; `q` quits; `1`–`6` switch screens, as do `tab` and `→` (next) and
+  `shift+tab` and `←` (previous) when no text field or the editor owns the keys. Graphs (`6`): braille line charts
   over the last `--history` polls (300); `space` pauses, `r` resets.
 - `teatest` golden frames at 80×24 and 120×40, including the admin-unreachable state (Phase 4).

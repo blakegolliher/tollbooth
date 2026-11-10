@@ -132,6 +132,19 @@ func readConfigText(path string) (string, time.Time, error) {
 	return string(b), st.ModTime(), nil
 }
 
+// nav sends a navigation key to the textarea n times; the textarea keeps its view on the cursor.
+func (e *editorState) nav(k tea.KeyType, n int) {
+	e.sync()
+	for i := 0; i < n; i++ {
+		e.ta, _ = e.ta.Update(tea.KeyMsg{Type: k})
+	}
+}
+
+// sync renders the textarea once so its viewport holds the current text. The viewport only learns
+// its content at render time and refuses to scroll without it, so a key handled before the first
+// render after a load (or several keys between two renders) would leave the view behind the cursor.
+func (e *editorState) sync() { _ = e.ta.View() }
+
 // dirty reports whether the buffer differs from what was loaded.
 func (e *editorState) dirty() bool { return e.ta.Value() != e.loaded }
 
@@ -177,6 +190,7 @@ func (m Model) keyEditor(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		var cmd tea.Cmd
+		m.ed.sync()
 		m.ed.ta, cmd = m.ed.ta.Update(msg)
 		m.ed.validate()
 		return m, cmd
@@ -209,32 +223,26 @@ func (m Model) keyEditor(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.ed.validate()
 		m.notice = "buffer reloaded from disk"
 		return m, clearAfter(4 * time.Second)
+	// Motions go through the textarea's own key handler, which scrolls its viewport to the cursor;
+	// the direct cursor methods do not, and the cursor walked off the bottom of the pane.
 	case "up", "k":
-		m.ed.ta.CursorUp()
+		m.ed.nav(tea.KeyUp, 1)
 	case "down", "j":
-		m.ed.ta.CursorDown()
+		m.ed.nav(tea.KeyDown, 1)
 	case "left", "h":
-		m.ed.ta.SetCursor(m.ed.ta.LineInfo().ColumnOffset - 1)
+		m.ed.nav(tea.KeyLeft, 1)
 	case "right", "l":
-		m.ed.ta.SetCursor(m.ed.ta.LineInfo().ColumnOffset + 1)
+		m.ed.nav(tea.KeyRight, 1)
 	case "pgup":
-		for i := 0; i < m.ed.ta.Height(); i++ {
-			m.ed.ta.CursorUp()
-		}
+		m.ed.nav(tea.KeyUp, m.ed.ta.Height())
 	case "pgdown":
-		for i := 0; i < m.ed.ta.Height(); i++ {
-			m.ed.ta.CursorDown()
-		}
+		m.ed.nav(tea.KeyDown, m.ed.ta.Height())
 	case "home", "g":
-		for m.ed.ta.Line() > 0 {
-			m.ed.ta.CursorUp()
-		}
-		m.ed.ta.CursorStart()
+		m.ed.nav(tea.KeyUp, m.ed.ta.Line())
+		m.ed.nav(tea.KeyHome, 1)
 	case "end", "G":
-		for m.ed.ta.Line() < m.ed.ta.LineCount()-1 {
-			m.ed.ta.CursorDown()
-		}
-		m.ed.ta.CursorEnd()
+		m.ed.nav(tea.KeyDown, m.ed.ta.LineCount()-1-m.ed.ta.Line())
+		m.ed.nav(tea.KeyEnd, 1)
 	case "?":
 		m.help = !m.help
 		return m, nil

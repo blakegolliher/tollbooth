@@ -437,6 +437,14 @@ func (m Model) key(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.help = false
 		m.detail = false
 		return m, nil
+	case "tab", "right":
+		m.screen = m.screen%ScreenGraphs + 1 // 1 → 2 … 6 → 1
+		m.help, m.detail = false, false
+		return m, nil
+	case "shift+tab", "left":
+		m.screen = (m.screen+ScreenGraphs-2)%ScreenGraphs + 1 // 1 → 6, 2 → 1 …
+		m.help, m.detail = false, false
+		return m, nil
 	case "r":
 		switch m.screen {
 		case ScreenOverview, ScreenConfig:

@@ -235,3 +235,64 @@ func BenchmarkGraphsView(b *testing.B) {
 		_ = m.View()
 	}
 }
+
+// TestScreenCycling: tab and the right arrow go forward through the six screens and wrap, shift+tab
+// and the left arrow go back; the keys are ignored while a text field or the editor owns input.
+func TestScreenCycling(t *testing.T) {
+	client, cfgPath := fixture(t)
+	base := New(Options{Client: client, Interval: time.Second, ConfigPath: cfgPath, Now: func() time.Time { return fixedNow }})
+	m := drive(t, base, size(80, 24), key("tab"), key("tab"))
+	if m.screen != ScreenUsage {
+		t.Fatalf("two tabs from Overview: %d", m.screen)
+	}
+	m = drive(t, m, key("6"), key("tab"))
+	if m.screen != ScreenOverview {
+		t.Fatalf("tab from Graphs must wrap to Overview: %d", m.screen)
+	}
+	m = drive(t, m, tea.KeyMsg{Type: tea.KeyShiftTab})
+	if m.screen != ScreenGraphs {
+		t.Fatalf("shift+tab from Overview must wrap to Graphs: %d", m.screen)
+	}
+	m = drive(t, m, tea.KeyMsg{Type: tea.KeyLeft}, tea.KeyMsg{Type: tea.KeyRight}, tea.KeyMsg{Type: tea.KeyRight})
+	if m.screen != ScreenOverview {
+		t.Fatalf("left, right, right from Graphs: %d", m.screen)
+	}
+	// Inside the editor, tab is not a screen switch.
+	m = drive(t, m, key("5"), key("e"), key("tab"))
+	if m.screen != ScreenConfig || !m.ed.open {
+		t.Fatal("tab must not leave the editor")
+	}
+}
+
+// TestEditorViewFollowsCursor: moving down past the pane's height in NORMAL mode scrolls the text so
+// the cursor line stays visible (it walked off the bottom before motions went through the textarea).
+func TestEditorViewFollowsCursor(t *testing.T) {
+	client, cfgPath := fixture(t)
+	var long strings.Builder
+	long.WriteString("node_id: tui-node\nbackend: {scheme: http, endpoints: [10.0.0.1:9000]}\nshowback: {dir: /tmp/x}\n")
+	for i := 0; i < 80; i++ {
+		fmt.Fprintf(&long, "# filler line %02d\n", i)
+	}
+	if err := os.WriteFile(cfgPath, []byte(long.String()), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	base := New(Options{Client: client, Interval: time.Second, ConfigPath: cfgPath, Now: func() time.Time { return fixedNow }})
+	m := drive(t, base, size(80, 24), key("5"), key("e"))
+	for i := 0; i < 60; i++ {
+		m = drive(t, m, key("j"))
+	}
+	if m.ed.ta.Line() != 60 {
+		t.Fatalf("cursor line %d, want 60", m.ed.ta.Line())
+	}
+	if !strings.Contains(m.View(), "filler line 57") {
+		t.Fatalf("the view did not scroll to the cursor:\n%s", m.View())
+	}
+	m = drive(t, m, key("G"))
+	if m.ed.ta.Line() != m.ed.ta.LineCount()-1 || !strings.Contains(m.View(), "filler line 79") {
+		t.Fatalf("G must reach the last line and show it: line %d", m.ed.ta.Line())
+	}
+	m = drive(t, m, key("g"))
+	if m.ed.ta.Line() != 0 || !strings.Contains(m.View(), "node_id: tui-node") {
+		t.Fatalf("g must return to the first line: %d", m.ed.ta.Line())
+	}
+}

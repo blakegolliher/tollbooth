@@ -131,17 +131,17 @@ func (m Model) footer() string {
 	}
 	switch m.screen {
 	case ScreenOverview:
-		return "r reload · 1-5 screens · ? help · q quit"
+		return "r reload · tab or 1-6 screens · ? help · q quit"
 	case ScreenLimits:
 		return "↑↓ select · enter detail · t test request · / filter · ? help · q quit"
 	case ScreenUsage:
 		return "g group-by · s sort · f range · / filter · enter hourly bars · x export CSV · ? help"
 	case ScreenBackends:
-		return "read-only · 1-5 screens · ? help · q quit"
+		return "read-only · tab or 1-6 screens · ? help · q quit"
 	case ScreenConfig:
 		return "e edit the file · r reload · v validate the file on disk · ? help · q quit"
 	case ScreenGraphs:
-		return "space pause · r reset history · 1-6 screens · ? help · q quit"
+		return "space pause · r reset history · tab or 1-6 screens · ? help · q quit"
 	}
 	return ""
 }
@@ -177,7 +177,7 @@ func (m Model) body() []string {
 func (m Model) helpLines() []string {
 	return []string{
 		styleTitle.Render("Keys"),
-		"  1 … 6       Overview, Limits, Usage, Backends, Config, Graphs",
+		"  1 … 6       Overview, Limits, Usage, Backends, Config, Graphs; tab / → next, shift+tab / ← previous",
 		"  r           reload the config file on the proxy (Overview, Config); reset the history (Graphs)",
 		"  v           validate the file on disk with check-config (Config)",
 		"  e           edit the file on disk: i insert, esc normal, ctrl+s save, ctrl+r save and reload, E $EDITOR (Config)",
