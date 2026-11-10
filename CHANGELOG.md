@@ -57,6 +57,14 @@ Decisions behind entries are in `docs/DECISIONS.md` (D-nnn) and `docs/adr/`.
 
 ### Changed
 
+- **Backends through a resolver outage (ADR-0008).** A backend given by name is still looked up on
+  every new connection, and the answer is now remembered: when the resolver does not answer, the
+  proxy connects and probes at the last known addresses, stays ready, and keeps serving. Before
+  this a DNS outage marked a serving proxy not ready and failed every request that needed a new
+  connection. `tollbooth_backend_errors_total` gains `kind="resolve"`; `backends list` gains a
+  `RESOLVE` column and `GET /admin/backends` the fields `errors_resolve`, `addresses`, and
+  `resolver_failing_since`.
+
 - **The rule schema is replaced, not extended** (nothing was tagged). `rate_limits.rules` with
   `id`, `match: {ops, access_keys, buckets, prefixes, source}`, `group_by`, `limit: {rate, burst}`,
   and `on_limit` is gone, as is `rate_limits.default_on_limit`; a file in the old shape fails

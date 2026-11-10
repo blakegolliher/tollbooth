@@ -41,7 +41,7 @@ The example file `deploy/tollbooth.example.yaml` sets every key to its default.
 | Key | Type | Default | Meaning |
 | --- | --- | --- | --- |
 | `backend.scheme` | `http` or `https` | **required** | Scheme for every endpoint. |
-| `backend.endpoints` | list of `host:port` | **required**, at least one | Backend endpoints, round-robin. No scheme, no path. `check-config` warns when an endpoint's host is not among `base_domains` (the vhost deployment constraint, docs/OPERATIONS.md). Example: `[vast-vip-1:443, vast-vip-2:443]`. |
+| `backend.endpoints` | list of `host:port` | **required**, at least one | Backend endpoints, round-robin. No scheme, no path. `check-config` warns when an endpoint's host is not among `base_domains` (the vhost deployment constraint, docs/OPERATIONS.md). Example: `[vast-vip-1:443, vast-vip-2:443]`. A name is looked up on every new connection, so a cluster that rotates its DNS answers spreads connections; the last answer is remembered and used when the resolver does not answer (ADR-0008). An address is dialed as it is. |
 | `backend.tls.ca_bundle` | path | `""` | PEM CA bundle for `https`. Empty means the system roots. Rejected when `scheme` is `http`. |
 | `backend.tls.insecure_skip_verify` | bool | `false` | Lab only. `serve` logs a warning at startup and `doctor` reports it. |
 | `backend.dial_timeout` | duration | `2s` | TCP connect timeout per endpoint. |

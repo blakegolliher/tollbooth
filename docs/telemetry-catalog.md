@@ -27,7 +27,7 @@ nothing observes is scaffolding (Gate 2 review, D-045). Its row below carries th
 | `tollbooth_inflight_requests` | gauge | — | requests | — | Requests between handler entry and completion | 1 |
 | `tollbooth_connections_open` | gauge | `side` ∈ {`client`, `backend`} | connections | — | Open TCP connections on each side | 1 |
 | `tollbooth_backend_up` | gauge | `endpoint` | — | — | 1 when the endpoint passed its last health check, else 0 | 1 |
-| `tollbooth_backend_errors_total` | counter | `endpoint`, `kind` ∈ {`dial`, `tls`, `timeout`, `reset`, `other`} | errors | — | Backend request failures by endpoint and kind | 1 |
+| `tollbooth_backend_errors_total` | counter | `endpoint`, `kind` ∈ {`dial`, `tls`, `timeout`, `reset`, `other`, `resolve`} | errors | — | Backend request failures by endpoint and kind. `resolve` (ADR-0008) counts lookups of an endpoint's name that failed; with a remembered address the connection is still made, so `resolve` rising while `backend_up` stays 1 is a resolver outage being ridden out | 1, 5 |
 | `tollbooth_backend_retries_total` | counter | — | retries | — | Requests moved to another endpoint after a connect or TLS error before any request byte was sent | 1 |
 | `tollbooth_config_reload_total` | counter | `result` ∈ {`ok`, `error`} | reloads | — | Reload attempts via `SIGHUP` or `POST /admin/reload` | 1 |
 | `tollbooth_limiter_decision_seconds` | histogram | — | seconds | 100 ns … 1 ms, log-spaced, 14 buckets | Time for the whole rule pass (match plus GCRA for every matching rule) | 2 |

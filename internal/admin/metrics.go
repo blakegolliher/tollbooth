@@ -190,7 +190,7 @@ func NewMetrics() *Metrics {
 			Name: "tollbooth_backend_up", Help: "1 when the endpoint passed its last health check, else 0.",
 		}, []string{"endpoint"}),
 		BackendErrors: prometheus.NewCounterVec(prometheus.CounterOpts{
-			Name: "tollbooth_backend_errors_total", Help: "Backend request failures by endpoint and kind (dial, tls, timeout, reset, other).",
+			Name: "tollbooth_backend_errors_total", Help: "Backend request failures by endpoint and kind (dial, tls, timeout, reset, other) and failed lookups of an endpoint's name (resolve).",
 		}, []string{"endpoint", "kind"}),
 		BackendRetries: prometheus.NewCounter(prometheus.CounterOpts{
 			Name: "tollbooth_backend_retries_total", Help: "Requests moved to another endpoint after a connect or TLS error before any request byte was sent.",
