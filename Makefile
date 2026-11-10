@@ -33,7 +33,7 @@ LDFLAGS    := -s -w -X main.version=$(VERSION) -X main.commit=$(COMMIT) -X main.
 # container runtime is needed (Gate 0 review).
 INTEGRATION_DIR := test/integration
 
-.PHONY: all build lint test race fuzz bench bench-compare bench-e2e s3diff-record backends compat release image demo soak tools tidy vuln licenses clean help
+.PHONY: all build lint test race fuzz bench bench-compare bench-e2e s3diff-record backends compat compat-vast release image demo soak tools tidy vuln licenses clean help
 
 all: build lint test race s3diff-record ## build, lint, test, race, in-process byte-equivalence — the PR gate (fuzz and compat run in their own CI jobs)
 
@@ -95,6 +95,12 @@ s3diff-record: ## byte-equivalence matrix against the in-process recording backe
 
 compat: build backends ## byte-equivalence against Garage and versitygw, the client matrix (docs/COMPAT.md), and the client throttling rows (docs/THROTTLE.md)
 	$(INTEGRATION_DIR)/compat.sh
+
+# The same matrix by hand against a cluster that already exists (test plan category 6). It creates
+# and deletes buckets there: s3diff-vast and compat-<tool>-vast-{direct,via}.
+#   VAST_ENDPOINT=host:port AWS_ACCESS_KEY_ID=… AWS_SECRET_ACCESS_KEY=… make compat-vast
+compat-vast: build ## byte-equivalence and the client matrix through tollbooth against an existing VAST cluster (VAST_ENDPOINT, AWS_*); writes docs/COMPAT-vast.md
+	BACKENDS=vast STAGES="s3diff clients" $(INTEGRATION_DIR)/compat.sh
 
 # Release artifacts: static binaries for linux/amd64 and linux/arm64, the systemd unit, the
 # example config, the Dockerfile, the licenses, a tarball per platform, and SHA-256 sums. The
