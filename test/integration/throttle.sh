@@ -27,7 +27,7 @@ denied() {
 import json, sys
 rule = sys.argv[1]
 for r in json.load(sys.stdin)["rules"]:
-    if r["id"] == rule:
+    if r["name"] == rule:
         print(r["denied"]); break
 else:
     print(0)' "$1"
