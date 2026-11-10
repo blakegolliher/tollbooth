@@ -31,7 +31,12 @@ rules an operator can read (ADR-0007, accepted 2026-11-10 after the first demo; 
 the `limits` schema in S3 operation names with the unit in the key, every rule read back as a
 sentence, `tollbooth_limiter_matched_total{rule}`, the Limits screen with live rates per rule and
 per operation, and the guided form that writes a rule into the file (D-058 to D-061). The rule
-schema of Phases 2 to 4 is replaced, not kept beside it; nothing was tagged with it.
+schema of Phases 2 to 4 is replaced, not kept beside it; nothing was tagged with it. Numbers for
+that branch (dev box, 2026-11-10, with the soak running beside it): lint 0 issues; race suite
+green, coverage 89.7%; fuzz 6 targets × 60 s clean (the new `FuzzEditRules` 179,904 executions);
+s3diff 293 cases, 0 diffs; govulncheck, licenses, and tidy clean; `BenchmarkDecide100Rules` +3.5%
+with the matched counter, 0 allocations; the form driven against a running proxy under 100 req/s
+added, changed, and deleted a rule, each reload under 1 ms, and left the file byte-identical.
 
 Running: the 24 h soak, started 2026-11-09T18:40Z at 804 req/s (half of the calibrated 1,608 req/s
 peak at concurrency 16), chaos every 10 min, under `bench/results/soak-2026-11-09T183931Z/`; it
