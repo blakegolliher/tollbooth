@@ -1,0 +1,21 @@
+samples: 35 over 0.11 h
+requests: 246314 total, 0 throttled, reloads ok 2 err 1
+rss: min 28 MiB, max 33 MiB, final 30 MiB; slope over the second half -32.90 MiB/h
+heap: final 4.7 MiB; goroutines final 13; limiter keys 0; showback tuples 192
+chaos steps: 12
+error events by chaos window (proxy errors + backend 5xx + backend transport errors + flush errors, over completed requests in the window):
+  backend-503: 357 over 18359 requests
+  backend-503/backend-stall: 136 over 3367 requests
+  backend-down: 405 over 179 requests
+  backend-down/reload-invalid: 145 over 2392 requests
+  backend-reset: 116 over 44 requests
+  backend-reset/backend-down: 288 over 1965 requests
+  backend-stall: 20 over 0 requests
+  backend-stall/backend-reset: 20 over 16 requests
+  reload-invalid: 0 over 16774 requests
+  reload-valid: 0 over 35819 requests
+  showback-ro: 1 over 127510 requests
+  showback-ro/sighup: 0 over 8673 requests
+  sighup: 0 over 8858 requests
+unexplained errors (outside every chaos window): 0
+verdict: run too short for a slope (under 1 h); zero unexplained errors
