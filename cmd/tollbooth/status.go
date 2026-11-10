@@ -131,7 +131,7 @@ func backendsCmd(af *adminFlags, stdout *os.File) error {
 	if err != nil {
 		return err
 	}
-	g := &grid{header: []string{"ENDPOINT", "STATE", "IN_FLIGHT", "REQUESTS", "ERRORS", "DIAL", "TLS", "TIMEOUT", "RESET", "OTHER", "TTFB_MEAN_MS", "TTFB_LAST_MS", "LAST_ERROR"}}
+	g := &grid{header: []string{"ENDPOINT", "STATE", "IN_FLIGHT", "REQUESTS", "ERRORS", "DIAL", "TLS", "TIMEOUT", "RESET", "OTHER", "RESOLVE", "TTFB_MEAN_MS", "TTFB_LAST_MS", "LAST_ERROR"}}
 	for i := range out.Backends {
 		b := &out.Backends[i]
 		state := "down"
@@ -143,7 +143,7 @@ func backendsCmd(af *adminFlags, stdout *os.File) error {
 			last = b.LastErrAt + " " + b.LastError
 		}
 		g.add(b.Endpoint, state, strconv.FormatInt(b.Inflight, 10), strconv.FormatInt(b.Requests, 10), strconv.FormatInt(b.Errors, 10),
-			strconv.FormatInt(b.ErrorsDial, 10), strconv.FormatInt(b.ErrorsTLS, 10), strconv.FormatInt(b.ErrorsTime, 10), strconv.FormatInt(b.ErrorsRst, 10), strconv.FormatInt(b.ErrorsOth, 10),
+			strconv.FormatInt(b.ErrorsDial, 10), strconv.FormatInt(b.ErrorsTLS, 10), strconv.FormatInt(b.ErrorsTime, 10), strconv.FormatInt(b.ErrorsRst, 10), strconv.FormatInt(b.ErrorsOth, 10), strconv.FormatInt(b.ErrorsResolve, 10),
 			strconv.FormatFloat(b.TTFBMeanMS, 'f', 1, 64), strconv.FormatFloat(b.TTFBLastMS, 'f', 1, 64), strings.TrimSpace(last))
 	}
 	return render(stdout, af.format, g, raw)
