@@ -44,7 +44,21 @@ func (m Model) limitsLines() []string {
 	if m.testing {
 		return append(lines, m.testFormLines()...)
 	}
-	const nameW, numW = 20, 11
+	// The name column fits the longest name (the form suggests names like
+	// getobject-per-access-key) up to a share of the width; the sentence column takes the rest.
+	const numW = 11
+	nameW, maxNameW := 12, 20
+	if m.width >= 100 {
+		maxNameW = 32
+	}
+	for _, r := range rules {
+		if n := len(r.Name); n > nameW { // names are ASCII (validated)
+			nameW = n
+		}
+	}
+	if nameW > maxNameW {
+		nameW = maxNameW
+	}
 	sumW := m.width - 2 - nameW - 1 - 2*(numW+1)
 	if sumW < 16 {
 		sumW = 16

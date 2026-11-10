@@ -1,8 +1,8 @@
  1 Overview  2 Limits  3 Usage  4 Backends  5 Config  6 Graphs  tui-node · v0.0.0-tui
-  LIMIT                MEANS                                                                       MATCHED/S THROTTLED/S
-▸ tenant-a-writes      PutObject +2: 2,000 per second for each access key on each bucket; key A…      none ⚠           0
-  list-storm           ListObjectsV2, ListObjects: 50 per second from each source IP                     312         170
-  frozen               all requests: blocked; key AKIAREVOKED                                              0           0
+  LIMIT           MEANS                                                                            MATCHED/S THROTTLED/S
+▸ tenant-a-writes PutObject +2: 2,000 per second for each access key on each bucket; key AKIAEX…      none ⚠           0
+  list-storm      ListObjectsV2, ListObjects: 50 per second from each source IP                          312         170
+  frozen          all requests: blocked; key AKIAREVOKED                                                   0           0
 
   tenant-a-writes: At most 2,000 PutObject, UploadPart, and CopyObject calls per second for each access key on each
   bucket, up to 4,000 at once. Only for requests by access key AKIAEXAMPLE1 on bucket training-data under prefix

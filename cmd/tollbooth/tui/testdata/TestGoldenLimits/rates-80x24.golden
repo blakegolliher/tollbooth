@@ -1,8 +1,8 @@
  1 Overview  2 Limits  3 Usage  4 Backends  5 Config  6 Graphs  tui-node · v0.0.
-  LIMIT                MEANS                               MATCHED/S THROTTLED/S
-  tenant-a-writes      PutObject +2: 2,000 per second f…          80           0
-▸ list-storm           ListObjectsV2, ListObjects: 50 p…         312         170
-  frozen               all requests: blocked; key AKIAR…           0           0
+  LIMIT           MEANS                                    MATCHED/S THROTTLED/S
+  tenant-a-writes PutObject +2: 2,000 per second for ea…          80           0
+▸ list-storm      ListObjectsV2, ListObjects: 50 per se…         312         170
+  frozen          all requests: blocked; key AKIAREVOKED           0           0
 
   list-storm: At most 50 ListObjectsV2 and ListObjects calls per second from
   each source IP, up to 200 at once. Over the limit, the client gets 429

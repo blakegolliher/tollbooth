@@ -1,7 +1,7 @@
  1 Overview  2 Limits  3 Usage  4 Backends  5 Config  6 Graphs  tui-node · v0.0.
   > list                                     
-  LIMIT                MEANS                               MATCHED/S THROTTLED/S
-▸ list-storm           ListObjectsV2, ListObjects: 50 p…           –           –
+  LIMIT        MEANS                                       MATCHED/S THROTTLED/S
+▸ list-storm   ListObjectsV2, ListObjects: 50 per secon…           –           –
 
   list-storm: At most 50 ListObjectsV2 and ListObjects calls per second from
   each source IP, up to 200 at once. Over the limit, the client gets 429

@@ -511,7 +511,11 @@ func (m Model) suggestions() []suggestion {
 			if s.value == "" || already[strings.ToLower(s.value)] || !strings.Contains(strings.ToLower(s.value), low) {
 				continue
 			}
-			out = append(out, suggestion{s.value, config.FormatCount(float64(s.requests)) + " requests lately"})
+			word := " requests lately"
+			if s.requests == 1 {
+				word = " request lately"
+			}
+			out = append(out, suggestion{s.value, config.FormatCount(float64(s.requests)) + word})
 		}
 		return out
 	}

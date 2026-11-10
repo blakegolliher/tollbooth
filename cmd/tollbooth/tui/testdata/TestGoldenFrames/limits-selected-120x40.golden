@@ -1,8 +1,8 @@
  1 Overview  2 Limits  3 Usage  4 Backends  5 Config  6 Graphs  tui-node · v0.0.0-tui
-  LIMIT                MEANS                                                                       MATCHED/S THROTTLED/S
-  tenant-a-writes      PutObject +2: 2,000 per second for each access key on each bucket; key A…           –           –
-  list-storm           ListObjectsV2, ListObjects: 50 per second from each source IP                       –           –
-▸ frozen               all requests: blocked; key AKIAREVOKED                                              –           –
+  LIMIT           MEANS                                                                            MATCHED/S THROTTLED/S
+  tenant-a-writes PutObject +2: 2,000 per second for each access key on each bucket; key AKIAEX…           –           –
+  list-storm      ListObjectsV2, ListObjects: 50 per second from each source IP                            –           –
+▸ frozen          all requests: blocked; key AKIAREVOKED                                                   –           –
 
   frozen: Refuses every request by access key AKIAREVOKED. The client gets 503 SlowDown.
   held in the last minute: requests (3)
