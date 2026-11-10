@@ -6,7 +6,7 @@ admin.token_file                          ""
 backend.dial_timeout                      "2s"
 backend.endpoints                         ["127.0.0.1:PORT"]
 backend.health_check.interval             "5s"
-backend.health_check.timeout              "2s"
+backend.health_check.timeout              "5s"
 backend.idle_body_timeout                 "1m0s"
 backend.max_idle_conns_per_host           1024
 backend.response_header_timeout           "5m0s"

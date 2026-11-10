@@ -13,7 +13,7 @@
       ],
       "health_check": {
         "interval": "5s",
-        "timeout": "2s"
+        "timeout": "5s"
       },
       "idle_body_timeout": "1m0s",
       "max_idle_conns_per_host": 1024,

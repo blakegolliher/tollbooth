@@ -57,6 +57,10 @@ Decisions behind entries are in `docs/DECISIONS.md` (D-nnn) and `docs/adr/`.
 
 ### Changed
 
+- The default of `backend.health_check.timeout` is `5s`, was `2s`. A VAST cluster answers the
+  health probe's unsigned `HEAD /` after 2.0 s, so with the old default every probe timed out, the
+  backend was marked down, and the proxy reported not ready while it forwarded requests (D-064).
+
 - **Backends through a resolver outage (ADR-0008).** A backend given by name is still looked up on
   every new connection, and the answer is now remembered: when the resolver does not answer, the
   proxy connects and probes at the last known addresses, stays ready, and keeps serving. Before

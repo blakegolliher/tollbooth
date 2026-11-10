@@ -49,7 +49,7 @@ The example file `deploy/tollbooth.example.yaml` sets every key to its default.
 | `backend.idle_body_timeout` | duration | `60s` | Idle-body timeout in each direction: aborts when no bytes move for this long. Pushed forward on every copied chunk. There is no whole-request timeout. |
 | `backend.max_idle_conns_per_host` | int | `1024` | Keep-alive pool size per endpoint. |
 | `backend.health_check.interval` | duration | `5s` | Active check cadence: TCP connect plus `HEAD /`; any HTTP status, 403 included, means healthy. |
-| `backend.health_check.timeout` | duration | `2s` | Per-check timeout. |
+| `backend.health_check.timeout` | duration | `5s` | Per-check timeout. The probe is unsigned, and a backend may make an unsigned request wait before refusing it: a VAST cluster answers it after 2.0 s. A timeout at or under that wait marks a working backend down and the proxy not ready (D-064). |
 
 ## `proxy`
 

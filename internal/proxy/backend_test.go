@@ -479,3 +479,30 @@ func BenchmarkDialNamedEndpoint(b *testing.B) {
 		_ = conn.Close()
 	}
 }
+
+// D-064: a backend that makes the unsigned probe wait two seconds before refusing it (a VAST
+// cluster does) is healthy under the default health-check settings.
+func TestHealthProbeOutlastsASlowRefusal(t *testing.T) {
+	if testing.Short() {
+		t.Skip("waits two seconds for the slow refusal")
+	}
+	slow := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		time.Sleep(2 * time.Second)
+		w.WriteHeader(http.StatusMethodNotAllowed)
+	}))
+	defer slow.Close()
+	c := testConfig(t, []string{strings.TrimPrefix(slow.URL, "http://")}, time.Second)
+	if c.Backend.HealthCheck.Timeout != config.DefaultHealthTimeout || config.DefaultHealthTimeout <= 2*time.Second {
+		t.Fatalf("health-check timeout %v (default %v) does not outlast a two-second refusal", c.Backend.HealthCheck.Timeout, config.DefaultHealthTimeout)
+	}
+	p, err := NewPool(&c.Backend, admin.NewMetrics(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	p.Start()
+	defer p.Stop()
+	time.Sleep(3 * time.Second) // one whole probe, and the start of the next
+	if !p.Endpoints[0].Up() || !p.Healthy() {
+		t.Fatalf("a backend that answers the probe after 2 s was marked down: %q", first(p.Endpoints[0].LastError()))
+	}
+}
