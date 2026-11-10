@@ -250,7 +250,7 @@ func (p *Pool) MarkDown(e *Endpoint, err error, kind string) {
 			p.log.Warn("backend endpoint marked down", "endpoint", e.Addr, "kind", kind, "err", err.Error())
 		}
 	}
-	if p.metrics != nil {
+	if p.metrics != nil && kind != "resolve" { // a failed lookup was counted where it failed (unresolved)
 		p.metrics.BackendErrors.WithLabelValues(e.Addr, kind).Inc()
 	}
 }
@@ -383,6 +383,9 @@ func (p *Pool) resolved(e *Endpoint, ips []netip.Addr) {
 // unresolved records a failed lookup and returns the addresses to dial instead: the last answer,
 // starting at a rotating position, or none when the name has never resolved. The failure is
 // counted and shown and does not change the endpoint's health; the dial that follows decides that.
+// This is the one place a failed lookup is counted, for the endpoint's row and for
+// backend_errors_total{kind="resolve"}, whichever path dialed and whether or not an address was
+// known; the callers that count other kinds skip this one.
 func (p *Pool) unresolved(e *Endpoint, err error) []netip.Addr {
 	e.mu.Lock()
 	first := e.failingSince.IsZero()

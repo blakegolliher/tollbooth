@@ -310,6 +310,11 @@ func TestStartDuringResolverOutage(t *testing.T) {
 	if served() != 0 {
 		t.Fatal("the backend was reached without an address")
 	}
+	// One lookup failed: it is counted once, in the endpoint's row and in the metric alike.
+	p.MarkDown(p.Endpoints[0], err, errorKind(err)) // what the request path does with a connect error
+	if st := p.Endpoints[0].status(); st.ErrorsResolve != 1 || resolveCount(m) != 1 {
+		t.Fatalf("one failed lookup counted %d times in the row and %v in the metric", st.ErrorsResolve, resolveCount(m))
+	}
 	p.Start()
 	defer p.Stop()
 	deadline := time.Now().Add(3 * time.Second)

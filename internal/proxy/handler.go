@@ -265,7 +265,9 @@ func (h *Handler) roundTrip(out *http.Request, inBody *progressReader, o *outcom
 			return resp, nil
 		}
 		kind := errorKind(err)
-		ep.countError(kind)
+		if kind != "resolve" { // a failed lookup was counted where it failed (Pool.unresolved)
+			ep.countError(kind)
+		}
 		if IsConnectError(err) {
 			h.Backend.MarkDown(ep, err, kind)
 			if attempt < len(h.Backend.Endpoints) && (inBody == nil || inBody.count() == 0) {
