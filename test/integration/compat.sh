@@ -31,6 +31,23 @@ STAGES=${STAGES:-s3diff clients throttle}
 THROTTLE_BACKEND=${THROTTLE_BACKEND:-garage} # the tools' behavior is under test, not the backend's; one is enough
 export GOTOOLCHAIN=${GOTOOLCHAIN:-auto}
 
+# A run against an existing cluster says what it needs before anything is downloaded or started.
+case " $BACKENDS " in *" vast "*)
+  if [ -z "${VAST_ENDPOINT:-}" ] || [ -z "${AWS_ACCESS_KEY_ID:-}" ] || [ -z "${AWS_SECRET_ACCESS_KEY:-}" ]; then
+    cat >&2 <<'USAGE'
+compat: a run against an existing cluster needs three things in the environment:
+
+  export AWS_ACCESS_KEY_ID=<a key that may create and delete buckets on the cluster>
+  export AWS_SECRET_ACCESS_KEY=<its secret>
+  VAST_ENDPOINT=<host or address>:<port> make compat-vast      # the cluster's S3 endpoint, plaintext HTTP
+
+Nothing was downloaded, started, or sent.
+USAGE
+    for v in VAST_ENDPOINT AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY; do [ -n "${!v:-}" ] || echo "compat: $v is not set" >&2; done
+    exit 2
+  fi ;;
+esac
+
 # A client tool that cannot be fetched becomes FAIL cells, not an aborted run: stage 1 still runs.
 case " $STAGES " in *" clients "*|*" throttle "*) "$HERE/clients.sh" fetch || echo "compat: some client tools are missing; their cells will fail" >&2 ;; esac
 # The pinned local backends are started only when one of them is asked for; an existing cluster
