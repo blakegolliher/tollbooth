@@ -43,8 +43,8 @@ type Rule struct {
 	LimitPerMinute *Number    `yaml:"limit_per_minute,omitempty"`
 	LimitPerHour   *Number    `yaml:"limit_per_hour,omitempty"`
 	Blocked        bool       `yaml:"blocked,omitempty"`
-	Per            StringList `yaml:"per,omitempty"`
 	Burst          int        `yaml:"burst,omitempty"`
+	Per            StringList `yaml:"per,omitempty"`
 	Respond        int        `yaml:"respond,omitempty"`
 	Note           string     `yaml:"note,omitempty"`
 }
@@ -340,11 +340,17 @@ func joinSome(names []string, n int) string {
 // canonicalize rewrites `operation` entries into S3's spelling and sorts nothing: the order is the
 // operator's. Entries that do not resolve are left for validation to report.
 func (r *Rule) canonicalize() {
+	if len(r.Operation) == 0 {
+		return
+	}
+	out := make(StringList, len(r.Operation)) // a fresh list: the caller's is not written through
 	for i, entry := range r.Operation {
+		out[i] = entry
 		if _, canonical, err := ResolveOperation(entry); err == nil {
-			r.Operation[i] = canonical
+			out[i] = canonical
 		}
 	}
+	r.Operation = out
 }
 
 // validPer reports whether p is a `per` value, and sortDims orders dimensions the way the sentence

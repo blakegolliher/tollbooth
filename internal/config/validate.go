@@ -129,34 +129,11 @@ func (c *Config) Validate() error { //nolint:gocritic // one function, one pass 
 	for i := range c.Limits {
 		r := &c.Limits[i]
 		key := fmt.Sprintf("limits[%d]", i)
-		if !ruleID.MatchString(r.Name) {
-			bad(key+".name", "required; letters, digits, and _ . - (at most 64), got %q", r.Name)
-		} else if prev, dup := names[r.Name]; dup {
+		validateRule(r, key, bad)
+		if prev, dup := names[r.Name]; dup && ruleID.MatchString(r.Name) {
 			bad(key+".name", "duplicate of limits[%d]", prev)
 		} else {
 			names[r.Name] = i
-		}
-		for j, entry := range r.Operation {
-			if _, _, err := ResolveOperation(entry); err != nil {
-				bad(listKey(key+".operation", j, len(r.Operation)), "%v", err)
-			}
-		}
-		for j, cidr := range r.SourceIP {
-			if _, err := parseCIDR(cidr); err != nil {
-				bad(listKey(key+".source_ip", j, len(r.SourceIP)), "not an address or a CIDR: %q", cidr)
-			}
-		}
-		for j, p := range r.Prefix {
-			if p == "" {
-				bad(listKey(key+".prefix", j, len(r.Prefix)), "empty prefix; omit `prefix` to match every key")
-			}
-		}
-		c.validateLimit(r, key, bad)
-		if r.Respond != 0 && r.Respond != RespondSlowDown && r.Respond != RespondTooManyRequests {
-			bad(key+".respond", "must be %d (SlowDown) or %d (TooManyRequests), got %d", RespondSlowDown, RespondTooManyRequests, r.Respond)
-		}
-		if len(r.Note) > 200 {
-			bad(key+".note", "at most 200 characters, got %d", len(r.Note))
 		}
 	}
 	positive("limiter.max_keys", int64(c.Limiter.MaxKeys))
@@ -218,6 +195,49 @@ func (c *Config) Validate() error { //nolint:gocritic // one function, one pass 
 	return errors.Join(errs...)
 }
 
+// CheckRule validates one rule on its own, the way the `limits` list would, and returns every
+// finding with the rule's own key first ("operation: unknown S3 operation …"). The guided form
+// uses it on every keystroke.
+func CheckRule(r *Rule) error {
+	var errs []error
+	validateRule(r, "", func(key, format string, args ...any) {
+		errs = append(errs, &Error{Key: strings.TrimPrefix(key, "."), Msg: fmt.Sprintf(format, args...)})
+	})
+	return errors.Join(errs...)
+}
+
+// validateRule checks everything about one rule except that its name is unique.
+func validateRule(r *Rule, key string, bad func(key, format string, args ...any)) {
+	if !ruleID.MatchString(r.Name) {
+		bad(key+".name", "required; letters, digits, and _ . - (at most 64), got %q", r.Name)
+	}
+	for j, entry := range r.Operation {
+		if _, _, err := ResolveOperation(entry); err != nil {
+			bad(listKey(key+".operation", j, len(r.Operation)), "%v", err)
+		}
+	}
+	for j, cidr := range r.SourceIP {
+		if _, err := parseCIDR(cidr); err != nil {
+			bad(listKey(key+".source_ip", j, len(r.SourceIP)), "not an address or a CIDR: %q", cidr)
+		}
+	}
+	for j, p := range r.Prefix {
+		if p == "" {
+			bad(listKey(key+".prefix", j, len(r.Prefix)), "empty prefix; omit `prefix` to match every key")
+		}
+	}
+	validateLimit(r, key, bad)
+	if r.Respond != 0 && r.Respond != RespondSlowDown && r.Respond != RespondTooManyRequests {
+		bad(key+".respond", "must be %d (SlowDown) or %d (TooManyRequests), got %d", RespondSlowDown, RespondTooManyRequests, r.Respond)
+	}
+	switch {
+	case len(r.Note) > 200:
+		bad(key+".note", "at most 200 characters, got %d", len(r.Note))
+	case strings.ContainsAny(r.Note, "\n\r"):
+		bad(key+".note", "one line only")
+	}
+}
+
 // listKey names item j of a scalar-or-list key: `limits[0].operation` for a single value,
 // `limits[0].operation[2]` in a list.
 func listKey(key string, j, n int) string {
@@ -230,7 +250,7 @@ func listKey(key string, j, n int) string {
 // validateLimit checks the "how many" and "counted how" of one rule: exactly one of the three
 // limit keys or `blocked`, a positive finite count inside the limiter's bounds (D-037), a `per`
 // that is required for a limit and optional for a block, and a burst the bucket can refill.
-func (c *Config) validateLimit(r *Rule, key string, bad func(key, format string, args ...any)) {
+func validateLimit(r *Rule, key string, bad func(key, format string, args ...any)) {
 	set := 0
 	for _, p := range []*Number{r.LimitPerSecond, r.LimitPerMinute, r.LimitPerHour} {
 		if p != nil {
@@ -240,7 +260,7 @@ func (c *Config) validateLimit(r *Rule, key string, bad func(key, format string,
 	const choices = "limit_per_second, limit_per_minute, limit_per_hour, or blocked: true"
 	switch {
 	case r.Blocked && set > 0:
-		bad(key, "set either a limit or blocked: true, not both")
+		bad(key+".limit", "set either a limit or blocked: true, not both")
 		return
 	case r.Blocked:
 		// A blocked rule has no budget, so `per` is optional; when present it only decides how
@@ -248,13 +268,13 @@ func (c *Config) validateLimit(r *Rule, key string, bad func(key, format string,
 		if r.Burst != 0 {
 			bad(key+".burst", "a blocked rule has no burst; remove it")
 		}
-		c.validatePer(r, key, bad)
+		validatePer(r, key, bad)
 		return
 	case set == 0:
-		bad(key, "no limit: set exactly one of %s", choices)
+		bad(key+".limit", "none set: write exactly one of %s", choices)
 		return
 	case set > 1:
-		bad(key, "more than one limit: set exactly one of %s", choices)
+		bad(key+".limit", "more than one set: write exactly one of %s", choices)
 		return
 	}
 	n, unit, _ := r.Count()
@@ -277,11 +297,11 @@ func (c *Config) validateLimit(r *Rule, key string, bad func(key, format string,
 		bad(key+".per", "required: who gets their own budget? Write per: %s for one budget shared by every request this rule matches, or per: %s, %s, %s, or %s", PerTotal, DimSourceIP, DimAccessKey, DimBucket, DimPrefix)
 		return
 	}
-	c.validatePer(r, key, bad)
+	validatePer(r, key, bad)
 }
 
 // validatePer checks the values of `per`.
-func (c *Config) validatePer(r *Rule, key string, bad func(key, format string, args ...any)) {
+func validatePer(r *Rule, key string, bad func(key, format string, args ...any)) {
 	seen := map[string]bool{}
 	for j, p := range r.Per {
 		pk := listKey(key+".per", j, len(r.Per))
