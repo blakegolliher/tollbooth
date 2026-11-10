@@ -3,7 +3,7 @@
 
   Running config versus /etc/tollbooth/tollbooth.yaml
   KEY                                  RUNNING              FILE                
-  limits                               [{"access_key":"AKI… [{"access_key":"AKI…
+  limits[tenant-a-writes].burst        4000                 8000                
 
   Running config (redacted)
   admin.address                            "127.0.0.1:9900"

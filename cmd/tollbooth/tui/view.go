@@ -467,7 +467,7 @@ func (m Model) configLines() []string {
 		}
 	}
 	lines = append(lines, "", styleTitle.Render("  Running config (redacted)"))
-	for _, kv := range flatten("", m.snap.config) {
+	for _, kv := range config.Flatten(m.snap.config) {
 		lines = append(lines, fmt.Sprintf("  %-40s %s", trunc(kv[0], 40), trunc(kv[1], m.width-44)))
 	}
 	return lines
@@ -483,7 +483,7 @@ func (m Model) configDiff() []diffRow {
 		return []diffRow{{key: "(file)", running: "", file: firstLine(err.Error())}}
 	}
 	running := map[string]string{}
-	for _, kv := range flatten("", m.snap.config) {
+	for _, kv := range config.Flatten(m.snap.config) {
 		running[kv[0]] = kv[1]
 	}
 	keys := map[string]bool{}
