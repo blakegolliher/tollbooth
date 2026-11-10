@@ -22,12 +22,8 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 
-	"github.com/blakegolliher/tollbooth/internal/limiter"
 	"github.com/blakegolliher/tollbooth/internal/showback"
 )
-
-// limiterRule wraps a status row for the Limits table.
-type limiterRule struct{ *limiter.RuleStatus }
 
 // The palette (the same one as vast-bucket-policy-manager, so the two tools look related): blue
 // for titles and focus, green for good, orange for warnings and INSERT, red for errors, grey for
@@ -105,6 +101,13 @@ func (m Model) tabs() string {
 }
 
 func (m Model) footer() string {
+	// A question waiting for y or n outranks a notice from the last action.
+	switch {
+	case m.form.open && m.form.discard:
+		return styleWarn.Render("discard this limit? y discard · n keep editing")
+	case m.confirmDelete != "":
+		return styleWarn.Render("delete limit " + m.confirmDelete + " from the file and apply? y delete · n keep")
+	}
 	if m.notice != "" {
 		if strings.Contains(m.notice, "REJECTED") || strings.Contains(m.notice, "INVALID") || strings.Contains(m.notice, "not saved") || strings.Contains(m.notice, "changed on disk") || strings.HasPrefix(m.notice, "save: ") || strings.HasPrefix(m.notice, "reload: ") {
 			return styleErr.Render(m.notice)
@@ -115,6 +118,8 @@ func (m Model) footer() string {
 		return "? close help · q quit"
 	}
 	switch {
+	case m.form.open:
+		return "tab next · arrows pick · enter accept · ctrl+r apply · ctrl+s save · esc cancel"
 	case m.ed.open && m.ed.prompt:
 		return "unsaved changes: y save · n discard · esc keep editing"
 	case m.ed.open && m.ed.insert:
@@ -132,7 +137,7 @@ func (m Model) footer() string {
 	case ScreenOverview:
 		return "r reload · tab or 1-6 screens · ? help · q quit"
 	case ScreenLimits:
-		return "↑↓ select · enter detail · t test request · / filter · ? help · q quit"
+		return "↑↓ select · enter change · n new · d delete · t test · / filter · ? help"
 	case ScreenUsage:
 		return "g group-by · s sort · f range · / filter · enter hourly bars · x export CSV · ? help"
 	case ScreenBackends:
@@ -157,6 +162,9 @@ func (m Model) body() []string {
 	}
 	switch m.screen {
 	case ScreenLimits:
+		if m.form.open {
+			return m.formLines()
+		}
 		return m.limitsLines()
 	case ScreenUsage:
 		return m.usageLines()
@@ -178,16 +186,16 @@ func (m Model) helpLines() []string {
 		styleTitle.Render("Keys"),
 		"  1 … 6       Overview, Limits, Usage, Backends, Config, Graphs; tab / → next, shift+tab / ← previous",
 		"  r           reload the config file on the proxy (Overview, Config); reset the history (Graphs)",
-		"  v           validate the file on disk with check-config (Config)",
-		"  e           edit the file on disk: i insert, esc normal, ctrl+s save, ctrl+r save and reload, E $EDITOR (Config)",
+		"  n enter d   add a limit, change the selected one, delete it: a guided form that reads the rule",
+		"              back as a sentence; ctrl+r saves and applies, ctrl+s saves only (Limits)",
+		"  t /         dry-run a request against the rules; filter the table (Limits)",
+		"  e v         edit the file on disk (i insert, esc normal, ctrl+s save, ctrl+r save and reload,",
+		"              E $EDITOR); validate it with check-config (Config)",
+		"  g s f x     cycle group-by, sort, edit the hour range, export CSV; enter: hourly bars (Usage)",
 		"  space       pause the graphs (Graphs)",
-		"  ↑ ↓ enter   select a rule and open its detail (Limits); hourly bars for a row (Usage)",
-		"  t           dry-run a request against the rules (Limits)",
-		"  /           filter the table (Limits, Usage)",
-		"  g s f x     cycle group-by, sort, edit the hour range, export CSV (Usage)",
 		"  ?           this help · q quit",
 		"",
-		styleDim.Render("Nothing here writes the config file except an explicit save in the editor, which keeps a .bak beside it."),
+		styleDim.Render("The config file is written only by an explicit save in the form or the editor, with a .bak beside it."),
 		styleDim.Render(fmt.Sprintf("Polling every %s; a STALE banner means the last poll failed and the screens show the last state.", m.opts.Interval)),
 	}
 }
@@ -273,49 +281,7 @@ func sparkline(h []sample, throttled bool, width int) string {
 	return fmt.Sprintf("%s  max %.0f/s over the last %s", b.String(), maxV, (h[len(h)-1].at.Sub(h[0].at)).Round(time.Second))
 }
 
-// ---- Limits
-
-func (m Model) limitsLines() []string {
-	rules := m.visibleRules()
-	var lines []string
-	if m.filtering || m.filter.Value() != "" {
-		lines = append(lines, "  "+m.filter.View())
-	}
-	if m.testing {
-		return append(lines, m.testFormLines()...)
-	}
-	sumW := m.width - 2 - 22 - 1 - 9 - 9
-	if sumW < 20 {
-		sumW = 20
-	}
-	hdr := fmt.Sprintf("  %-22s %-*s %8s %8s", "NAME", sumW, "LIMIT", "KEYS", "DENIED")
-	lines = append(lines, styleHeader.Render(hdr))
-	if len(rules) == 0 {
-		lines = append(lines, styleDim.Render("  (no rules)"))
-	}
-	for i, r := range rules {
-		row := fmt.Sprintf("  %-22s %-*s %8d %8d", trunc(r.Name, 22), sumW, trunc(r.Summary, sumW), r.LiveKeys, r.Denied)
-		if i == m.selected {
-			row = styleSel.Render(row)
-		}
-		lines = append(lines, row)
-	}
-	if m.detail && m.selected < len(rules) {
-		lines = append(lines, "", styleTitle.Render("  Top denied keys, last 60 s, for "+rules[m.selected].Name))
-		n := 0
-		for _, e := range m.snap.top.Top {
-			if e.Rule != rules[m.selected].Name {
-				continue
-			}
-			n++
-			lines = append(lines, fmt.Sprintf("    %6d  %s  (%.0fs ago)", e.Denied, dims(e.AccessKey, e.Bucket, e.Prefix, e.SourceIP), e.LastSeconds))
-		}
-		if n == 0 {
-			lines = append(lines, styleDim.Render("    none"))
-		}
-	}
-	return lines
-}
+// ---- Limits: the rules table and the busiest operations are in limits.go, the form in form.go.
 
 func (m Model) testFormLines() []string {
 	labels := []string{"access key", "bucket", "key", "source ip", "operation"}

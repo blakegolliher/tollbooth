@@ -1,0 +1,40 @@
+ 1 Overview  2 Limits  3 Usage  4 Backends  5 Config  6 Graphs  tui-node · v0.0.0-tui
+╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ New limit                                                                                                            │
+│   Limit what     every operation                                                                                     │
+│   Limit          blocked  every matching request is refused                                                          │
+│   List refusals  together                                                                                            │
+│   Only for       access key any                                                                                      │
+│ ▸                bucket     scratch                                                                                  │
+│                  prefix     any                                                                                      │
+│                  source IP  any                                                                                      │
+│   Over the limit 503 SlowDown (what S3 itself answers)                                                               │
+│   Name           all-scratch-blocked                                                                                 │
+│   Note           why this limit exists (optional)                                                                    │
+│ ── seen by the proxy lately, busiest first: ↓ pick · enter accept ────────────────────────────────────────────────── │
+│   (nothing recorded lately that matches; type the value)                                                             │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│ Means   Refuses every request on bucket scratch. The client gets 503 SlowDown.                                       │
+│                                                                                                                      │
+│ Now     ⚠ no request for bucket scratch seen in the last two hours                                                   │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+
+
+
+
+
+
+
+
+
+
+
+tab next · arrows pick · enter accept · ctrl+r apply · ctrl+s save · esc cancel

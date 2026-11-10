@@ -1,7 +1,14 @@
  1 Overview  2 Limits  3 Usage  4 Backends  5 Config  6 Graphs  tui-node · v0.0.
   > list                                     
-  NAME                   LIMIT                                     KEYS   DENIED
-  list-storm             ListObjectsV2, ListObjects: 50 per s…        0        0
+  LIMIT                MEANS                               MATCHED/S THROTTLED/S
+▸ list-storm           ListObjectsV2, ListObjects: 50 p…           –           –
+
+  list-storm: At most 50 ListObjectsV2 and ListObjects calls per second from
+  each source IP, up to 200 at once. Over the limit, the client gets 429
+  TooManyRequests.
+
+  BUSIEST OPERATIONS RIGHT NOW            REQ/S  THROTTLED/S  LIMITED BY
+  (measured between two polls; one more moment)
 
 
 
@@ -14,11 +21,4 @@
 
 
 
-
-
-
-
-
-
-
-↑↓ select · enter detail · t test request · / filter · ? help · q quit
+↑↓ select · enter change · n new · d delete · t test · / filter · ? help

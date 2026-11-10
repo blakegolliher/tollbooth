@@ -2,16 +2,16 @@
 Keys
   1 … 6       Overview, Limits, Usage, Backends, Config, Graphs; tab / → next, s
   r           reload the config file on the proxy (Overview, Config); reset the 
-  v           validate the file on disk with check-config (Config)
-  e           edit the file on disk: i insert, esc normal, ctrl+s save, ctrl+r s
+  n enter d   add a limit, change the selected one, delete it: a guided form tha
+              back as a sentence; ctrl+r saves and applies, ctrl+s saves only (L
+  t /         dry-run a request against the rules; filter the table (Limits)
+  e v         edit the file on disk (i insert, esc normal, ctrl+s save, ctrl+r s
+              E $EDITOR); validate it with check-config (Config)
+  g s f x     cycle group-by, sort, edit the hour range, export CSV; enter: hour
   space       pause the graphs (Graphs)
-  ↑ ↓ enter   select a rule and open its detail (Limits); hourly bars for a row 
-  t           dry-run a request against the rules (Limits)
-  /           filter the table (Limits, Usage)
-  g s f x     cycle group-by, sort, edit the hour range, export CSV (Usage)
   ?           this help · q quit
 
-Nothing here writes the config file except an explicit save in the editor, which
+The config file is written only by an explicit save in the form or the editor, w
 Polling every 2s; a STALE banner means the last poll failed and the screens show
 
 

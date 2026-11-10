@@ -1,0 +1,24 @@
+ 1 Overview  2 Limits  3 Usage  4 Backends  5 Config  6 Graphs  tui-node · v0.0.
+  LIMIT                MEANS                               MATCHED/S THROTTLED/S
+  tenant-a-writes      PutObject +2: 2,000 per second f…           –           –
+  list-storm           ListObjectsV2, ListObjects: 50 p…           –           –
+▸ frozen               all requests: blocked; key AKIAR…           –           –
+
+  frozen: Refuses every request by access key AKIAREVOKED. The client gets 503
+  SlowDown.
+  held in the last minute: requests (3)
+
+  BUSIEST OPERATIONS RIGHT NOW            REQ/S  THROTTLED/S  LIMITED BY
+  (measured between two polls; one more moment)
+
+
+
+
+
+
+
+
+
+
+
+↑↓ select · enter change · n new · d delete · t test · / filter · ? help

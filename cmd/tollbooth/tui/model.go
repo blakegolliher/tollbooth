@@ -82,7 +82,10 @@ type snapshot struct {
 	usage    *showback.Result
 	usageErr string
 	metrics  map[string]float64 // the few process gauges the Graphs screen plots
-	at       time.Time
+	// requests_total by operation, summed over its other labels, and the throttled part of it: what
+	// the Limits screen's "busiest operations" and the form's operation picker turn into rates.
+	opRequests, opThrottled map[string]float64
+	at                      time.Time
 }
 
 type configView struct {
@@ -147,6 +150,12 @@ type Model struct {
 
 	// Config editor (ADR-0006)
 	ed editorState
+
+	// Limits: rates from the last two polls, the guided form, and the delete prompt (ADR-0007).
+	opRate, opThrottle map[string]float64    // requests and throttled requests per second, by operation
+	ruleRate           map[string][2]float64 // matched and denied per second, by rule
+	form               formState
+	confirmDelete      string // the rule a delete is waiting on y/n for
 
 	// Limits
 	filter     textinput.Model
@@ -261,6 +270,7 @@ func (m Model) poll() tea.Cmd {
 		s.config, s.view = cv.Config, cv.configView
 		if raw, err := c.Do(ctx, http.MethodGet, "/metrics", nil, nil); err == nil {
 			s.metrics = parseGauges(raw, "go_memstats_heap_alloc_bytes", "go_goroutines", "process_resident_memory_bytes")
+			s.opRequests, s.opThrottled = parseOpCounters(raw)
 		}
 		q := url.Values{"group_by": {groupBy}}
 		if from != "" {
@@ -284,6 +294,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if m2, cmd, ok := m.updateEditor(msg); ok {
 		return m2, cmd
 	}
+	if m2, cmd, ok := m.updateForm(msg); ok {
+		return m2, cmd
+	}
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width, m.height = msg.Width, msg.Height
@@ -299,6 +312,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		m.stale, m.lastErr = false, ""
+		m.observe(m.snap, msg.snap)
 		m.snap = msg.snap
 		if !m.paused {
 			m.history = append(m.history, sampleOf(msg.snap))
@@ -363,6 +377,12 @@ func clearAfter(d time.Duration) tea.Cmd {
 func (m Model) key(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if m.ed.open {
 		return m.keyEditor(msg)
+	}
+	if m.form.open {
+		return m.keyForm(msg)
+	}
+	if m.confirmDelete != "" {
+		return m.keyConfirmDelete(msg)
 	}
 	if m.testing {
 		return m.keyTestForm(msg)
@@ -535,8 +555,21 @@ func (m Model) keyLimits(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.testFields[i].Blur()
 		}
 		return m, m.testFields[0].Focus()
+	case "n":
+		return m.openForm("")
 	case "enter":
-		m.detail = !m.detail
+		if m.selected < len(rules) {
+			return m.openForm(rules[m.selected].Name)
+		}
+		return m.openForm("")
+	case "d":
+		if m.selected < len(rules) {
+			if m.opts.ConfigPath == "" {
+				m.notice = "no --config given; nothing to delete from"
+				return m, clearAfter(8 * time.Second)
+			}
+			m.confirmDelete = rules[m.selected].Name
+		}
 		return m, nil
 	case "up", "k":
 		if m.selected > 0 {
@@ -548,6 +581,92 @@ func (m Model) keyLimits(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 	}
 	return m, nil
+}
+
+// observe turns two consecutive polls into per-second rates: requests and throttles by operation,
+// matched and denied by rule. The first poll, and two polls at the same instant, leave them unset.
+func (m *Model) observe(prev, cur *snapshot) {
+	if prev == nil || cur == nil {
+		return
+	}
+	dt := cur.at.Sub(prev.at).Seconds()
+	if dt <= 0 {
+		return
+	}
+	m.opRate, m.opThrottle = map[string]float64{}, map[string]float64{}
+	for op, v := range cur.opRequests {
+		if d := v - prev.opRequests[op]; d > 0 {
+			m.opRate[op] = d / dt
+		}
+	}
+	for op, v := range cur.opThrottled {
+		if d := v - prev.opThrottled[op]; d > 0 {
+			m.opThrottle[op] = d / dt
+		}
+	}
+	was := make(map[string][2]int64, len(prev.limits.Rules))
+	for i := range prev.limits.Rules {
+		r := &prev.limits.Rules[i]
+		was[r.Name] = [2]int64{r.Matched, r.Denied}
+	}
+	m.ruleRate = map[string][2]float64{}
+	for i := range cur.limits.Rules {
+		r := &cur.limits.Rules[i]
+		if p, ok := was[r.Name]; ok {
+			m.ruleRate[r.Name] = [2]float64{max(0, float64(r.Matched-p[0])/dt), max(0, float64(r.Denied-p[1])/dt)}
+		}
+	}
+}
+
+// parseOpCounters sums tollbooth_requests_total by its operation label, and the part of it whose
+// result is "throttled", from a Prometheus text exposition.
+func parseOpCounters(raw []byte) (requests, throttled map[string]float64) {
+	requests, throttled = map[string]float64{}, map[string]float64{}
+	const name = "tollbooth_requests_total{"
+	for _, line := range strings.Split(string(raw), "\n") {
+		if !strings.HasPrefix(line, name) {
+			continue
+		}
+		end := strings.LastIndexByte(line, '}')
+		if end < 0 {
+			continue
+		}
+		var v float64
+		if _, err := fmt.Sscanf(strings.TrimSpace(line[end+1:]), "%g", &v); err != nil || v == 0 {
+			continue
+		}
+		labels := line[len(name):end]
+		op := labelValue(labels, "operation")
+		if op == "" {
+			continue
+		}
+		requests[op] += v
+		if labelValue(labels, "result") == "throttled" {
+			throttled[op] += v
+		}
+	}
+	return requests, throttled
+}
+
+// labelValue reads one label out of a `k="v",k2="v2"` list (tollbooth's label values carry no quotes).
+func labelValue(labels, key string) string {
+	needle := key + `="`
+	for off := 0; off < len(labels); {
+		i := strings.Index(labels[off:], needle)
+		if i < 0 {
+			return ""
+		}
+		i += off
+		if i == 0 || labels[i-1] == ',' {
+			rest := labels[i+len(needle):]
+			if j := strings.IndexByte(rest, '"'); j >= 0 {
+				return rest[:j]
+			}
+			return ""
+		}
+		off = i + 1
+	}
+	return ""
 }
 
 func (m Model) keyTestForm(msg tea.KeyMsg) (tea.Model, tea.Cmd) {

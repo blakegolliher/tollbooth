@@ -1,0 +1,24 @@
+ 1 Overview  2 Limits  3 Usage  4 Backends  5 Config  6 Graphs  tui-node · v0.0.
+╭──────────────────────────────────────────────────────────────────────────────╮
+│ New limit                                                                    │
+│   Limit what     ListObjectV2                                                │
+│ ▸ To at most     20           per second   at once: same as the limit        │
+│   Counted        choose…                                                     │
+│   Only for       access key any                                              │
+│                  bucket     any                                              │
+│                  prefix     any                                              │
+│                  source IP  any                                              │
+│   Over the limit 503 SlowDown (what S3 itself answers)                       │
+│   Name           listobjectv2                                                │
+│   Note           why this limit exists (optional)                            │
+│ ── how many ──────────────────────────────────────────────────────────────── │
+│   A number, for example 20.                                                  │
+│   That many may also arrive at once; the allowance then refills evenly.      │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│ Means   ✗ Limit what: unknown S3 operation "ListObjectV2"; did you mean      │
+│         ListObjectsV2?                                                       │
+│ Now                                                                          │
+╰──────────────────────────────────────────────────────────────────────────────╯
+tab next · arrows pick · enter accept · ctrl+r apply · ctrl+s save · esc cancel
