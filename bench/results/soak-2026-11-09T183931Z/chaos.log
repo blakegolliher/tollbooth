@@ -1,0 +1,317 @@
+2026-11-09T18:50:11Z begin backend-503
+2026-11-09T18:50:41Z end backend-503
+2026-11-09T19:00:19Z begin backend-stall
+2026-11-09T19:00:39Z end backend-stall
+2026-11-09T19:10:29Z begin backend-reset
+2026-11-09T19:10:49Z end backend-reset
+2026-11-09T19:20:38Z begin backend-down
+2026-11-09T19:21:08Z end backend-down
+2026-11-09T19:30:48Z begin reload-invalid
+422
+2026-11-09T19:30:54Z end reload-invalid
+2026-11-09T19:41:01Z begin reload-valid
+200
+2026-11-09T19:41:06Z end reload-valid
+2026-11-09T19:51:10Z begin showback-ro
+2026-11-09T19:52:40Z end showback-ro
+2026-11-09T20:01:20Z begin sighup
+2026-11-09T20:01:25Z end sighup
+2026-11-09T20:11:30Z begin backend-503
+2026-11-09T20:12:00Z end backend-503
+2026-11-09T20:21:40Z begin backend-stall
+2026-11-09T20:22:00Z end backend-stall
+2026-11-09T20:31:54Z begin backend-reset
+2026-11-09T20:32:14Z end backend-reset
+2026-11-09T20:42:04Z begin backend-down
+2026-11-09T20:42:34Z end backend-down
+2026-11-09T20:52:16Z begin reload-invalid
+422
+2026-11-09T20:52:21Z end reload-invalid
+2026-11-09T21:02:25Z begin reload-valid
+200
+2026-11-09T21:02:31Z end reload-valid
+2026-11-09T21:12:36Z begin showback-ro
+2026-11-09T21:14:06Z end showback-ro
+2026-11-09T21:22:45Z begin sighup
+2026-11-09T21:22:50Z end sighup
+2026-11-09T21:32:56Z begin backend-503
+2026-11-09T21:33:26Z end backend-503
+2026-11-09T21:43:10Z begin backend-stall
+2026-11-09T21:43:30Z end backend-stall
+2026-11-09T21:53:21Z begin backend-reset
+2026-11-09T21:53:41Z end backend-reset
+2026-11-09T22:03:32Z begin backend-down
+2026-11-09T22:04:02Z end backend-down
+2026-11-09T22:13:43Z begin reload-invalid
+422
+2026-11-09T22:13:48Z end reload-invalid
+2026-11-09T22:23:56Z begin reload-valid
+200
+2026-11-09T22:24:01Z end reload-valid
+2026-11-09T22:34:07Z begin showback-ro
+2026-11-09T22:35:37Z end showback-ro
+2026-11-09T22:44:21Z begin sighup
+2026-11-09T22:44:26Z end sighup
+2026-11-09T22:54:37Z begin backend-503
+2026-11-09T22:55:07Z end backend-503
+2026-11-09T23:04:49Z begin backend-stall
+2026-11-09T23:05:10Z end backend-stall
+2026-11-09T23:15:02Z begin backend-reset
+2026-11-09T23:15:22Z end backend-reset
+2026-11-09T23:25:11Z begin backend-down
+2026-11-09T23:25:41Z end backend-down
+2026-11-09T23:35:24Z begin reload-invalid
+422
+2026-11-09T23:35:29Z end reload-invalid
+2026-11-09T23:45:37Z begin reload-valid
+200
+2026-11-09T23:45:42Z end reload-valid
+2026-11-09T23:55:50Z begin showback-ro
+2026-11-09T23:57:21Z end showback-ro
+2026-11-10T00:06:03Z begin sighup
+2026-11-10T00:06:08Z end sighup
+2026-11-10T00:16:13Z begin backend-503
+2026-11-10T00:16:44Z end backend-503
+2026-11-10T00:26:25Z begin backend-stall
+2026-11-10T00:26:46Z end backend-stall
+2026-11-10T00:36:36Z begin backend-reset
+2026-11-10T00:36:56Z end backend-reset
+2026-11-10T00:46:47Z begin backend-down
+2026-11-10T00:47:17Z end backend-down
+2026-11-10T00:56:57Z begin reload-invalid
+422
+2026-11-10T00:57:03Z end reload-invalid
+2026-11-10T01:07:18Z begin reload-valid
+200
+2026-11-10T01:07:23Z end reload-valid
+2026-11-10T01:17:29Z begin showback-ro
+2026-11-10T01:18:59Z end showback-ro
+2026-11-10T01:27:40Z begin sighup
+2026-11-10T01:27:45Z end sighup
+2026-11-10T01:37:52Z begin backend-503
+2026-11-10T01:38:22Z end backend-503
+2026-11-10T01:48:03Z begin backend-stall
+2026-11-10T01:48:23Z end backend-stall
+2026-11-10T01:58:14Z begin backend-reset
+2026-11-10T01:58:34Z end backend-reset
+2026-11-10T02:08:25Z begin backend-down
+2026-11-10T02:08:55Z end backend-down
+2026-11-10T02:18:38Z begin reload-invalid
+422
+2026-11-10T02:18:43Z end reload-invalid
+2026-11-10T02:28:51Z begin reload-valid
+200
+2026-11-10T02:28:56Z end reload-valid
+2026-11-10T02:39:03Z begin showback-ro
+2026-11-10T02:40:33Z end showback-ro
+2026-11-10T02:49:19Z begin sighup
+2026-11-10T02:49:24Z end sighup
+2026-11-10T02:59:32Z begin backend-503
+2026-11-10T03:00:02Z end backend-503
+2026-11-10T03:09:45Z begin backend-stall
+2026-11-10T03:10:05Z end backend-stall
+2026-11-10T03:19:56Z begin backend-reset
+2026-11-10T03:20:16Z end backend-reset
+2026-11-10T03:30:11Z begin backend-down
+2026-11-10T03:30:41Z end backend-down
+2026-11-10T03:40:23Z begin reload-invalid
+422
+2026-11-10T03:40:28Z end reload-invalid
+2026-11-10T03:50:36Z begin reload-valid
+200
+2026-11-10T03:50:41Z end reload-valid
+2026-11-10T04:00:47Z begin showback-ro
+2026-11-10T04:02:17Z end showback-ro
+2026-11-10T04:10:58Z begin sighup
+2026-11-10T04:11:03Z end sighup
+2026-11-10T04:21:11Z begin backend-503
+2026-11-10T04:21:41Z end backend-503
+2026-11-10T04:31:25Z begin backend-stall
+2026-11-10T04:31:45Z end backend-stall
+2026-11-10T04:41:35Z begin backend-reset
+2026-11-10T04:41:55Z end backend-reset
+2026-11-10T04:51:46Z begin backend-down
+2026-11-10T04:52:16Z end backend-down
+2026-11-10T05:01:59Z begin reload-invalid
+422
+2026-11-10T05:02:04Z end reload-invalid
+2026-11-10T05:12:13Z begin reload-valid
+200
+2026-11-10T05:12:18Z end reload-valid
+2026-11-10T05:22:27Z begin showback-ro
+2026-11-10T05:23:57Z end showback-ro
+2026-11-10T05:32:39Z begin sighup
+2026-11-10T05:32:44Z end sighup
+2026-11-10T05:42:49Z begin backend-503
+2026-11-10T05:43:19Z end backend-503
+2026-11-10T05:53:00Z begin backend-stall
+2026-11-10T05:53:21Z end backend-stall
+2026-11-10T06:03:11Z begin backend-reset
+2026-11-10T06:03:31Z end backend-reset
+2026-11-10T06:13:22Z begin backend-down
+2026-11-10T06:13:52Z end backend-down
+2026-11-10T06:23:34Z begin reload-invalid
+422
+2026-11-10T06:23:39Z end reload-invalid
+2026-11-10T06:33:46Z begin reload-valid
+200
+2026-11-10T06:33:51Z end reload-valid
+2026-11-10T06:44:01Z begin showback-ro
+2026-11-10T06:45:31Z end showback-ro
+2026-11-10T06:54:12Z begin sighup
+2026-11-10T06:54:17Z end sighup
+2026-11-10T07:04:27Z begin backend-503
+2026-11-10T07:04:57Z end backend-503
+2026-11-10T07:14:35Z begin backend-stall
+2026-11-10T07:14:55Z end backend-stall
+2026-11-10T07:24:49Z begin backend-reset
+2026-11-10T07:25:09Z end backend-reset
+2026-11-10T07:35:01Z begin backend-down
+2026-11-10T07:35:31Z end backend-down
+2026-11-10T07:45:12Z begin reload-invalid
+422
+2026-11-10T07:45:17Z end reload-invalid
+2026-11-10T07:55:25Z begin reload-valid
+200
+2026-11-10T07:55:31Z end reload-valid
+2026-11-10T08:05:37Z begin showback-ro
+2026-11-10T08:07:08Z end showback-ro
+2026-11-10T08:15:50Z begin sighup
+2026-11-10T08:15:55Z end sighup
+2026-11-10T08:26:01Z begin backend-503
+2026-11-10T08:26:31Z end backend-503
+2026-11-10T08:36:12Z begin backend-stall
+2026-11-10T08:36:32Z end backend-stall
+2026-11-10T08:46:24Z begin backend-reset
+2026-11-10T08:46:44Z end backend-reset
+2026-11-10T08:56:35Z begin backend-down
+2026-11-10T08:57:05Z end backend-down
+2026-11-10T09:06:45Z begin reload-invalid
+422
+2026-11-10T09:06:50Z end reload-invalid
+2026-11-10T09:16:56Z begin reload-valid
+200
+2026-11-10T09:17:01Z end reload-valid
+2026-11-10T09:27:07Z begin showback-ro
+2026-11-10T09:28:37Z end showback-ro
+2026-11-10T09:37:21Z begin sighup
+2026-11-10T09:37:26Z end sighup
+2026-11-10T09:47:34Z begin backend-503
+2026-11-10T09:48:04Z end backend-503
+2026-11-10T09:57:46Z begin backend-stall
+2026-11-10T09:58:06Z end backend-stall
+2026-11-10T10:07:57Z begin backend-reset
+2026-11-10T10:08:17Z end backend-reset
+2026-11-10T10:18:07Z begin backend-down
+2026-11-10T10:18:37Z end backend-down
+2026-11-10T10:28:18Z begin reload-invalid
+422
+2026-11-10T10:28:23Z end reload-invalid
+2026-11-10T10:38:30Z begin reload-valid
+200
+2026-11-10T10:38:36Z end reload-valid
+2026-11-10T10:48:41Z begin showback-ro
+2026-11-10T10:50:11Z end showback-ro
+2026-11-10T10:58:51Z begin sighup
+2026-11-10T10:58:56Z end sighup
+2026-11-10T11:09:00Z begin backend-503
+2026-11-10T11:09:30Z end backend-503
+2026-11-10T11:19:10Z begin backend-stall
+2026-11-10T11:19:30Z end backend-stall
+2026-11-10T11:29:22Z begin backend-reset
+2026-11-10T11:29:42Z end backend-reset
+2026-11-10T11:39:34Z begin backend-down
+2026-11-10T11:40:04Z end backend-down
+2026-11-10T11:49:45Z begin reload-invalid
+422
+2026-11-10T11:49:50Z end reload-invalid
+2026-11-10T11:59:56Z begin reload-valid
+200
+2026-11-10T12:00:01Z end reload-valid
+2026-11-10T12:10:11Z begin showback-ro
+2026-11-10T12:11:41Z end showback-ro
+2026-11-10T12:20:22Z begin sighup
+2026-11-10T12:20:27Z end sighup
+2026-11-10T12:30:33Z begin backend-503
+2026-11-10T12:31:03Z end backend-503
+2026-11-10T12:40:45Z begin backend-stall
+2026-11-10T12:41:05Z end backend-stall
+2026-11-10T12:50:55Z begin backend-reset
+2026-11-10T12:51:15Z end backend-reset
+2026-11-10T13:01:06Z begin backend-down
+2026-11-10T13:01:36Z end backend-down
+2026-11-10T13:11:20Z begin reload-invalid
+422
+2026-11-10T13:11:25Z end reload-invalid
+2026-11-10T13:21:33Z begin reload-valid
+200
+2026-11-10T13:21:38Z end reload-valid
+2026-11-10T13:31:42Z begin showback-ro
+2026-11-10T13:33:12Z end showback-ro
+2026-11-10T13:41:56Z begin sighup
+2026-11-10T13:42:01Z end sighup
+2026-11-10T13:52:08Z begin backend-503
+2026-11-10T13:52:38Z end backend-503
+2026-11-10T14:02:18Z begin backend-stall
+2026-11-10T14:02:38Z end backend-stall
+2026-11-10T14:12:29Z begin backend-reset
+2026-11-10T14:12:49Z end backend-reset
+2026-11-10T14:22:39Z begin backend-down
+2026-11-10T14:23:09Z end backend-down
+2026-11-10T14:32:52Z begin reload-invalid
+422
+2026-11-10T14:32:57Z end reload-invalid
+2026-11-10T14:43:02Z begin reload-valid
+200
+2026-11-10T14:43:07Z end reload-valid
+2026-11-10T14:53:11Z begin showback-ro
+2026-11-10T14:54:41Z end showback-ro
+2026-11-10T15:03:22Z begin sighup
+2026-11-10T15:03:27Z end sighup
+2026-11-10T15:13:33Z begin backend-503
+2026-11-10T15:14:03Z end backend-503
+2026-11-10T15:23:44Z begin backend-stall
+2026-11-10T15:24:04Z end backend-stall
+2026-11-10T15:33:55Z begin backend-reset
+2026-11-10T15:34:15Z end backend-reset
+2026-11-10T15:44:07Z begin backend-down
+2026-11-10T15:44:37Z end backend-down
+2026-11-10T15:54:20Z begin reload-invalid
+422
+2026-11-10T15:54:25Z end reload-invalid
+2026-11-10T16:04:33Z begin reload-valid
+200
+2026-11-10T16:04:38Z end reload-valid
+2026-11-10T16:14:46Z begin showback-ro
+2026-11-10T16:16:16Z end showback-ro
+2026-11-10T16:24:58Z begin sighup
+2026-11-10T16:25:03Z end sighup
+2026-11-10T16:35:13Z begin backend-503
+2026-11-10T16:35:43Z end backend-503
+2026-11-10T16:45:26Z begin backend-stall
+2026-11-10T16:45:46Z end backend-stall
+2026-11-10T16:55:41Z begin backend-reset
+2026-11-10T16:56:01Z end backend-reset
+2026-11-10T17:05:56Z begin backend-down
+2026-11-10T17:06:26Z end backend-down
+2026-11-10T17:16:07Z begin reload-invalid
+422
+2026-11-10T17:16:12Z end reload-invalid
+2026-11-10T17:26:26Z begin reload-valid
+200
+2026-11-10T17:26:31Z end reload-valid
+2026-11-10T17:36:46Z begin showback-ro
+2026-11-10T17:38:16Z end showback-ro
+2026-11-10T17:47:00Z begin sighup
+2026-11-10T17:47:05Z end sighup
+2026-11-10T17:57:20Z begin backend-503
+2026-11-10T17:57:50Z end backend-503
+2026-11-10T18:07:39Z begin backend-stall
+2026-11-10T18:07:59Z end backend-stall
+2026-11-10T18:17:50Z begin backend-reset
+2026-11-10T18:18:10Z end backend-reset
+2026-11-10T18:28:02Z begin backend-down
+2026-11-10T18:28:32Z end backend-down
+2026-11-10T18:38:16Z begin reload-invalid
+422
+2026-11-10T18:38:21Z end reload-invalid

@@ -1,0 +1,40 @@
+ 1 Overview  2 Limits  3 Usage  4 Backends  5 Config  6 Graphs  tui-node · v0.0.0-tui
+╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ Change limit tenant-a-writes                                                                                         │
+│   Limit what     PutObject, UploadPart, CopyObject                                                                   │
+│ ▸ To at most     2000         per second   at once: 8000                                                             │
+│   Counted        each access key on each bucket                                                                      │
+│   Only for       access key AKIAEXAMPLE1                                                                             │
+│                  bucket     training-data                                                                            │
+│                  prefix     ckpt/                                                                                    │
+│                  source IP  any                                                                                      │
+│   Over the limit 503 SlowDown (what S3 itself answers)                                                               │
+│   Name           tenant-a-writes                                                                                     │
+│   Note           why this limit exists (optional)                                                                    │
+│ ── how many ──────────────────────────────────────────────────────────────────────────────────────────────────────── │
+│   A number, for example 20.                                                                                          │
+│   That many may also arrive at once; the allowance then refills evenly.                                              │
+│   For an even pace instead, choose "evenly spaced" under "at once".                                                  │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│ Means   At most 2,000 PutObject, UploadPart, and CopyObject calls per second for each access key on each bucket, up  │
+│         to 8,000 at once. Only for requests by access key AKIAEXAMPLE1 on bucket training-data under prefix ckpt/. … │
+│ Now     these 3 operations: 96/s right now, before this rule's filters                                               │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+
+
+
+
+
+
+
+
+
+
+
+tab next · arrows pick · enter accept · ctrl+r apply · ctrl+s save · esc cancel

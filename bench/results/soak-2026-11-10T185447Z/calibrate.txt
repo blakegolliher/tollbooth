@@ -1,0 +1,6 @@
+run 1/1 proxied warm-up 5s
+run 1/1 proxied measuring 5s … 7993 requests, 1597 req/s, p50 3670 µs, p99 23200 µs, p99.9 34767 µs, errors 0, attempts 7993, throttled 0
+
+median        req/s     p50 µs     p90 µs     p99 µs   p99.9 µs     max µs   errors   attempts  throttled
+proxied        1597       3670      10740      23200      34767      42697        0       7993          0
+wrote /tmp/claude-31337/-home-vastdata-projects-tollbooth/5617172b-9a56-474f-812e-295b803df285/scratchpad/wt-soak/bench/results/soak-2026-11-10T185447Z/20261110T185504Z-sdk-calibrate.json

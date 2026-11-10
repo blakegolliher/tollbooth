@@ -1,9 +1,10 @@
 # bench/
 
 - `nullbackend/` the in-repo S3-shaped backend (library, used by the proxy tests and `test/s3diff -record`) and `nullbackend/cmd/nullbackend`, the same thing as a process for `bench/run.sh`
-- `loadgen/` the load generator (ADR-0002): `-mode raw` fires presigned GET URLs over `net/http` for the latency rows (no signing on the hot path), `-mode sdk` drives an aws-sdk-go-v2 operation mix with the SDK's own retries for the throttle path; `-direct` and `-proxied` runs are interleaved and the added latency is proxied minus direct; HDR histograms (`hdrhistogram-go`, MIT, imported here and nowhere else, depguard) as text and JSON
+- `loadgen/` the load generator (ADR-0002): `-mode raw` fires presigned GET URLs over `net/http` for the latency rows (no signing on the hot path), `-mode sdk` drives an aws-sdk-go-v2 operation mix with the SDK's own retries for the throttle path; `-direct` and `-proxied` runs are interleaved and the added latency is proxied minus direct; HDR histograms (`hdrhistogram-go`, MIT, imported here and nowhere else, depguard) as text and JSON; against a real endpoint `-access-key`/`-secret-key` (or the `AWS_*` variables), `-bucket` (an existing one), `-seed` (write the objects first), `-insecure` (lab certificates)
 - `run.sh` what `make bench-e2e` runs: null backend, tollbooth with 100 rules loaded and pprof on, the raw and sdk scenarios, CPU and allocation profiles during the proxied run, environment facts; everything lands under `results/<date>/`
-- `warp/` (Phase 5) the external cross-check, a script and a pinned release only (AGPL-3.0, never code)
+- `soak.sh` what `make soak` runs (Phase 5): null backend, tollbooth, and loadgen at 50% of a calibrated peak for `SOAK_HOURS` with a chaos rotation (backend 503, stall, reset, process down, invalid and valid reloads, read-only showback directory, SIGHUP; a step starts only after the previous one ends); one sample every `SAMPLE_SECS` (60) to `soak.csv`, a verdict in `soak-report.txt` from `soak-report.py` (runnable by hand over a finished or running soak directory); refuses to start if its ports are taken and always rebuilds `bin/tollbooth`
+- `crosscheck.sh` (Phase 5, ADR-0005 amending ADR-0002): elbencho (GPL-3.0, a process, never code) against the direct and proxied endpoints, interleaved; replaces the planned warp cross-check since MinIO archived warp
 
 Results and profiles land under `results/<date>/` (docs/SPEC.md, Performance targets). The
 reference-node numbers are Phase 5; the dev-box numbers in the gate reports are indicative.

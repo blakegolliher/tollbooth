@@ -1,6 +1,8 @@
 node_id: a
 backend: {scheme: http, endpoints: [h:1]}
 showback: {dir: /d}
-rate_limits:
-  rules:
-    - {id: r, limit: {rate: 0.001, burst: 2000000000}}
+limits:
+  - name: r
+    limit_per_second: 0.001
+    burst: 2000000000
+    per: total

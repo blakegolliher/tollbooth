@@ -122,28 +122,38 @@ func (l *Limiter) Top(n int, window, now int64) []TopEntry {
 	return out
 }
 
-// RuleStatus is one row of GET /admin/limits: the rule as configured, its effective per-node
-// limit, and its counters.
+// RuleStatus is one row of GET /admin/limits: the rule in the file's own words, the sentence
+// tollbooth reads back for it (ADR-0007), its effective per-node limit, and its counters.
 type RuleStatus struct {
-	ID          string   `json:"id"`
-	AccessKeys  []string `json:"access_keys,omitempty"`
-	Buckets     []string `json:"buckets,omitempty"`
-	Prefixes    []string `json:"prefixes,omitempty"`
-	SourceCIDRs []string `json:"source_cidrs,omitempty"`
-	Ops         []string `json:"ops,omitempty"`
-	GroupBy     []string `json:"group_by"`
-	Rate        float64  `json:"rate"`
-	Burst       int      `json:"burst"`
+	Name      string   `json:"name"`
+	Sentence  string   `json:"sentence"`
+	Summary   string   `json:"summary"`
+	Operation []string `json:"operation,omitempty"`
+	AccessKey []string `json:"access_key,omitempty"`
+	Bucket    []string `json:"bucket,omitempty"`
+	Prefix    []string `json:"prefix,omitempty"`
+	SourceIP  []string `json:"source_ip,omitempty"`
+	// Limit is the limit as written ("20 per second", or "blocked"); RatePerSecond is the same in
+	// requests per second, 0 when blocked.
+	Limit         string   `json:"limit"`
+	Blocked       bool     `json:"blocked"`
+	RatePerSecond float64  `json:"rate_per_second"`
+	Burst         int      `json:"burst"`
+	Per           []string `json:"per"`
 	// EffectiveRate and EffectiveBurst are what this node enforces after cluster.node_count.
-	EffectiveRate  float64 `json:"effective_rate"`
+	EffectiveRate  float64 `json:"effective_rate_per_second"`
 	EffectiveBurst int     `json:"effective_burst"`
-	OnLimit        string  `json:"on_limit"`
+	Respond        int     `json:"respond"`
+	Note           string  `json:"note,omitempty"`
 	LiveKeys       int64   `json:"live_keys"`
-	Denied         int64   `json:"denied"`
+	// Matched counts the requests charged against the rule, allowed or denied; Denied the ones it
+	// refused. Both run since the rule's name first appeared and survive reloads.
+	Matched int64 `json:"matched"`
+	Denied  int64 `json:"denied"`
 }
 
 // Status lists the rules in force, in config order, with live key counts and denials since the
-// rule id first appeared.
+// rule name first appeared.
 func (l *Limiter) Status() []RuleStatus {
 	rs := l.rules.Load()
 	if rs == nil {
@@ -151,14 +161,16 @@ func (l *Limiter) Status() []RuleStatus {
 	}
 	out := make([]RuleStatus, 0, len(rs.rules))
 	for _, r := range rs.rules {
+		src := &r.src
 		st := RuleStatus{
-			ID: r.ID, AccessKeys: r.src.Match.AccessKeys, Buckets: r.src.Match.Buckets, Prefixes: r.src.Match.Prefixes,
-			SourceCIDRs: r.src.Match.SourceCIDRs, Ops: r.matchOpsNames, GroupBy: r.groupByNames,
-			Rate: r.src.Limit.Rate, Burst: r.src.Limit.Burst, EffectiveRate: r.effRate, EffectiveBurst: r.effBurst,
-			OnLimit: r.mode.String(), LiveKeys: r.stats.live.Load(), Denied: r.stats.denied.Load(),
+			Name: r.ID, Sentence: src.Sentence(), Summary: src.Summary(),
+			Operation: src.Operation, AccessKey: src.AccessKey, Bucket: src.Bucket, Prefix: src.Prefix, SourceIP: src.SourceIP,
+			Limit: src.LimitText(), Blocked: src.Blocked, RatePerSecond: src.Rate(), Burst: src.BurstSize(), Per: src.Per,
+			EffectiveRate: r.effRate, EffectiveBurst: r.effBurst, Respond: src.RespondStatus(), Note: src.Note,
+			LiveKeys: r.stats.live.Load(), Matched: r.stats.matched.Load(), Denied: r.stats.denied.Load(),
 		}
-		if st.GroupBy == nil {
-			st.GroupBy = []string{}
+		if st.Per == nil {
+			st.Per = []string{}
 		}
 		out = append(out, st)
 	}

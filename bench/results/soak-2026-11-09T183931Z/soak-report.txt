@@ -1,0 +1,16 @@
+samples: 1413 over 24.00 h
+requests: 69520214 total, 0 throttled, reloads ok 34 err 18
+rss: min 27 MiB, max 37 MiB, final 29 MiB; slope over the second half -0.19 MiB/h
+heap: final 5.9 MiB; goroutines final 43; limiter keys 0; showback tuples 208
+chaos steps: 141
+error events by chaos window (proxy errors + backend 5xx + backend transport errors + flush errors, over completed requests in the window):
+  backend-503: 8756 over 1744512 requests
+  backend-down: 17963 over 1735587 requests
+  backend-reset: 12146 over 1765111 requests
+  backend-stall: 360 over 1718166 requests
+  reload-invalid: 0 over 1770578 requests
+  reload-valid: 0 over 1674893 requests
+  showback-ro: 25 over 2507267 requests
+  sighup: 0 over 1669374 requests
+unexplained errors (outside every chaos window): 0
+verdict: flat memory, zero unexplained errors

@@ -32,6 +32,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -64,6 +65,11 @@ type options struct {
 	concurrency, keys, buckets, prefixes, objects, size, runs        int
 	duration, warmup                                                 time.Duration
 	adaptive                                                         bool
+	rate                                                             float64 // requests per second across all workers; 0 = as fast as possible
+	// A real S3 endpoint (a POC against a cluster): one real credential pair, one existing bucket,
+	// the objects written before the runs so GET and HEAD find them, and TLS verification optional.
+	accessKey, secretKey, bucket string
+	seed, insecure               bool
 }
 
 func main() {
@@ -93,6 +99,12 @@ func run(args []string, stdout, stderr io.Writer) int {
 	fs.DurationVar(&o.duration, "duration", 30*time.Second, "length of one measured run")
 	fs.DurationVar(&o.warmup, "warmup", 30*time.Second, "unmeasured warm-up before each run")
 	fs.BoolVar(&o.adaptive, "adaptive", false, "sdk mode: use the SDK's adaptive retry mode instead of standard")
+	fs.Float64Var(&o.rate, "rate", 0, "pace the whole run to this many requests per second (0: as fast as possible); the soak uses it")
+	fs.StringVar(&o.accessKey, "access-key", os.Getenv("AWS_ACCESS_KEY_ID"), "a real access key for a real endpoint (default $AWS_ACCESS_KEY_ID); forces -keys 1")
+	fs.StringVar(&o.secretKey, "secret-key", os.Getenv("AWS_SECRET_ACCESS_KEY"), "its secret (default $AWS_SECRET_ACCESS_KEY)")
+	fs.StringVar(&o.bucket, "bucket", "", "an existing bucket to use as is (overrides -bucket-base and -buckets)")
+	fs.BoolVar(&o.seed, "seed", false, "PUT every -prefixes × -objects object once before the runs, so GET and HEAD find them on a real endpoint")
+	fs.BoolVar(&o.insecure, "insecure", false, "skip TLS verification of an https endpoint (lab certificates)")
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
@@ -103,6 +115,16 @@ func run(args []string, stdout, stderr io.Writer) int {
 	if o.mode != "raw" && o.mode != "sdk" {
 		_, _ = fmt.Fprintln(stderr, "loadgen: -mode must be raw or sdk")
 		return 2
+	}
+	if (o.accessKey == "") != (o.secretKey == "") {
+		_, _ = fmt.Fprintln(stderr, "loadgen: -access-key and -secret-key go together")
+		return 2
+	}
+	if o.accessKey != "" {
+		o.keys = 1
+	}
+	if o.bucket != "" {
+		o.buckets = 1
 	}
 	rep, err := execute(&o, stdout)
 	if err != nil {
@@ -187,11 +209,18 @@ func execute(o *options, stdout io.Writer) (*Report, error) {
 		targets = append(targets, struct{ name, url string }{"proxied", o.proxied})
 	}
 	byTarget := map[string][]Run{}
+	seeded := map[string]bool{}
 	for i := 1; i <= o.runs; i++ {
 		for _, t := range targets {
 			w, err := newWorkload(o, t.url)
 			if err != nil {
 				return nil, err
+			}
+			if o.seed && !seeded[t.name] {
+				if err := w.seed(stdout); err != nil {
+					return nil, err
+				}
+				seeded[t.name] = true
 			}
 			if o.warmup > 0 {
 				_, _ = fmt.Fprintf(stdout, "run %d/%d %-7s warm-up %s\n", i, o.runs, t.name, o.warmup)
@@ -271,15 +300,22 @@ func newWorkload(o *options, endpoint string) (*workload, error) {
 			}
 			d.LocalAddr = &net.TCPAddr{IP: ip}
 		}
-		w.transports = append(w.transports, &http.Transport{
+		tr := &http.Transport{
 			DialContext: d.DialContext, MaxIdleConns: o.concurrency * 2, MaxIdleConnsPerHost: o.concurrency * 2,
 			IdleConnTimeout: 90 * time.Second, DisableCompression: true, ForceAttemptHTTP2: false,
-		})
+		}
+		if o.insecure {
+			tr.TLSClientConfig = &tls.Config{InsecureSkipVerify: true, MinVersion: tls.VersionTLS12} //nolint:gosec // -insecure, the operator's explicit choice for a lab certificate
+		}
+		w.transports = append(w.transports, tr)
 	}
 	ctx := context.Background()
 	for k := 0; k < max(1, o.keys); k++ {
-		ak := fmt.Sprintf("AKIALOAD%03d", k)
-		cfg := aws.Config{Region: o.region, Credentials: credentials.NewStaticCredentialsProvider(ak, "load-secret", "")}
+		ak, sk := fmt.Sprintf("AKIALOAD%03d", k), "load-secret"
+		if o.accessKey != "" {
+			ak, sk = o.accessKey, o.secretKey
+		}
+		cfg := aws.Config{Region: o.region, Credentials: credentials.NewStaticCredentialsProvider(ak, sk, "")}
 		if o.adaptive {
 			cfg.Retryer = func() aws.Retryer { return retry.NewAdaptiveMode() }
 		}
@@ -306,7 +342,7 @@ func newWorkload(o *options, endpoint string) (*workload, error) {
 			for b := 0; b < max(1, o.buckets); b++ {
 				for p := 0; p < max(1, o.prefixes); p++ {
 					for n := 0; n < min(max(1, o.objects), 64); n++ { // a bounded URL set per (key, bucket, prefix)
-						req, err := ps.PresignGetObject(ctx, &s3.GetObjectInput{Bucket: aws.String(fmt.Sprintf("%s%d", o.bucketBase, b)), Key: aws.String(fmt.Sprintf("p%d/obj-%d", p, n))})
+						req, err := ps.PresignGetObject(ctx, &s3.GetObjectInput{Bucket: aws.String(o.bucketName(b)), Key: aws.String(fmt.Sprintf("p%d/obj-%d", p, n))})
 						if err != nil {
 							return nil, err
 						}
@@ -379,7 +415,19 @@ func (w *workload) measure(d time.Duration, concurrency int) Run {
 			rng := rand.New(rand.NewPCG(uint64(i), uint64(start.UnixNano()))) //nolint:gosec // workload shaping, not security
 			client := &http.Client{Transport: w.transports[i%len(w.transports)]}
 			body := bytes.Repeat([]byte("x"), w.o.size)
+			// Pacing: each worker owns rate/concurrency requests per second, spaced evenly.
+			var interval time.Duration
+			if w.o.rate > 0 {
+				interval = time.Duration(float64(time.Second) * float64(concurrency) / w.o.rate)
+			}
+			next := time.Now()
 			for time.Now().Before(deadline) {
+				if interval > 0 {
+					if d := time.Until(next); d > 0 {
+						time.Sleep(d)
+					}
+					next = next.Add(interval)
+				}
 				t0 := time.Now()
 				var status int
 				var n int64
@@ -443,10 +491,60 @@ func (w *workload) rawGet(c *http.Client, url string) (status int, n int64, err 
 	return resp.StatusCode, n, nil
 }
 
+// bucketName is bucket b of the run: -bucket as is, or <bucket-base><b>.
+func (o *options) bucketName(b int) string {
+	if o.bucket != "" {
+		return o.bucket
+	}
+	return fmt.Sprintf("%s%d", o.bucketBase, b)
+}
+
+// seed writes every object the mix can address, once, with the first client, so GET and HEAD on a
+// real endpoint find them. Errors are returned after the whole set was attempted.
+func (w *workload) seed(stdout io.Writer) error {
+	c := w.clients[0]
+	body := bytes.Repeat([]byte("x"), w.o.size)
+	total := max(1, w.o.buckets) * max(1, w.o.prefixes) * max(1, w.o.objects)
+	_, _ = fmt.Fprintf(stdout, "seeding %d objects of %d bytes…", total, w.o.size)
+	var failed int
+	var first error
+	sem := make(chan struct{}, max(1, w.o.concurrency))
+	var mu sync.Mutex
+	var wg sync.WaitGroup
+	for b := 0; b < max(1, w.o.buckets); b++ {
+		for p := 0; p < max(1, w.o.prefixes); p++ {
+			for n := 0; n < max(1, w.o.objects); n++ {
+				wg.Add(1)
+				sem <- struct{}{}
+				go func(bucket, key string) {
+					defer wg.Done()
+					defer func() { <-sem }()
+					_, err := c.PutObject(context.Background(), &s3.PutObjectInput{Bucket: &bucket, Key: &key, Body: bytes.NewReader(body)})
+					if err != nil {
+						mu.Lock()
+						failed++
+						if first == nil {
+							first = err
+						}
+						mu.Unlock()
+					}
+				}(w.o.bucketName(b), fmt.Sprintf("p%d/obj-%d", p, n))
+			}
+		}
+	}
+	wg.Wait()
+	if failed > 0 {
+		_, _ = fmt.Fprintf(stdout, " %d failed\n", failed)
+		return fmt.Errorf("seed: %d of %d PUTs failed; first: %w", failed, total, first)
+	}
+	_, _ = fmt.Fprintln(stdout, " done")
+	return nil
+}
+
 func (w *workload) sdkOp(rng *rand.Rand, body []byte) (status int, n int64, err error) {
 	ctx := context.Background()
 	c := w.clients[rng.IntN(len(w.clients))]
-	bucket := aws.String(fmt.Sprintf("%s%d", w.o.bucketBase, rng.IntN(max(1, w.o.buckets))))
+	bucket := aws.String(w.o.bucketName(rng.IntN(max(1, w.o.buckets))))
 	key := aws.String(fmt.Sprintf("p%d/obj-%d", rng.IntN(max(1, w.o.prefixes)), rng.IntN(max(1, w.o.objects))))
 	switch w.ops[rng.IntN(len(w.ops))] {
 	case opGet:

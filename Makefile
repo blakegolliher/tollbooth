@@ -20,7 +20,6 @@ BENCH_COUNT ?= 6
 GOLANGCI_LINT_VERSION ?= v2.15.0
 GO_LICENSES_VERSION   ?= v2.0.1
 GOVULNCHECK_VERSION   ?= v1.9.0
-BENCHSTAT             ?= golang.org/x/perf/cmd/benchstat@latest
 GOLANGCI_LINT         := $(BIN)/golangci-lint-$(GOLANGCI_LINT_VERSION)
 GO_LICENSES           := $(BIN)/go-licenses-$(GO_LICENSES_VERSION)
 GOVULNCHECK           := $(BIN)/govulncheck-$(GOVULNCHECK_VERSION)
@@ -34,7 +33,7 @@ LDFLAGS    := -s -w -X main.version=$(VERSION) -X main.commit=$(COMMIT) -X main.
 # container runtime is needed (Gate 0 review).
 INTEGRATION_DIR := test/integration
 
-.PHONY: all build lint test race fuzz bench bench-compare bench-e2e s3diff-record backends compat release tools tidy vuln licenses clean help
+.PHONY: all build lint test race fuzz bench bench-compare bench-e2e s3diff-record backends compat compat-vast release image demo soak tools tidy vuln licenses clean help
 
 all: build lint test race s3diff-record ## build, lint, test, race, in-process byte-equivalence — the PR gate (fuzz and compat run in their own CI jobs)
 
@@ -81,8 +80,8 @@ bench: ## run all benchmarks with -benchmem, write test/bench/new.txt
 	@mkdir -p test/bench
 	$(GO) test -run '^$$' -bench . -benchmem -benchtime $(BENCH_TIME) -count $(BENCH_COUNT) $(PKGS) > test/bench/new.txt 2>&1; rc=$$?; cat test/bench/new.txt; exit $$rc
 
-bench-compare: bench ## compare test/bench/new.txt against test/bench/baseline.txt with benchstat (±10% gate, CLAUDE.md)
-	$(GO) run $(BENCHSTAT) test/bench/baseline.txt test/bench/new.txt
+bench-compare: bench ## compare test/bench/new.txt against test/bench/baseline.txt: fails on a median ns/op more than 10% slower or any allocs/op increase (test/bench/compare)
+	$(GO) run ./test/bench/compare -threshold 10 test/bench/baseline.txt test/bench/new.txt
 
 bench-e2e: build ## null backend + tollbooth (100 rules) + bench/loadgen, direct versus proxied, interleaved runs, profiles; results under bench/results/<date>/
 	bench/run.sh
@@ -95,10 +94,37 @@ s3diff-record: ## byte-equivalence matrix against the in-process recording backe
 	$(GO) run ./test/s3diff -record > $(RUN)/s3diff-record.log 2>&1; rc=$$?; tail -3 $(RUN)/s3diff-record.log; exit $$rc
 
 compat: build backends ## byte-equivalence against Garage and versitygw, the client matrix (docs/COMPAT.md), and the client throttling rows (docs/THROTTLE.md)
+	$(INTEGRATION_DIR)/selftest.sh
 	$(INTEGRATION_DIR)/compat.sh
 
-release: ## build release artifacts into ./dist (Phase 5: binary, systemd unit, container image)
-	@echo "release: defined in Phase 5"; exit 1
+# The same matrix by hand against a cluster that already exists (test plan category 6). With
+# VAST_BUCKET it works inside that bucket under prefixes of its own and creates or deletes no
+# bucket; without it, it creates and deletes s3diff-vast and compat-<tool>-vast-{direct,via}.
+#   VAST_ENDPOINT=host:port VAST_BUCKET=bucket AWS_ACCESS_KEY_ID=… AWS_SECRET_ACCESS_KEY=… make compat-vast
+compat-vast: build ## byte-equivalence and the client matrix through tollbooth against an existing VAST cluster (VAST_ENDPOINT, VAST_BUCKET, AWS_*); writes docs/COMPAT-vast.md
+	$(INTEGRATION_DIR)/selftest.sh
+	BACKENDS=vast STAGES="s3diff clients" $(INTEGRATION_DIR)/compat.sh
+
+# Release artifacts: static binaries for linux/amd64 and linux/arm64, the systemd unit, the
+# example config, the Dockerfile, the licenses, a tarball per platform, and SHA-256 sums. The
+# container image is built by `make image` (docker) from deploy/Dockerfile.
+DIST := $(CURDIR)/dist
+release: ## build release artifacts into ./dist: static binaries (amd64, arm64), unit, config, notices, tarballs, SHA256SUMS
+	@rm -rf $(DIST) && mkdir -p $(DIST)
+	@for arch in amd64 arm64; do \
+	  d=$(DIST)/tollbooth-$(VERSION)-linux-$$arch; mkdir -p $$d; \
+	  CGO_ENABLED=0 GOOS=linux GOARCH=$$arch $(GO) build -trimpath -ldflags '$(LDFLAGS)' -o $$d/tollbooth ./cmd/tollbooth || exit 1; \
+	  cp deploy/tollbooth.service deploy/tollbooth.example.yaml deploy/Dockerfile LICENSE THIRD_PARTY_NOTICES.md CHANGELOG.md $$d/; \
+	  cp docs/OPERATIONS.md docs/CONFIG.md docs/SHOWBACK_SCHEMA.md $$d/; \
+	  tar -C $(DIST) -czf $$d.tar.gz $$(basename $$d) && rm -rf $$d; \
+	done
+	@cd $(DIST) && sha256sum *.tar.gz > SHA256SUMS && cat SHA256SUMS
+	@# The amd64 binary must run here and report the version it was built with.
+	@mkdir -p $(DIST)/check && tar -C $(DIST)/check -xzf $(DIST)/tollbooth-$(VERSION)-linux-amd64.tar.gz && $(DIST)/check/tollbooth-$(VERSION)-linux-amd64/tollbooth version && rm -rf $(DIST)/check
+
+image: ## build the container image from deploy/Dockerfile (needs docker)
+	docker build -f deploy/Dockerfile --build-arg VERSION=$(VERSION) --build-arg COMMIT=$(COMMIT) --build-arg BUILD_DATE=$(BUILD_DATE) -t tollbooth:$(VERSION) .
+	docker run --rm tollbooth:$(VERSION) version
 
 tools: $(GOLANGCI_LINT) $(GO_LICENSES) $(GOVULNCHECK) ## install pinned tool binaries into ./bin
 
@@ -127,8 +153,14 @@ tidy: ## go mod tidy and verify nothing changed
 	$(GO) mod tidy
 	git diff --exit-code -- go.mod go.sum
 
+demo: build ## the demo stack (demo/run.sh start): null backend + tollbooth with demo/tollbooth.demo.yaml; demo/DEMO.md is the walkthrough
+	demo/run.sh start
+
+soak: build ## the soak: null backend + tollbooth + loadgen at 50% of peak with chaos injections (SOAK_HOURS, default 24)
+	bench/soak.sh
+
 clean:
-	rm -rf $(BIN) $(RUN) test/bench/new.txt
+	rm -rf $(BIN) $(RUN) $(DIST) test/bench/new.txt
 
 help:
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN{FS=":.*?## "}{printf "  %-14s %s\n", $$1, $$2}'

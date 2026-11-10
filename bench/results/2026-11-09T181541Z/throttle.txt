@@ -1,0 +1,6 @@
+run 1/1 proxied warm-up 5s
+run 1/1 proxied measuring 30s … 15514 requests, 473 req/s, p50 946 µs, p99 1684013 µs, p99.9 2747269 µs, errors 0, attempts 16432, throttled 918
+
+median        req/s     p50 µs     p90 µs     p99 µs   p99.9 µs     max µs   errors   attempts  throttled
+proxied         473        946      19268    1684013    2747269    5259657        0      16432        918
+wrote /home/vastdata/projects/tollbooth/bench/results/2026-11-09T181541Z/20261109T182830Z-sdk-throttle.json

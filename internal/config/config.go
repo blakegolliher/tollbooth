@@ -31,17 +31,17 @@ type Config struct {
 	NodeID      string   `yaml:"node_id"`
 	BaseDomains []string `yaml:"base_domains"`
 
-	Listen     Listen       `yaml:"listen"`
-	Backend    Backend      `yaml:"backend"`
-	Proxy      Proxy        `yaml:"proxy"`
-	Cluster    Cluster      `yaml:"cluster"`
-	RateLimits RateLimits   `yaml:"rate_limits"`
-	Limiter    Limiter      `yaml:"limiter"`
-	Showback   Showback     `yaml:"showback"`
-	Admin      Admin        `yaml:"admin"`
-	Logging    Logging      `yaml:"logging"`
-	Features   Features     `yaml:"features"`
-	Kill       KillSwitches `yaml:"kill_switches"`
+	Listen   Listen       `yaml:"listen"`
+	Backend  Backend      `yaml:"backend"`
+	Proxy    Proxy        `yaml:"proxy"`
+	Cluster  Cluster      `yaml:"cluster"`
+	Limits   []Rule       `yaml:"limits"`
+	Limiter  Limiter      `yaml:"limiter"`
+	Showback Showback     `yaml:"showback"`
+	Admin    Admin        `yaml:"admin"`
+	Logging  Logging      `yaml:"logging"`
+	Features Features     `yaml:"features"`
+	Kill     KillSwitches `yaml:"kill_switches"`
 
 	// Derived at load, never from the file.
 	identity s3id.Config
@@ -102,37 +102,6 @@ type Cluster struct {
 	NodeCount int `yaml:"node_count"`
 }
 
-// RateLimits is the rule set (docs/SPEC.md, Rate limiting).
-type RateLimits struct {
-	DefaultOnLimit string `yaml:"default_on_limit"`
-	Rules          []Rule `yaml:"rules"`
-}
-
-// Rule is one rate-limit rule. Validation is here; compilation into matchers and GCRA state is
-// internal/limiter's (Phase 2).
-type Rule struct {
-	ID      string   `yaml:"id"`
-	Match   Match    `yaml:"match"`
-	GroupBy []string `yaml:"group_by"`
-	Limit   Limit    `yaml:"limit"`
-	OnLimit string   `yaml:"on_limit"`
-}
-
-// Match is a rule's conditions; every listed one must hold, an omitted one matches anything.
-type Match struct {
-	AccessKeys  []string `yaml:"access_keys"`
-	Buckets     []string `yaml:"buckets"`
-	Prefixes    []string `yaml:"prefixes"`
-	SourceCIDRs []string `yaml:"source_cidrs"`
-	Ops         []string `yaml:"ops"`
-}
-
-// Limit is rate and burst. Rate 0 blocks. Burst defaults to max(1, ceil(rate)).
-type Limit struct {
-	Rate  float64 `yaml:"rate"`
-	Burst int     `yaml:"burst"`
-}
-
 // Limiter is the key store's bounds.
 type Limiter struct {
 	MaxKeys       int           `yaml:"max_keys"`
@@ -164,13 +133,14 @@ type Logging struct {
 	ThrottleSample int    `yaml:"throttle_sample"`
 }
 
-// Mode names for throttle responses.
+// Mode names for throttle responses, as the limiter and the admin API name them; in the file a
+// rule says `respond: 503` or `respond: 429`.
 const (
 	ModeSlowDown        = "slowdown"
 	ModeTooManyRequests = "too_many_requests"
 )
 
-// Dimension names shared by group_by and showback.dimensions.
+// Dimension names shared by a rule's filters, its `per`, and showback.dimensions.
 const (
 	DimAccessKey   = "access_key"
 	DimBucket      = "bucket"
@@ -193,19 +163,21 @@ const (
 	DefaultIdleBodyTimeout       = 60 * time.Second
 	DefaultMaxIdleConnsPerHost   = 1024
 	DefaultHealthInterval        = 5 * time.Second
-	DefaultHealthTimeout         = 2 * time.Second
-	DefaultCopyBufferBytes       = 128 << 10
-	DefaultDrainTimeout          = 30 * time.Second
-	DefaultNodeCount             = 1
-	DefaultOnLimit               = ModeSlowDown
-	DefaultMaxKeys               = 2_000_000
-	DefaultSweepInterval         = 10 * time.Second
-	DefaultFlushInterval         = 60 * time.Second
-	DefaultRetentionDays         = 400
-	DefaultMaxTuplesPerHour      = 250_000
-	DefaultAdminAddress          = "127.0.0.1:9900"
-	DefaultLogLevel              = "info"
-	DefaultThrottleSample        = 100
+	// A VAST cluster answers the unsigned HEAD / of the health probe after 2.0 s (measured 2.003
+	// to 2.007 s, 2026-11-10); at the earlier default of 2 s every probe timed out and a working
+	// backend was marked down (D-064).
+	DefaultHealthTimeout    = 5 * time.Second
+	DefaultCopyBufferBytes  = 128 << 10
+	DefaultDrainTimeout     = 30 * time.Second
+	DefaultNodeCount        = 1
+	DefaultMaxKeys          = 2_000_000
+	DefaultSweepInterval    = 10 * time.Second
+	DefaultFlushInterval    = 60 * time.Second
+	DefaultRetentionDays    = 400
+	DefaultMaxTuplesPerHour = 250_000
+	DefaultAdminAddress     = "127.0.0.1:9900"
+	DefaultLogLevel         = "info"
+	DefaultThrottleSample   = 100
 )
 
 // Bounds on the limiter arithmetic (D-037): with these, every GCRA quantity (emission interval,
@@ -267,23 +239,8 @@ func (c *Config) applyDefaults() {
 	if c.Cluster.NodeCount == 0 {
 		c.Cluster.NodeCount = DefaultNodeCount
 	}
-	if c.RateLimits.DefaultOnLimit == "" {
-		c.RateLimits.DefaultOnLimit = DefaultOnLimit
-	}
-	for i := range c.RateLimits.Rules {
-		r := &c.RateLimits.Rules[i]
-		if r.OnLimit == "" {
-			r.OnLimit = c.RateLimits.DefaultOnLimit
-		}
-		if r.Limit.Burst == 0 && r.Limit.Rate > 0 {
-			r.Limit.Burst = int(r.Limit.Rate)
-			if float64(r.Limit.Burst) < r.Limit.Rate {
-				r.Limit.Burst++ // ceil
-			}
-			if r.Limit.Burst < 1 {
-				r.Limit.Burst = 1
-			}
-		}
+	for i := range c.Limits {
+		c.Limits[i].canonicalize() // operation names in S3's spelling, whatever case they were typed in
 	}
 	if c.Limiter.MaxKeys == 0 {
 		c.Limiter.MaxKeys = DefaultMaxKeys

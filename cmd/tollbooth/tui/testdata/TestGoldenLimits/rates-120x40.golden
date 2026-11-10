@@ -1,0 +1,40 @@
+ 1 Overview  2 Limits  3 Usage  4 Backends  5 Config  6 Graphs  tui-node · v0.0.0-tui
+  LIMIT           MEANS                                                                            MATCHED/S THROTTLED/S
+  tenant-a-writes PutObject +2: 2,000 per second for each access key on each bucket; key AKIAEX…          80           0
+▸ list-storm      ListObjectsV2, ListObjects: 50 per second from each source IP                          312         170
+  frozen          all requests: blocked; key AKIAREVOKED                                                   0           0
+
+  list-storm: At most 50 ListObjectsV2 and ListObjects calls per second from each source IP, up to 200 at once. Over
+  the limit, the client gets 429 TooManyRequests.
+
+  BUSIEST OPERATIONS RIGHT NOW            REQ/S  THROTTLED/S  LIMITED BY
+  GetObject                               1,204            0  no limit
+  ListObjectsV2                             312          170  list-storm
+  PutObject                                  96            0  tenant-a-writes (part)
+  HeadObject                                4.2            0  no limit
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+↑↓ select · enter change · n new · d delete · t test · / filter · ? help

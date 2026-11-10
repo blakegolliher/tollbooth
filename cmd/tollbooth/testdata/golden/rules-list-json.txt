@@ -1,60 +1,77 @@
 {
   "rules": [
     {
-      "id": "tenant-a-writes",
-      "access_keys": [
+      "name": "tenant-a-writes",
+      "sentence": "At most 2,000 PutObject, UploadPart, and CopyObject calls per second for each access key on each bucket, up to 4,000 at once. Only for requests by access keys AKIAEXAMPLE1 and AKIAEXAMPLE2 on bucket training-data under prefix ckpt/. Over the limit, the client gets 503 SlowDown.",
+      "summary": "PutObject +2: 2,000 per second for each access key on each bucket; 2 keys, bucket training-data, prefix ckpt/",
+      "operation": [
+        "PutObject",
+        "UploadPart",
+        "CopyObject"
+      ],
+      "access_key": [
         "AKIAEXAMPLE1",
         "AKIAEXAMPLE2"
       ],
-      "buckets": [
+      "bucket": [
         "training-data"
       ],
-      "prefixes": [
+      "prefix": [
         "ckpt/"
       ],
-      "ops": [
-        "WRITE"
-      ],
-      "group_by": [
+      "limit": "2,000 per second",
+      "blocked": false,
+      "rate_per_second": 2000,
+      "burst": 4000,
+      "per": [
         "access_key",
         "bucket"
       ],
-      "rate": 2000,
-      "burst": 4000,
-      "effective_rate": 1000,
+      "effective_rate_per_second": 1000,
       "effective_burst": 2000,
-      "on_limit": "slowdown",
+      "respond": 503,
       "live_keys": 0,
+      "matched": 0,
       "denied": 0
     },
     {
-      "id": "list-storm",
-      "ops": [
-        "LIST"
+      "name": "list-storm",
+      "sentence": "At most 50 List* calls (11 operations) per second from each source IP, up to 200 at once. Over the limit, the client gets 429 TooManyRequests.",
+      "summary": "List*: 50 per second from each source IP",
+      "operation": [
+        "List*"
       ],
-      "group_by": [
+      "limit": "50 per second",
+      "blocked": false,
+      "rate_per_second": 50,
+      "burst": 200,
+      "per": [
         "source_ip"
       ],
-      "rate": 50,
-      "burst": 200,
-      "effective_rate": 25,
+      "effective_rate_per_second": 25,
       "effective_burst": 100,
-      "on_limit": "too_many_requests",
+      "respond": 429,
       "live_keys": 0,
+      "matched": 0,
       "denied": 0
     },
     {
-      "id": "frozen",
-      "access_keys": [
+      "name": "frozen",
+      "sentence": "Refuses every request by access key AKIAREVOKED. The client gets 503 SlowDown.",
+      "summary": "all requests: blocked; key AKIAREVOKED",
+      "access_key": [
         "AKIAREVOKED"
       ],
-      "group_by": [],
-      "rate": 0,
+      "limit": "blocked",
+      "blocked": true,
+      "rate_per_second": 0,
       "burst": 0,
-      "effective_rate": 0,
+      "per": [],
+      "effective_rate_per_second": 0,
       "effective_burst": 0,
-      "on_limit": "slowdown",
+      "respond": 503,
       "live_keys": 0,
+      "matched": 3,
       "denied": 3
     }
   ],

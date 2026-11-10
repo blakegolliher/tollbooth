@@ -43,7 +43,7 @@ func (m Mode) String() string {
 	return config.ModeSlowDown
 }
 
-// group_by dimensions as bits.
+// The `per` dimensions as bits.
 const (
 	dimAccessKey uint8 = 1 << iota
 	dimBucket
@@ -74,16 +74,16 @@ type Rule struct {
 	mode     Mode
 
 	// As configured, for the admin view.
-	src           config.Rule
-	effRate       float64
-	effBurst      int
-	groupByNames  []string
-	matchOpsNames []string
+	src      config.Rule
+	effRate  float64
+	effBurst int
 
 	// Per-rule counters carried across reloads by id, and the pre-resolved
-	// tollbooth_limiter_denied_total{rule} child (nil without metrics).
-	stats  *ruleStats
-	denied prometheus.Counter
+	// tollbooth_limiter_matched_total{rule} and tollbooth_limiter_denied_total{rule} children (nil
+	// without metrics).
+	stats   *ruleStats
+	matched prometheus.Counter
+	denied  prometheus.Counter
 }
 
 // RuleSet is one compiled configuration, published whole by Apply and read whole by every
@@ -102,19 +102,15 @@ func compile(cfg *config.Config) (*RuleSet, error) {
 	if n < 1 {
 		n = 1
 	}
-	defMode, err := parseMode(cfg.RateLimits.DefaultOnLimit)
-	if err != nil {
-		return nil, fmt.Errorf("rate_limits.default_on_limit: %w", err)
-	}
-	rs := &RuleSet{byID: make(map[string]*Rule, len(cfg.RateLimits.Rules))}
-	for i := range cfg.RateLimits.Rules {
-		src := &cfg.RateLimits.Rules[i]
-		r, err := compileRule(src, i, n, defMode)
+	rs := &RuleSet{byID: make(map[string]*Rule, len(cfg.Limits))}
+	for i := range cfg.Limits {
+		src := &cfg.Limits[i]
+		r, err := compileRule(src, i, n)
 		if err != nil {
-			return nil, fmt.Errorf("rate_limits.rules[%d] (%s): %w", i, src.ID, err)
+			return nil, fmt.Errorf("limits[%d] (%s): %w", i, src.Name, err)
 		}
 		if _, dup := rs.byID[r.ID]; dup {
-			return nil, fmt.Errorf("rate_limits.rules[%d]: duplicate id %q", i, r.ID)
+			return nil, fmt.Errorf("limits[%d]: duplicate name %q", i, r.ID)
 		}
 		rs.rules = append(rs.rules, r)
 		rs.byID[r.ID] = r
@@ -127,25 +123,25 @@ func compile(cfg *config.Config) (*RuleSet, error) {
 	return rs, nil
 }
 
-func compileRule(src *config.Rule, idx, nodeCount int, defMode Mode) (*Rule, error) {
-	r := &Rule{ID: strings.Clone(src.ID), idx: idx, src: *src}
-	if len(src.Match.AccessKeys) > 0 {
-		r.accessKeys = make(map[string]struct{}, len(src.Match.AccessKeys))
-		for _, k := range src.Match.AccessKeys {
+func compileRule(src *config.Rule, idx, nodeCount int) (*Rule, error) {
+	r := &Rule{ID: strings.Clone(src.Name), idx: idx, src: *src}
+	if len(src.AccessKey) > 0 {
+		r.accessKeys = make(map[string]struct{}, len(src.AccessKey))
+		for _, k := range src.AccessKey {
 			r.accessKeys[strings.Clone(k)] = struct{}{}
 		}
 	}
-	if len(src.Match.Buckets) > 0 {
-		r.buckets = make(map[string]struct{}, len(src.Match.Buckets))
-		for _, b := range src.Match.Buckets {
+	if len(src.Bucket) > 0 {
+		r.buckets = make(map[string]struct{}, len(src.Bucket))
+		for _, b := range src.Bucket {
 			r.buckets[strings.Clone(b)] = struct{}{}
 		}
 	}
-	if len(src.Match.Prefixes) > 0 {
-		r.prefixes = make([]string, 0, len(src.Match.Prefixes))
-		for _, p := range src.Match.Prefixes {
+	if len(src.Prefix) > 0 {
+		r.prefixes = make([]string, 0, len(src.Prefix))
+		for _, p := range src.Prefix {
 			if p == "" {
-				return nil, fmt.Errorf("match.prefixes: empty prefix")
+				return nil, fmt.Errorf("prefix: empty prefix")
 			}
 			r.prefixes = append(r.prefixes, strings.Clone(p))
 		}
@@ -153,37 +149,30 @@ func compileRule(src *config.Rule, idx, nodeCount int, defMode Mode) (*Rule, err
 		// distinct strings of equal length that both prefix the same key.
 		sort.SliceStable(r.prefixes, func(i, j int) bool { return len(r.prefixes[i]) > len(r.prefixes[j]) })
 	}
-	if len(src.Match.SourceCIDRs) > 0 {
-		r.cidrs = make([]netip.Prefix, 0, len(src.Match.SourceCIDRs))
-		for _, c := range src.Match.SourceCIDRs {
+	if len(src.SourceIP) > 0 {
+		r.cidrs = make([]netip.Prefix, 0, len(src.SourceIP))
+		for _, c := range src.SourceIP {
 			p, err := parseCIDR(c)
 			if err != nil {
-				return nil, fmt.Errorf("match.source_cidrs: %w", err)
+				return nil, fmt.Errorf("source_ip: %w", err)
 			}
 			r.cidrs = append(r.cidrs, p)
 		}
 	}
-	if len(src.Match.Ops) == 0 {
+	if len(src.Operation) == 0 {
 		r.ops = [2]uint64{math.MaxUint64, math.MaxUint64}
 	} else {
-		for _, name := range src.Match.Ops {
-			if c, ok := s3id.ParseClass(name); ok {
-				for _, op := range s3id.Ops() {
-					if op.Class() == c {
-						r.setOp(op)
-					}
-				}
-				continue
+		for _, entry := range src.Operation {
+			ops, _, err := config.ResolveOperation(entry)
+			if err != nil {
+				return nil, fmt.Errorf("operation: %w", err)
 			}
-			op, ok := s3id.ParseOp(name)
-			if !ok {
-				return nil, fmt.Errorf("match.ops: unknown operation or class %q", name)
+			for _, op := range ops {
+				r.setOp(op)
 			}
-			r.setOp(op)
 		}
 	}
-	r.matchOpsNames = append([]string(nil), src.Match.Ops...)
-	for _, g := range src.GroupBy {
+	for _, g := range src.GroupBy() {
 		switch g {
 		case config.DimAccessKey:
 			r.groupBy |= dimAccessKey
@@ -191,43 +180,38 @@ func compileRule(src *config.Rule, idx, nodeCount int, defMode Mode) (*Rule, err
 			r.groupBy |= dimBucket
 		case config.DimPrefix:
 			if r.prefixes == nil {
-				return nil, fmt.Errorf("group_by: prefix needs match.prefixes")
+				return nil, fmt.Errorf("per: prefix needs a `prefix` list")
 			}
 			r.groupBy |= dimPrefix
 		case config.DimSourceIP:
 			r.groupBy |= dimSourceIP
 		default:
-			return nil, fmt.Errorf("group_by: unknown dimension %q", g)
+			return nil, fmt.Errorf("per: unknown value %q", g)
 		}
 	}
-	r.groupByNames = append([]string(nil), src.GroupBy...)
-	mode := defMode
-	if src.OnLimit != "" {
-		var err error
-		if mode, err = parseMode(src.OnLimit); err != nil {
-			return nil, fmt.Errorf("on_limit: %w", err)
-		}
+	if src.Respond == config.RespondTooManyRequests {
+		r.mode = ModeTooManyRequests
 	}
-	r.mode = mode
 
+	rate := src.Rate()
 	switch {
-	case src.Limit.Rate < 0 || math.IsNaN(src.Limit.Rate) || math.IsInf(src.Limit.Rate, 0):
-		return nil, fmt.Errorf("limit.rate: must be >= 0, got %v", src.Limit.Rate)
-	case src.Limit.Rate == 0:
+	case src.Blocked:
 		r.blockAll = true
+	case rate <= 0 || math.IsNaN(rate) || math.IsInf(rate, 0):
+		return nil, fmt.Errorf("no usable limit (rate %v per second)", rate)
 	default:
 		// rate_eff = rate / node_count; T = 1e9 / rate_eff; burst_eff = max(1, ceil(burst / n));
 		// tau = (burst_eff - 1) × T, so exactly burst_eff requests pass from a full bucket.
-		r.effRate = src.Limit.Rate / float64(nodeCount)
+		r.effRate = rate / float64(nodeCount)
 		t := math.Round(1e9 / r.effRate)
 		if t < 1 {
 			t = 1
 		}
 		if t > float64(maxEmission) {
-			return nil, fmt.Errorf("limit.rate %v over %d nodes: emission interval %.0f ns exceeds %d", src.Limit.Rate, nodeCount, t, maxEmission)
+			return nil, fmt.Errorf("limit %s over %d nodes: emission interval %.0f ns exceeds %d", src.LimitText(), nodeCount, t, maxEmission)
 		}
 		r.T = int64(t)
-		burst := src.Limit.Burst
+		burst := src.BurstSize()
 		if burst < 1 {
 			burst = 1
 		}
@@ -237,7 +221,7 @@ func compileRule(src *config.Rule, idx, nodeCount int, defMode Mode) (*Rule, err
 		}
 		tau := float64(r.effBurst-1) * t
 		if tau > float64(maxTolerance) {
-			return nil, fmt.Errorf("limit.burst %d at rate %v: the bucket takes %.0f s to refill, more than the %d s bound", burst, src.Limit.Rate, tau/1e9, maxTolerance/1e9)
+			return nil, fmt.Errorf("burst %d at %s: the bucket takes %.0f s to refill, more than the %d s bound", burst, src.LimitText(), tau/1e9, maxTolerance/1e9)
 		}
 		r.tau = int64(tau)
 	}
@@ -251,16 +235,6 @@ const (
 	maxEmission  = int64(1e15)
 	maxTolerance = int64(1e18)
 )
-
-func parseMode(s string) (Mode, error) {
-	switch s {
-	case config.ModeSlowDown:
-		return ModeSlowDown, nil
-	case config.ModeTooManyRequests:
-		return ModeTooManyRequests, nil
-	}
-	return 0, fmt.Errorf("must be %s or %s, got %q", config.ModeSlowDown, config.ModeTooManyRequests, s)
-}
 
 func parseCIDR(s string) (netip.Prefix, error) {
 	if p, err := netip.ParsePrefix(s); err == nil {

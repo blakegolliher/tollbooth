@@ -1,0 +1,24 @@
+ 1 Overview  2 Limits  3 Usage  4 Backends  5 Config  6 Graphs  tui-node · v0.0.
+╭──────────────────────────────────────────────────────────────────────────────╮
+│ tollbooth.yaml   NORMAL   line 3 col 1 · 23 lines                            │
+│                                                                              │
+│  1 node_id: tui-node                                                         │
+│  2 backend: {scheme: http, endpoints: [10.0.0.1:9000, 10.0.0.2:9000]}        │
+│  3 showback: {dir: /tmp/x}                                                   │
+│  4 admin: {token: tok}                                                       │
+│  5 limits:                                                                   │
+│  6   - name: tenant-a-writes                                                 │
+│  7     operation: [PutObject, UploadPart, CopyObject]                        │
+│  8     access_key: AKIAEXAMPLE1                                              │
+│  9     bucket: training-data                                                 │
+│  10     prefix: ckpt/                                                        │
+│  11     limit_per_second: 2000                                               │
+│  12     burst: 8000                                                          │
+│  13     per: [access_key, bucket]                                            │
+│  14   - name: list-storm                                                     │
+│  15     operation: [ListObjectsV2, ListObjects]                              │
+│                                                                              │
+│ ✓ valid: 3 rules   ⚠ base_domains is empty: virtual-hosted-style requests    │
+╰──────────────────────────────────────────────────────────────────────────────╯
+
+NORMAL · i insert · ctrl+s save · ctrl+r save and reload · E $EDITOR · L reload 

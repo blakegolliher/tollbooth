@@ -1,0 +1,40 @@
+ 1 Overview  2 Limits  3 Usage  4 Backends  5 Config  6 Graphs  tui-node · v0.0.0-tui
+╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ tollbooth.yaml   NORMAL  ● modified  line 1 col 2 · 23 lines                                                         │
+│                                                                                                                      │
+│  1 #node_id: tui-node                                                                                                │
+│  2 backend: {scheme: http, endpoints: [10.0.0.1:9000, 10.0.0.2:9000]}                                                │
+│  3 showback: {dir: /tmp/x}                                                                                           │
+│  4 admin: {token: tok}                                                                                               │
+│  5 limits:                                                                                                           │
+│  6   - name: tenant-a-writes                                                                                         │
+│  7     operation: [PutObject, UploadPart, CopyObject]                                                                │
+│  8     access_key: AKIAEXAMPLE1                                                                                      │
+│  9     bucket: training-data                                                                                         │
+│  10     prefix: ckpt/                                                                                                │
+│  11     limit_per_second: 2000                                                                                       │
+│  12     burst: 8000                                                                                                  │
+│  13     per: [access_key, bucket]                                                                                    │
+│  14   - name: list-storm                                                                                             │
+│  15     operation: [ListObjectsV2, ListObjects]                                                                      │
+│  16     limit_per_second: 50                                                                                         │
+│  17     burst: 200                                                                                                   │
+│  18     per: source_ip                                                                                               │
+│  19     respond: 429                                                                                                 │
+│  20   - name: frozen                                                                                                 │
+│  21     access_key: AKIAREVOKED                                                                                      │
+│  22     blocked: true                                                                                                │
+│  23                                                                                                                  │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│  INVALID  node_id: required; must be stable across restarts (a pod name is the wrong choice)                         │
+│  Unsaved changes   y save  n discard  esc keep editing                                                               │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+unsaved changes: y save · n discard · esc keep editing

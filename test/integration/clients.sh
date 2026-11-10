@@ -9,7 +9,12 @@
 #   GAP   it failed both ways identically: a backend limitation the proxy relayed faithfully
 #
 #   clients.sh fetch                      install the pinned tools into test/integration/bin and .venv
-#   clients.sh run <backend> <direct-endpoint> <via-endpoint> <region> <ak> <sk> <results-file>
+#   clients.sh run <backend> <direct-endpoint> <via-endpoint> <region> <ak> <sk> <results-file> [existing-bucket]
+#
+# By default every tool makes and removes buckets of its own (compat-<tool>-<backend>-direct and
+# -via). Given an existing bucket, nothing is made or removed but objects under the key prefixes
+# compat-<tool>-<backend>-direct/ and -via/ inside it: the mb and rb cells are not run, no command
+# names anything outside those prefixes, and each tool's prefixes are emptied when it is done.
 #
 # Tools are pinned by version and sha256 (computed 2026-11-09; s5cmd's and rclone's match their
 # published checksum files, elbencho publishes none). All are external processes; none of their
@@ -17,8 +22,9 @@
 set -euo pipefail
 
 HERE=$(cd "$(dirname "$0")" && pwd)
-BIN=$HERE/bin
-VENV=$HERE/.venv
+# COMPAT_BIN and COMPAT_VENV let selftest.sh put logging stand-ins where the tools are looked for.
+BIN=${COMPAT_BIN:-$HERE/bin}
+VENV=${COMPAT_VENV:-$HERE/.venv}
 mkdir -p "$BIN"
 
 S5CMD_VERSION=2.3.0
@@ -79,8 +85,28 @@ fetch() {
     else missing=1; fi
   fi
   if [ ! -x "$VENV/bin/python" ] || ! "$VENV/bin/python" -c "import boto3, awscrt" 2>/dev/null; then
-    # botocore[crt] brings the CRC32C and CRC64NVME implementations boto3 needs for the checksum leg.
-    if python3 -m venv "$VENV" && "$VENV/bin/pip" install -q "boto3==$BOTO3_VERSION" "botocore[crt]" "s3cmd==$S3CMD_VERSION"; then :; else missing=1; fi
+    # The pinned boto3 needs Python 3.10 or newer. A host's `python3` can be older (RHEL 9's is
+    # 3.9, where pip answers with every version it does know, several screens of them). `python3`
+    # builds the environment when it is new enough, as it always has in CI; otherwise the newest
+    # other interpreter on the PATH that is, and an environment built by an older interpreter is
+    # rebuilt. pip's own output goes to a log; the outcome is one line.
+    local py="" cand
+    for cand in python3 python3.13 python3.12 python3.11 python3.10; do
+      if command -v "$cand" >/dev/null && "$cand" -c 'import sys; sys.exit(0 if sys.version_info >= (3, 10) else 1)' 2>/dev/null; then py=$cand; break; fi
+    done
+    if [ -z "$py" ]; then
+      echo "clients: boto3 $BOTO3_VERSION and s3cmd need Python 3.10 or newer; this host has only $(python3 --version 2>&1). Install one (for example python3.12) and run again; until then the boto3 and s3cmd cells fail as not installed" >&2
+      missing=1
+    else
+      rm -rf "$VENV"
+      # botocore[crt] brings the CRC32C and CRC64NVME implementations boto3 needs for the checksum leg.
+      if "$py" -m venv "$VENV" && "$VENV/bin/pip" install -q --disable-pip-version-check "boto3==$BOTO3_VERSION" "botocore[crt]" "s3cmd==$S3CMD_VERSION" > "$HERE/.venv-install.log" 2>&1; then
+        echo "clients: python environment built with $("$VENV/bin/python" --version 2>&1)"
+      else
+        echo "clients: installing boto3 $BOTO3_VERSION and s3cmd $S3CMD_VERSION with $py failed: $(tail -1 "$HERE/.venv-install.log" | cut -c1-200) (full output in $HERE/.venv-install.log)" >&2
+        missing=1
+      fi
+    fi
   fi
   command -v aws >/dev/null || { echo "clients: aws cli v2 is expected on the runner image" >&2; missing=1; }
   echo "clients: aws $(aws --version 2>&1 | cut -d' ' -f1), boto3 $BOTO3_VERSION, s3cmd $S3CMD_VERSION, s5cmd $S5CMD_VERSION, rclone $RCLONE_VERSION, elbencho $ELBENCHO_VERSION (missing=$missing)"
@@ -90,18 +116,37 @@ fetch() {
 # record TOOL OP PASS|FAIL|GAP [detail]
 record() { printf '%s\t%s\t%s\t%s\n' "$1" "$2" "$3" "${4:-}" >> "$RESULTS"; }
 
-# side SIDE command...  runs the command with @EP@, @B@, @S@, @CFG@ substituted for the side.
+# side SIDE command...  runs the command with @EP@, @B@, @P@, @S@, @CFG@ substituted for the side.
+# @B@ is the bucket and @P@ the key prefix inside it: a bucket of the tool's own and no prefix, or
+# the existing bucket and the tool's own prefix.
 side() {
   local s=$1; shift
-  local ep b cfg args=()
+  local ep b p cfg args=()
   if [ "$s" = direct ]; then ep=$DIRECT_EP; cfg=$S3CFG_DIRECT; else ep=$VIA_EP; cfg=$S3CFG_VIA; fi
-  b="$BUCKET_BASE-$s"
+  b="$BUCKET_BASE-$s"; p=""
+  if [ -n "$EXISTING_BUCKET" ]; then b=$EXISTING_BUCKET; p="$BUCKET_BASE-$s/"; fi
   local a
   for a in "$@"; do
-    a=${a//@EP@/$ep}; a=${a//@B@/$b}; a=${a//@S@/$s}; a=${a//@CFG@/$cfg}
+    a=${a//@EP@/$ep}; a=${a//@B@/$b}; a=${a//@P@/$p}; a=${a//@S@/$s}; a=${a//@CFG@/$cfg}
     args+=("$a")
   done
   "${args[@]}" 2>&1
+}
+
+# bucket TOOL OP command...  is `both` for a step that makes or removes a bucket: not run, and not
+# recorded, when the bucket is an existing one that is not ours to make or remove.
+bucket() {
+  [ -n "$EXISTING_BUCKET" ] || both "$@"
+}
+
+# sweep  empties the current tool's two prefixes in an existing bucket, direct at the backend. The
+# prefix always begins with compat-<tool>-<backend>-, so nothing else in the bucket is named.
+sweep() {
+  [ -n "$EXISTING_BUCKET" ] || return 0
+  local s
+  for s in direct via; do
+    aws --endpoint-url "$DIRECT_EP" s3 rm "s3://$EXISTING_BUCKET/$BUCKET_BASE-$s/" --recursive --quiet >/dev/null 2>&1 || true
+  done
 }
 
 # both TOOL OP command...  → PASS / FAIL / GAP from the direct and via outcomes.
@@ -127,6 +172,7 @@ run() {
   DIRECT_EP=$2 VIA_EP=$3
   local REGION=$4 AK=$5 SK=$6
   RESULTS=$7
+  EXISTING_BUCKET=${8:-}
   : > "$RESULTS"
   export AWS_ACCESS_KEY_ID=$AK AWS_SECRET_ACCESS_KEY=$SK AWS_DEFAULT_REGION=$REGION AWS_EC2_METADATA_DISABLED=true
   local work; work=$(mktemp -d)
@@ -155,26 +201,30 @@ CFG
   BUCKET_BASE="compat-awscli-$backend"
   aws configure set default.s3.multipart_threshold 5MB >/dev/null 2>&1 || true
   aws configure set default.s3.multipart_chunksize 5MB >/dev/null 2>&1 || true
-  both awscli mb          aws --endpoint-url @EP@ s3 mb "s3://@B@"
-  both awscli cp          aws --endpoint-url @EP@ s3 cp "$work/small.bin" "s3://@B@/dir/small.bin"
-  both awscli get         bash -c "aws --endpoint-url @EP@ s3 cp s3://@B@/dir/small.bin $work/small.@S@ && cmp -s $work/small.bin $work/small.@S@"
-  both awscli sync        aws --endpoint-url @EP@ s3 sync "$work/tree" "s3://@B@/tree"
-  both awscli ls          aws --endpoint-url @EP@ s3 ls "s3://@B@/tree/a/"
-  both awscli multipart   aws --endpoint-url @EP@ s3 cp "$work/big.bin" "s3://@B@/dir/big.bin"
-  both awscli part-number aws --endpoint-url @EP@ s3api get-object --bucket @B@ --key dir/big.bin --part-number 2 "$work/part2.@S@"
-  both awscli head-part   aws --endpoint-url @EP@ s3api head-object --bucket @B@ --key dir/big.bin --part-number 2
-  both awscli attributes  aws --endpoint-url @EP@ s3api get-object-attributes --bucket @B@ --key dir/small.bin --object-attributes ETag ObjectSize
-  both awscli presign     bash -c "curl -sf -o /dev/null \"\$(aws --endpoint-url @EP@ s3 presign s3://@B@/dir/small.bin --expires-in 300)\""
+  bucket awscli mb        aws --endpoint-url @EP@ s3 mb "s3://@B@"
+  both awscli cp          aws --endpoint-url @EP@ s3 cp "$work/small.bin" "s3://@B@/@P@dir/small.bin"
+  both awscli get         bash -c "aws --endpoint-url @EP@ s3 cp s3://@B@/@P@dir/small.bin $work/small.@S@ && cmp -s $work/small.bin $work/small.@S@"
+  both awscli sync        aws --endpoint-url @EP@ s3 sync "$work/tree" "s3://@B@/@P@tree"
+  both awscli ls          aws --endpoint-url @EP@ s3 ls "s3://@B@/@P@tree/a/"
+  both awscli multipart   aws --endpoint-url @EP@ s3 cp "$work/big.bin" "s3://@B@/@P@dir/big.bin"
+  both awscli part-number aws --endpoint-url @EP@ s3api get-object --bucket @B@ --key @P@dir/big.bin --part-number 2 "$work/part2.@S@"
+  both awscli head-part   aws --endpoint-url @EP@ s3api head-object --bucket @B@ --key @P@dir/big.bin --part-number 2
+  both awscli attributes  aws --endpoint-url @EP@ s3api get-object-attributes --bucket @B@ --key @P@dir/small.bin --object-attributes ETag ObjectSize
+  both awscli presign     bash -c "curl -sf -o /dev/null \"\$(aws --endpoint-url @EP@ s3 presign s3://@B@/@P@dir/small.bin --expires-in 300)\""
   for algo in CRC32 CRC32C SHA1 SHA256 CRC64NVME; do
-    both awscli "checksum-$algo" aws --endpoint-url @EP@ s3api put-object --bucket @B@ --key "dir/sum-$algo" --body "$work/small.bin" --checksum-algorithm "$algo"
+    both awscli "checksum-$algo" aws --endpoint-url @EP@ s3api put-object --bucket @B@ --key "@P@dir/sum-$algo" --body "$work/small.bin" --checksum-algorithm "$algo"
   done
-  both awscli rm          aws --endpoint-url @EP@ s3 rm "s3://@B@/dir/small.bin"
-  both awscli rb          aws --endpoint-url @EP@ s3 rb "s3://@B@" --force
+  both awscli rm          aws --endpoint-url @EP@ s3 rm "s3://@B@/@P@dir/small.bin"
+  bucket awscli rb        aws --endpoint-url @EP@ s3 rb "s3://@B@" --force
+  sweep
 
   # boto3 -----------------------------------------------------------------------------------
   local dpy vpy
-  dpy=$(ENDPOINT="$DIRECT_EP" REGION="$REGION" BUCKET="compat-boto3-$backend-direct" ADDRESSING=path "$VENV/bin/python" "$HERE/clients/boto3_matrix.py" 2>&1 || true)
-  vpy=$(ENDPOINT="$VIA_EP" REGION="$REGION" BUCKET="compat-boto3-$backend-via" ADDRESSING=path "$VENV/bin/python" "$HERE/clients/boto3_matrix.py" 2>&1 || true)
+  BUCKET_BASE="compat-boto3-$backend"
+  local dbucket="$BUCKET_BASE-direct" vbucket="$BUCKET_BASE-via" dprefix="" vprefix=""
+  if [ -n "$EXISTING_BUCKET" ]; then dbucket=$EXISTING_BUCKET; vbucket=$EXISTING_BUCKET; dprefix="$BUCKET_BASE-direct/"; vprefix="$BUCKET_BASE-via/"; fi
+  dpy=$(ENDPOINT="$DIRECT_EP" REGION="$REGION" BUCKET="$dbucket" PREFIX="$dprefix" ADDRESSING=path "$VENV/bin/python" "$HERE/clients/boto3_matrix.py" 2>&1 || true)
+  vpy=$(ENDPOINT="$VIA_EP" REGION="$REGION" BUCKET="$vbucket" PREFIX="$vprefix" ADDRESSING=path "$VENV/bin/python" "$HERE/clients/boto3_matrix.py" 2>&1 || true)
   while IFS=' ' read -r op status detail; do
     [ -n "$op" ] || continue
     if [ "$status" = PASS ]; then
@@ -188,58 +238,67 @@ CFG
       fi
     fi
   done <<< "$vpy"
+  sweep
 
   # aws-sdk-go-v2 is exercised by test/s3diff (compat.sh stage 1); its cells come from that run.
 
   # s5cmd -----------------------------------------------------------------------------------
   BUCKET_BASE="compat-s5cmd-$backend"
-  both s5cmd mb        "$BIN/s5cmd" --endpoint-url @EP@ mb "s3://@B@"
-  both s5cmd cp        "$BIN/s5cmd" --endpoint-url @EP@ cp "$work/small.bin" "s3://@B@/dir/small.bin"
-  both s5cmd get       "$BIN/s5cmd" --endpoint-url @EP@ cp "s3://@B@/dir/small.bin" "$work/s5.@S@"
-  both s5cmd sync      "$BIN/s5cmd" --endpoint-url @EP@ sync "$work/tree/" "s3://@B@/tree/"
-  both s5cmd ls        "$BIN/s5cmd" --endpoint-url @EP@ ls "s3://@B@/tree/a/"
-  both s5cmd multipart "$BIN/s5cmd" --endpoint-url @EP@ cp --concurrency 2 --part-size 5 "$work/big.bin" "s3://@B@/dir/big.bin"
-  both s5cmd rm        "$BIN/s5cmd" --endpoint-url @EP@ rm "s3://@B@/dir/*"
-  both s5cmd rb        bash -c "$BIN/s5cmd --endpoint-url @EP@ rm 's3://@B@/*' >/dev/null 2>&1; $BIN/s5cmd --endpoint-url @EP@ rb s3://@B@"
+  bucket s5cmd mb      "$BIN/s5cmd" --endpoint-url @EP@ mb "s3://@B@"
+  both s5cmd cp        "$BIN/s5cmd" --endpoint-url @EP@ cp "$work/small.bin" "s3://@B@/@P@dir/small.bin"
+  both s5cmd get       "$BIN/s5cmd" --endpoint-url @EP@ cp "s3://@B@/@P@dir/small.bin" "$work/s5.@S@"
+  both s5cmd sync      "$BIN/s5cmd" --endpoint-url @EP@ sync "$work/tree/" "s3://@B@/@P@tree/"
+  both s5cmd ls        "$BIN/s5cmd" --endpoint-url @EP@ ls "s3://@B@/@P@tree/a/"
+  both s5cmd multipart "$BIN/s5cmd" --endpoint-url @EP@ cp --concurrency 2 --part-size 5 "$work/big.bin" "s3://@B@/@P@dir/big.bin"
+  both s5cmd rm        "$BIN/s5cmd" --endpoint-url @EP@ rm "s3://@B@/@P@dir/*"
+  bucket s5cmd rb      bash -c "$BIN/s5cmd --endpoint-url @EP@ rm 's3://@B@/*' >/dev/null 2>&1; $BIN/s5cmd --endpoint-url @EP@ rb s3://@B@"
+  sweep
 
   # rclone ----------------------------------------------------------------------------------
   BUCKET_BASE="compat-rclone-$backend"
   local rc=("$BIN/rclone" --s3-provider Other --s3-endpoint @EP@ --s3-region "$REGION" --s3-access-key-id "$AK" --s3-secret-access-key "$SK" --s3-force-path-style --s3-upload-cutoff 5M --s3-chunk-size 5M)
-  both rclone mb        "${rc[@]}" mkdir ":s3:@B@"
-  both rclone cp        "${rc[@]}" copyto "$work/small.bin" ":s3:@B@/dir/small.bin"
-  both rclone get       "${rc[@]}" copyto ":s3:@B@/dir/small.bin" "$work/rclone.@S@"
-  both rclone sync      "${rc[@]}" sync "$work/tree" ":s3:@B@/tree"
-  both rclone ls        "${rc[@]}" ls ":s3:@B@/tree"
-  both rclone multipart "${rc[@]}" copyto "$work/big.bin" ":s3:@B@/dir/big.bin"
-  both rclone rm        "${rc[@]}" delete ":s3:@B@/dir"
-  both rclone rb        "${rc[@]}" purge ":s3:@B@"
+  # rclone makes the bucket before an upload unless told the bucket is there.
+  [ -z "$EXISTING_BUCKET" ] || rc+=(--s3-no-check-bucket)
+  bucket rclone mb      "${rc[@]}" mkdir ":s3:@B@"
+  both rclone cp        "${rc[@]}" copyto "$work/small.bin" ":s3:@B@/@P@dir/small.bin"
+  both rclone get       "${rc[@]}" copyto ":s3:@B@/@P@dir/small.bin" "$work/rclone.@S@"
+  both rclone sync      "${rc[@]}" sync "$work/tree" ":s3:@B@/@P@tree"
+  both rclone ls        "${rc[@]}" ls ":s3:@B@/@P@tree"
+  both rclone multipart "${rc[@]}" copyto "$work/big.bin" ":s3:@B@/@P@dir/big.bin"
+  both rclone rm        "${rc[@]}" delete ":s3:@B@/@P@dir"
+  bucket rclone rb      "${rc[@]}" purge ":s3:@B@"
+  sweep
 
   # s3cmd -----------------------------------------------------------------------------------
   BUCKET_BASE="compat-s3cmd-$backend"
   local s3c=("$VENV/bin/s3cmd" -c @CFG@)
-  both s3cmd mb        "${s3c[@]}" mb "s3://@B@"
-  both s3cmd cp        "${s3c[@]}" put "$work/small.bin" "s3://@B@/dir/small.bin"
-  both s3cmd get       "${s3c[@]}" get --force "s3://@B@/dir/small.bin" "$work/s3cmd.@S@"
-  both s3cmd sync      "${s3c[@]}" sync "$work/tree/" "s3://@B@/tree/"
-  both s3cmd ls        "${s3c[@]}" ls "s3://@B@/tree/"
-  both s3cmd multipart "${s3c[@]}" put "$work/big.bin" "s3://@B@/dir/big.bin"
-  both s3cmd rm        "${s3c[@]}" rm "s3://@B@/dir/small.bin"
-  both s3cmd rb        "${s3c[@]}" rb --recursive --force "s3://@B@"
+  bucket s3cmd mb      "${s3c[@]}" mb "s3://@B@"
+  both s3cmd cp        "${s3c[@]}" put "$work/small.bin" "s3://@B@/@P@dir/small.bin"
+  both s3cmd get       "${s3c[@]}" get --force "s3://@B@/@P@dir/small.bin" "$work/s3cmd.@S@"
+  both s3cmd sync      "${s3c[@]}" sync "$work/tree/" "s3://@B@/@P@tree/"
+  both s3cmd ls        "${s3c[@]}" ls "s3://@B@/@P@tree/"
+  both s3cmd multipart "${s3c[@]}" put "$work/big.bin" "s3://@B@/@P@dir/big.bin"
+  both s3cmd rm        "${s3c[@]}" rm "s3://@B@/@P@dir/small.bin"
+  bucket s3cmd rb      "${s3c[@]}" rb --recursive --force "s3://@B@"
+  sweep
 
   # elbencho --------------------------------------------------------------------------------
   BUCKET_BASE="compat-elbencho-$backend"
   local el=("$BIN/elbencho" --s3endpoints @EP@ --s3key "$AK" --s3secret "$SK" --s3region "$REGION")
-  both elbencho mb        "${el[@]}" -d "@B@"
+  # elbencho names its own objects; in an existing bucket they go under the tool's prefix.
+  [ -z "$EXISTING_BUCKET" ] || el+=(--s3objprefix "@P@")
+  bucket elbencho mb      "${el[@]}" -d "@B@"
   both elbencho cp        "${el[@]}" -w -t 2 -n 1 -N 4 -s 1m -b 1m "@B@"
   both elbencho get       "${el[@]}" -r -t 2 -n 1 -N 4 -s 1m -b 1m "@B@"
   both elbencho multipart "${el[@]}" -w -t 1 -n 1 -N 1 -s 12m -b 6m "@B@"
   both elbencho ls        "${el[@]}" --s3listobj 1000 "@B@"
   both elbencho rm        "${el[@]}" -F -t 2 -n 1 -N 4 "@B@"
-  both elbencho rb        "${el[@]}" -D "@B@"
+  bucket elbencho rb      "${el[@]}" -D "@B@"
+  sweep
 }
 
 case "${1:-}" in
   fetch) fetch ;;
   run) shift; run "$@" ;;
-  *) echo "usage: $0 fetch | run <backend> <direct-endpoint> <via-endpoint> <region> <ak> <sk> <results-file>" >&2; exit 2 ;;
+  *) echo "usage: $0 fetch | run <backend> <direct-endpoint> <via-endpoint> <region> <ak> <sk> <results-file> [existing-bucket]" >&2; exit 2 ;;
 esac

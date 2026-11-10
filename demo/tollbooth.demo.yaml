@@ -1,0 +1,56 @@
+# tollbooth demo configuration (demo/run.sh fills the @PLACEHOLDERS@ and writes demo/state/tollbooth.yaml).
+# Four rules that each show one behavior. `tollbooth check-config` reads every rule back as a
+# sentence; docs/CONFIG.md documents every key.
+
+node_id: demo-a01
+base_domains: []
+
+listen:
+  address: "@PROXY_ADDR@"
+
+backend:
+  scheme: @BACKEND_SCHEME@
+  endpoints: [@BACKEND@]
+  tls: {insecure_skip_verify: @BACKEND_INSECURE@}   # lab certificates; false in production
+  health_check: {interval: @HEALTH_INTERVAL@, timeout: @HEALTH_TIMEOUT@}   # restart-only; a cluster can take 2 s to answer HEAD /
+
+limits:
+  # Tenant A may make 2 GetObject or HeadObject calls a second on each bucket (low, so hand-typed
+  # commands trip it). The third in a second gets 503 SlowDown.
+  - name: tenant-a-reads
+    operation: [GetObject, HeadObject]
+    access_key: DEMO-TENANT-A
+    limit_per_second: 2
+    per: bucket
+
+  # A listing storm: each client address may list once a second, answered with 429 instead.
+  - name: list-storm
+    operation: ListObjectsV2
+    limit_per_second: 1
+    per: source_ip
+    respond: 429
+
+  # Uploads are limited per bucket with headroom: visible in `rules list`, never hit in the demo.
+  - name: uploads-per-bucket
+    operation: [PutObject, UploadPart, CompleteMultipartUpload]
+    limit_per_second: 500
+    burst: 1000
+    per: bucket
+
+  # A frozen bucket: every request to it is refused (incident response, a stop button).
+  - name: frozen-bucket
+    bucket: frozen
+    blocked: true
+    per: access_key                   # list the refusals for each access key in `rules top`
+
+showback:
+  dir: @SHOWBACK_DIR@
+  flush_interval: 10s                 # demo: rows appear within ten seconds (production default 60s)
+  dimensions: [access_key, bucket, prefix, operation, status_class]
+
+admin:
+  address: @ADMIN_ADDR@
+  pprof: true
+
+logging:
+  level: info

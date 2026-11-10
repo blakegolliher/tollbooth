@@ -46,7 +46,7 @@ func TestReloadUnderLoad(t *testing.T) {
 	listen, adminAddr := freePort(t), freePort(t)
 	body := func(rule string) string {
 		return "node_id: a\nlisten: {address: " + listen + "}\nadmin: {address: " + adminAddr + ", token: tok}\nbackend: {scheme: http, endpoints: [" + strings.TrimPrefix(be.URL, "http://") + "], health_check: {interval: 50ms, timeout: 200ms}}\nshowback: {dir: " + dir + "}\n" +
-			"rate_limits:\n  rules:\n    - id: " + rule + "\n      match: {buckets: [never]}\n      limit: {rate: 0}\n    - id: wide\n      match: {ops: [READ]}\n      group_by: [access_key]\n      limit: {rate: 1000000000, burst: 1000000000}\n"
+			"limits:\n  - name: " + rule + "\n    bucket: never\n    blocked: true\n  - name: wide\n    operation: [GetObject, HeadObject]\n    limit_per_second: 1000000000\n    burst: 1000000000\n    per: access_key\n"
 	}
 	path := writeConfig(t, dir, body("gen-0"))
 	cfg, err := config.Load(path)
@@ -131,7 +131,7 @@ func TestReloadUnderLoad(t *testing.T) {
 		var lim admin.Limits
 		_ = json.NewDecoder(resp.Body).Decode(&lim)
 		resp.Body.Close() //nolint:errcheck // test
-		if len(lim.Rules) != 2 || lim.Rules[0].ID != rule {
+		if len(lim.Rules) != 2 || lim.Rules[0].Name != rule {
 			t.Fatalf("after reload %d rules are %+v", i, lim.Rules)
 		}
 		time.Sleep(20 * time.Millisecond)

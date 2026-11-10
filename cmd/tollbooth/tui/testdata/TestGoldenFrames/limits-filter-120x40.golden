@@ -1,7 +1,13 @@
- 1 Overview  2 Limits  3 Usage  4 Backends  5 Config  tui-node · v0.0.0-tui
+ 1 Overview  2 Limits  3 Usage  4 Backends  5 Config  6 Graphs  tui-node · v0.0.0-tui
   > list                                     
-  ID                       MATCH                        GROUP_BY             RATE/BURST     MODE                   KEYS 
-  list-storm               ops=LIST                     source_ip            50/200         too_many_requests         0 
+  LIMIT        MEANS                                                                               MATCHED/S THROTTLED/S
+▸ list-storm   ListObjectsV2, ListObjects: 50 per second from each source IP                               –           –
+
+  list-storm: At most 50 ListObjectsV2 and ListObjects calls per second from each source IP, up to 200 at once. Over
+  the limit, the client gets 429 TooManyRequests.
+
+  BUSIEST OPERATIONS RIGHT NOW            REQ/S  THROTTLED/S  LIMITED BY
+  (measured between two polls; one more moment)
 
 
 
@@ -31,10 +37,4 @@
 
 
 
-
-
-
-
-
-
-↑↓ select · enter detail · t test request · / filter · ? help · q quit
+↑↓ select · enter change · n new · d delete · t test · / filter · ? help

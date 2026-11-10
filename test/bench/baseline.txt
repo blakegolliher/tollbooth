@@ -1,120 +1,203 @@
+# Benchmark baseline for make bench-compare (test/bench/compare). Recorded by nightly run 42885875806
+# on 2026-11-10 at commit 47da8e0 (the final Phase 5 build), hosted runner, CPU below. Timings are
+# enforced only against a run on the same CPU model; allocation counts always (D-063).
+?   	github.com/blakegolliher/tollbooth/bench/loadgen	[no test files]
 ?   	github.com/blakegolliher/tollbooth/bench/nullbackend	[no test files]
+?   	github.com/blakegolliher/tollbooth/bench/nullbackend/cmd/nullbackend	[no test files]
 PASS
-ok  	github.com/blakegolliher/tollbooth/cmd/tollbooth	0.005s
-?   	github.com/blakegolliher/tollbooth/cmd/tollbooth/tui	[no test files]
+ok  	github.com/blakegolliher/tollbooth/cmd/tollbooth	0.006s
+goos: linux
+goarch: amd64
+pkg: github.com/blakegolliher/tollbooth/cmd/tollbooth/tui
+cpu: INTEL(R) XEON(R) PLATINUM 8573C
+BenchmarkChart-4        	   18373	     65256 ns/op	   17868 B/op	     166 allocs/op
+BenchmarkChart-4        	   18350	     65648 ns/op	   17867 B/op	     166 allocs/op
+BenchmarkChart-4        	   18399	     64986 ns/op	   17867 B/op	     166 allocs/op
+BenchmarkChart-4        	   18494	     65104 ns/op	   17867 B/op	     166 allocs/op
+BenchmarkChart-4        	   18496	     67523 ns/op	   17867 B/op	     166 allocs/op
+BenchmarkChart-4        	   18433	     64853 ns/op	   17867 B/op	     166 allocs/op
+BenchmarkGraphsView-4   	    2136	    550451 ns/op	  137226 B/op	     956 allocs/op
+BenchmarkGraphsView-4   	    2188	    550068 ns/op	  137225 B/op	     956 allocs/op
+BenchmarkGraphsView-4   	    2185	    558650 ns/op	  137226 B/op	     956 allocs/op
+BenchmarkGraphsView-4   	    2191	    553895 ns/op	  137226 B/op	     956 allocs/op
+BenchmarkGraphsView-4   	    2186	    552907 ns/op	  137226 B/op	     956 allocs/op
+BenchmarkGraphsView-4   	    2173	    550112 ns/op	  137226 B/op	     956 allocs/op
+BenchmarkFormView-4     	    5174	    220229 ns/op	   64640 B/op	     867 allocs/op
+BenchmarkFormView-4     	    5236	    223207 ns/op	   64612 B/op	     867 allocs/op
+BenchmarkFormView-4     	    5190	    221347 ns/op	   64718 B/op	     867 allocs/op
+BenchmarkFormView-4     	    4627	    221460 ns/op	   64630 B/op	     867 allocs/op
+BenchmarkFormView-4     	    5318	    223158 ns/op	   64634 B/op	     867 allocs/op
+BenchmarkFormView-4     	    5052	    221755 ns/op	   64585 B/op	     867 allocs/op
+PASS
+ok  	github.com/blakegolliher/tollbooth/cmd/tollbooth/tui	21.274s
 goos: linux
 goarch: amd64
 pkg: github.com/blakegolliher/tollbooth/internal/admin
-cpu: AMD EPYC 9V45 96-Core Processor                
-BenchmarkObserve-4   	15525186	        77.55 ns/op	       0 B/op	       0 allocs/op
-BenchmarkObserve-4   	15716731	        75.43 ns/op	       0 B/op	       0 allocs/op
-BenchmarkObserve-4   	16088322	        75.61 ns/op	       0 B/op	       0 allocs/op
-BenchmarkObserve-4   	15012898	        77.01 ns/op	       0 B/op	       0 allocs/op
-BenchmarkObserve-4   	15484036	        77.40 ns/op	       0 B/op	       0 allocs/op
-BenchmarkObserve-4   	15420285	        77.49 ns/op	       0 B/op	       0 allocs/op
+cpu: INTEL(R) XEON(R) PLATINUM 8573C
+BenchmarkObserve-4   	 9726553	       123.5 ns/op	       0 B/op	       0 allocs/op
+BenchmarkObserve-4   	 9663314	       124.4 ns/op	       0 B/op	       0 allocs/op
+BenchmarkObserve-4   	 9717080	       123.4 ns/op	       0 B/op	       0 allocs/op
+BenchmarkObserve-4   	 9659223	       124.8 ns/op	       0 B/op	       0 allocs/op
+BenchmarkObserve-4   	 9553680	       123.6 ns/op	       0 B/op	       0 allocs/op
+BenchmarkObserve-4   	 9646038	       125.3 ns/op	       0 B/op	       0 allocs/op
 PASS
-ok  	github.com/blakegolliher/tollbooth/internal/admin	7.173s
+ok  	github.com/blakegolliher/tollbooth/internal/admin	7.224s
 goos: linux
 goarch: amd64
 pkg: github.com/blakegolliher/tollbooth/internal/config
-cpu: AMD EPYC 9V45 96-Core Processor                
-BenchmarkParse-4   	   16848	     69777 ns/op	   49230 B/op	     914 allocs/op
-BenchmarkParse-4   	   18284	     65869 ns/op	   49227 B/op	     914 allocs/op
-BenchmarkParse-4   	   17805	     67454 ns/op	   49227 B/op	     914 allocs/op
-BenchmarkParse-4   	   17563	     68872 ns/op	   49227 B/op	     914 allocs/op
-BenchmarkParse-4   	   17449	     69404 ns/op	   49227 B/op	     914 allocs/op
-BenchmarkParse-4   	   17302	     67963 ns/op	   49228 B/op	     914 allocs/op
+cpu: INTEL(R) XEON(R) PLATINUM 8573C
+BenchmarkParse-4         	    8313	    124729 ns/op	   50664 B/op	     913 allocs/op
+BenchmarkParse-4         	    9780	    122613 ns/op	   50660 B/op	     913 allocs/op
+BenchmarkParse-4         	    9772	    122176 ns/op	   50660 B/op	     913 allocs/op
+BenchmarkParse-4         	    9530	    121930 ns/op	   50660 B/op	     913 allocs/op
+BenchmarkParse-4         	    9734	    121918 ns/op	   50660 B/op	     913 allocs/op
+BenchmarkParse-4         	    9770	    122202 ns/op	   50660 B/op	     913 allocs/op
+BenchmarkReplaceRule-4   	    6848	    171519 ns/op	  133448 B/op	    1288 allocs/op
+BenchmarkReplaceRule-4   	    7101	    162030 ns/op	  133447 B/op	    1288 allocs/op
+BenchmarkReplaceRule-4   	    7149	    161868 ns/op	  133447 B/op	    1288 allocs/op
+BenchmarkReplaceRule-4   	    7489	    161864 ns/op	  133448 B/op	    1288 allocs/op
+BenchmarkReplaceRule-4   	    7663	    162267 ns/op	  133447 B/op	    1288 allocs/op
+BenchmarkReplaceRule-4   	    6957	    163257 ns/op	  133447 B/op	    1288 allocs/op
+BenchmarkFlatten-4       	   29816	     40315 ns/op	   26359 B/op	     486 allocs/op
+BenchmarkFlatten-4       	   29704	     40277 ns/op	   26359 B/op	     486 allocs/op
+BenchmarkFlatten-4       	   29931	     40218 ns/op	   26359 B/op	     486 allocs/op
+BenchmarkFlatten-4       	   29698	     40366 ns/op	   26358 B/op	     486 allocs/op
+BenchmarkFlatten-4       	   29888	     40058 ns/op	   26359 B/op	     486 allocs/op
+BenchmarkFlatten-4       	   29971	     40032 ns/op	   26359 B/op	     486 allocs/op
+BenchmarkSentence-4      	  109662	     10848 ns/op	    4969 B/op	     125 allocs/op
+BenchmarkSentence-4      	  109845	     10750 ns/op	    4969 B/op	     125 allocs/op
+BenchmarkSentence-4      	  111702	     10742 ns/op	    4969 B/op	     125 allocs/op
+BenchmarkSentence-4      	  110630	     10748 ns/op	    4969 B/op	     125 allocs/op
+BenchmarkSentence-4      	  110572	     10785 ns/op	    4969 B/op	     125 allocs/op
+BenchmarkSentence-4      	  111787	     10741 ns/op	    4969 B/op	     125 allocs/op
 PASS
-ok  	github.com/blakegolliher/tollbooth/internal/config	7.184s
+ok  	github.com/blakegolliher/tollbooth/internal/config	28.424s
 goos: linux
 goarch: amd64
 pkg: github.com/blakegolliher/tollbooth/internal/limiter
-cpu: AMD EPYC 9V45 96-Core Processor                
-BenchmarkDecide100Rules-4           	 3100542	       346.1 ns/op	       0 B/op	       0 allocs/op
-BenchmarkDecide100Rules-4           	 3087506	       334.8 ns/op	       0 B/op	       0 allocs/op
-BenchmarkDecide100Rules-4           	 3163612	       335.7 ns/op	       0 B/op	       0 allocs/op
-BenchmarkDecide100Rules-4           	 3058898	       341.6 ns/op	       0 B/op	       0 allocs/op
-BenchmarkDecide100Rules-4           	 3030124	       343.3 ns/op	       0 B/op	       0 allocs/op
-BenchmarkDecide100Rules-4           	 3136719	       333.4 ns/op	       0 B/op	       0 allocs/op
-BenchmarkDecide100RulesAllMatch-4   	   82996	     14518 ns/op	       0 B/op	       0 allocs/op
-BenchmarkDecide100RulesAllMatch-4   	   71781	     15952 ns/op	       1 B/op	       0 allocs/op
-BenchmarkDecide100RulesAllMatch-4   	   80671	     14939 ns/op	       0 B/op	       0 allocs/op
-BenchmarkDecide100RulesAllMatch-4   	   82992	     14376 ns/op	       0 B/op	       0 allocs/op
-BenchmarkDecide100RulesAllMatch-4   	   80659	     14512 ns/op	       0 B/op	       0 allocs/op
-BenchmarkDecide100RulesAllMatch-4   	   81426	     14850 ns/op	       0 B/op	       0 allocs/op
-BenchmarkDecideNoRules-4            	168785762	         7.119 ns/op	       0 B/op	       0 allocs/op
-BenchmarkDecideNoRules-4            	168403238	         7.139 ns/op	       0 B/op	       0 allocs/op
-BenchmarkDecideNoRules-4            	167583224	         7.139 ns/op	       0 B/op	       0 allocs/op
-BenchmarkDecideNoRules-4            	169359291	         7.102 ns/op	       0 B/op	       0 allocs/op
-BenchmarkDecideNoRules-4            	169428920	         7.090 ns/op	       0 B/op	       0 allocs/op
-BenchmarkDecideNoRules-4            	170243239	         7.074 ns/op	       0 B/op	       0 allocs/op
-BenchmarkMatch100Rules-4            	 1452924	       824.9 ns/op	       0 B/op	       0 allocs/op
-BenchmarkMatch100Rules-4            	 1533382	       778.9 ns/op	       0 B/op	       0 allocs/op
-BenchmarkMatch100Rules-4            	 1477082	       812.4 ns/op	       0 B/op	       0 allocs/op
-BenchmarkMatch100Rules-4            	 1536374	       783.8 ns/op	       0 B/op	       0 allocs/op
-BenchmarkMatch100Rules-4            	 1486124	       806.2 ns/op	       0 B/op	       0 allocs/op
-BenchmarkMatch100Rules-4            	 1491859	       803.8 ns/op	       0 B/op	       0 allocs/op
-BenchmarkGCRA-4                     	19446435	        62.35 ns/op	       0 B/op	       0 allocs/op
-BenchmarkGCRA-4                     	19461681	        62.06 ns/op	       0 B/op	       0 allocs/op
-BenchmarkGCRA-4                     	19505478	        61.65 ns/op	       0 B/op	       0 allocs/op
-BenchmarkGCRA-4                     	19307444	        62.97 ns/op	       0 B/op	       0 allocs/op
-BenchmarkGCRA-4                     	19420782	        62.08 ns/op	       0 B/op	       0 allocs/op
-BenchmarkGCRA-4                     	19138420	        63.04 ns/op	       0 B/op	       0 allocs/op
-BenchmarkDecideParallel-4           	 7729326	       158.9 ns/op	       0 B/op	       0 allocs/op
-BenchmarkDecideParallel-4           	 7832206	       155.3 ns/op	       0 B/op	       0 allocs/op
-BenchmarkDecideParallel-4           	 7551339	       158.1 ns/op	       0 B/op	       0 allocs/op
-BenchmarkDecideParallel-4           	 7383657	       160.1 ns/op	       0 B/op	       0 allocs/op
-BenchmarkDecideParallel-4           	 7725480	       157.9 ns/op	       0 B/op	       0 allocs/op
-BenchmarkDecideParallel-4           	 7584664	       156.6 ns/op	       0 B/op	       0 allocs/op
+cpu: INTEL(R) XEON(R) PLATINUM 8573C
+BenchmarkDecide100Rules-4           	 2393601	       488.4 ns/op	       0 B/op	       0 allocs/op
+BenchmarkDecide100Rules-4           	 2401350	       487.6 ns/op	       0 B/op	       0 allocs/op
+BenchmarkDecide100Rules-4           	 2392462	       487.9 ns/op	       0 B/op	       0 allocs/op
+BenchmarkDecide100Rules-4           	 2383711	       491.3 ns/op	       0 B/op	       0 allocs/op
+BenchmarkDecide100Rules-4           	 2404261	       486.3 ns/op	       0 B/op	       0 allocs/op
+BenchmarkDecide100Rules-4           	 2401413	       487.1 ns/op	       0 B/op	       0 allocs/op
+BenchmarkDecide100RulesAllMatch-4   	   59818	     20005 ns/op	       1 B/op	       0 allocs/op
+BenchmarkDecide100RulesAllMatch-4   	   59766	     20095 ns/op	       1 B/op	       0 allocs/op
+BenchmarkDecide100RulesAllMatch-4   	   59968	     20082 ns/op	       1 B/op	       0 allocs/op
+BenchmarkDecide100RulesAllMatch-4   	   59634	     20037 ns/op	       1 B/op	       0 allocs/op
+BenchmarkDecide100RulesAllMatch-4   	   59859	     19998 ns/op	       1 B/op	       0 allocs/op
+BenchmarkDecide100RulesAllMatch-4   	   59527	     20061 ns/op	       1 B/op	       0 allocs/op
+BenchmarkDecideNoRules-4            	100000000	        11.82 ns/op	       0 B/op	       0 allocs/op
+BenchmarkDecideNoRules-4            	99228498	        11.87 ns/op	       0 B/op	       0 allocs/op
+BenchmarkDecideNoRules-4            	100000000	        11.80 ns/op	       0 B/op	       0 allocs/op
+BenchmarkDecideNoRules-4            	100000000	        11.83 ns/op	       0 B/op	       0 allocs/op
+BenchmarkDecideNoRules-4            	100000000	        11.83 ns/op	       0 B/op	       0 allocs/op
+BenchmarkDecideNoRules-4            	100000000	        11.83 ns/op	       0 B/op	       0 allocs/op
+BenchmarkMatch100Rules-4            	  940167	      1274 ns/op	       0 B/op	       0 allocs/op
+BenchmarkMatch100Rules-4            	  935636	      1276 ns/op	       0 B/op	       0 allocs/op
+BenchmarkMatch100Rules-4            	  923931	      1298 ns/op	       0 B/op	       0 allocs/op
+BenchmarkMatch100Rules-4            	  935430	      1292 ns/op	       0 B/op	       0 allocs/op
+BenchmarkMatch100Rules-4            	  913956	      1313 ns/op	       0 B/op	       0 allocs/op
+BenchmarkMatch100Rules-4            	  903385	      1293 ns/op	       0 B/op	       0 allocs/op
+BenchmarkGCRA-4                     	14819464	        80.98 ns/op	       0 B/op	       0 allocs/op
+BenchmarkGCRA-4                     	14777738	        80.85 ns/op	       0 B/op	       0 allocs/op
+BenchmarkGCRA-4                     	12608965	        95.10 ns/op	       0 B/op	       0 allocs/op
+BenchmarkGCRA-4                     	14795134	        80.93 ns/op	       0 B/op	       0 allocs/op
+BenchmarkGCRA-4                     	14064060	        85.28 ns/op	       0 B/op	       0 allocs/op
+BenchmarkGCRA-4                     	14797482	        80.87 ns/op	       0 B/op	       0 allocs/op
+BenchmarkDecideParallel-4           	 4270288	       297.5 ns/op	       0 B/op	       0 allocs/op
+BenchmarkDecideParallel-4           	 3966002	       324.4 ns/op	       0 B/op	       0 allocs/op
+BenchmarkDecideParallel-4           	 4019446	       298.5 ns/op	       0 B/op	       0 allocs/op
+BenchmarkDecideParallel-4           	 4034522	       290.3 ns/op	       0 B/op	       0 allocs/op
+BenchmarkDecideParallel-4           	 4155435	       293.5 ns/op	       0 B/op	       0 allocs/op
+BenchmarkDecideParallel-4           	 3817267	       314.7 ns/op	       0 B/op	       0 allocs/op
 PASS
-ok  	github.com/blakegolliher/tollbooth/internal/limiter	43.326s
+ok  	github.com/blakegolliher/tollbooth/internal/limiter	45.958s
 goos: linux
 goarch: amd64
 pkg: github.com/blakegolliher/tollbooth/internal/proxy
-cpu: AMD EPYC 9V45 96-Core Processor                
-BenchmarkSmallGET-4           	  779728	      1345 ns/op	     900 B/op	       7 allocs/op
-BenchmarkSmallGET-4           	  835957	      1324 ns/op	     901 B/op	       7 allocs/op
-BenchmarkSmallGET-4           	  849524	      1333 ns/op	     901 B/op	       7 allocs/op
-BenchmarkSmallGET-4           	  855446	      1321 ns/op	     901 B/op	       7 allocs/op
-BenchmarkSmallGET-4           	  897068	      1323 ns/op	     900 B/op	       7 allocs/op
-BenchmarkSmallGET-4           	  835306	      1370 ns/op	     900 B/op	       7 allocs/op
-BenchmarkSmallGETEndToEnd-4   	   12001	    100730 ns/op	   13868 B/op	     161 allocs/op
-BenchmarkSmallGETEndToEnd-4   	   10000	    104495 ns/op	   13886 B/op	     161 allocs/op
-BenchmarkSmallGETEndToEnd-4   	   10000	    105168 ns/op	   13916 B/op	     161 allocs/op
-BenchmarkSmallGETEndToEnd-4   	   10000	    103579 ns/op	   14007 B/op	     161 allocs/op
-BenchmarkSmallGETEndToEnd-4   	   10000	    104506 ns/op	   13773 B/op	     161 allocs/op
-BenchmarkSmallGETEndToEnd-4   	   10000	    104720 ns/op	   13957 B/op	     161 allocs/op
+cpu: INTEL(R) XEON(R) PLATINUM 8573C
+BenchmarkSmallGET-4           	  476307	      2222 ns/op	     898 B/op	       7 allocs/op
+BenchmarkSmallGET-4           	  511228	      2205 ns/op	     899 B/op	       7 allocs/op
+BenchmarkSmallGET-4           	  513224	      2189 ns/op	     899 B/op	       7 allocs/op
+BenchmarkSmallGET-4           	  524734	      2332 ns/op	     896 B/op	       7 allocs/op
+BenchmarkSmallGET-4           	  506886	      2196 ns/op	     903 B/op	       7 allocs/op
+BenchmarkSmallGET-4           	  508815	      2196 ns/op	     895 B/op	       7 allocs/op
+BenchmarkSmallGETEndToEnd-4   	    6680	    156561 ns/op	   14404 B/op	     164 allocs/op
+BenchmarkSmallGETEndToEnd-4   	    6972	    156601 ns/op	   13892 B/op	     164 allocs/op
+BenchmarkSmallGETEndToEnd-4   	    7098	    157090 ns/op	   14036 B/op	     164 allocs/op
+BenchmarkSmallGETEndToEnd-4   	    7082	    148839 ns/op	   14024 B/op	     164 allocs/op
+BenchmarkSmallGETEndToEnd-4   	    7212	    152244 ns/op	   13967 B/op	     164 allocs/op
+BenchmarkSmallGETEndToEnd-4   	    7201	    152520 ns/op	   13977 B/op	     164 allocs/op
 PASS
-ok  	github.com/blakegolliher/tollbooth/internal/proxy	13.215s
+ok  	github.com/blakegolliher/tollbooth/internal/proxy	13.315s
 goos: linux
 goarch: amd64
 pkg: github.com/blakegolliher/tollbooth/internal/s3id
-cpu: AMD EPYC 9V45 96-Core Processor                
-BenchmarkClassify-4                 	32654623	        38.81 ns/op	       0 B/op	       0 allocs/op
-BenchmarkClassify-4                 	33384630	        37.10 ns/op	       0 B/op	       0 allocs/op
-BenchmarkClassify-4                 	32010668	        38.80 ns/op	       0 B/op	       0 allocs/op
-BenchmarkClassify-4                 	33490278	        37.90 ns/op	       0 B/op	       0 allocs/op
-BenchmarkClassify-4                 	33505932	        36.42 ns/op	       0 B/op	       0 allocs/op
-BenchmarkClassify-4                 	31515720	        38.26 ns/op	       0 B/op	       0 allocs/op
-BenchmarkClassifyGetObject-4        	78866136	        14.93 ns/op	       0 B/op	       0 allocs/op
-BenchmarkClassifyGetObject-4        	79892810	        15.00 ns/op	       0 B/op	       0 allocs/op
-BenchmarkClassifyGetObject-4        	80253901	        14.93 ns/op	       0 B/op	       0 allocs/op
-BenchmarkClassifyGetObject-4        	78966615	        15.04 ns/op	       0 B/op	       0 allocs/op
-BenchmarkClassifyGetObject-4        	78023056	        15.02 ns/op	       0 B/op	       0 allocs/op
-BenchmarkClassifyGetObject-4        	79919196	        15.45 ns/op	       0 B/op	       0 allocs/op
-BenchmarkParse-4                    	 9137038	       130.5 ns/op	       0 B/op	       0 allocs/op
-BenchmarkParse-4                    	 9138588	       130.7 ns/op	       0 B/op	       0 allocs/op
-BenchmarkParse-4                    	 9324001	       132.4 ns/op	       0 B/op	       0 allocs/op
-BenchmarkParse-4                    	 9119288	       130.6 ns/op	       0 B/op	       0 allocs/op
-BenchmarkParse-4                    	 9254956	       135.2 ns/op	       0 B/op	       0 allocs/op
-BenchmarkParse-4                    	 9240804	       131.2 ns/op	       0 B/op	       0 allocs/op
-BenchmarkParseGetObject100Rules-4   	12398364	        99.65 ns/op	       0 B/op	       0 allocs/op
-BenchmarkParseGetObject100Rules-4   	12429261	        99.32 ns/op	       0 B/op	       0 allocs/op
-BenchmarkParseGetObject100Rules-4   	11538110	       101.5 ns/op	       0 B/op	       0 allocs/op
-BenchmarkParseGetObject100Rules-4   	11964036	       108.4 ns/op	       0 B/op	       0 allocs/op
-BenchmarkParseGetObject100Rules-4   	12016665	        99.42 ns/op	       0 B/op	       0 allocs/op
-BenchmarkParseGetObject100Rules-4   	12323377	        98.43 ns/op	       0 B/op	       0 allocs/op
+cpu: INTEL(R) XEON(R) PLATINUM 8573C
+BenchmarkClassify-4                 	21605373	        55.45 ns/op	       0 B/op	       0 allocs/op
+BenchmarkClassify-4                 	21441399	        56.48 ns/op	       0 B/op	       0 allocs/op
+BenchmarkClassify-4                 	21731925	        54.52 ns/op	       0 B/op	       0 allocs/op
+BenchmarkClassify-4                 	22149340	        54.95 ns/op	       0 B/op	       0 allocs/op
+BenchmarkClassify-4                 	21836949	        55.24 ns/op	       0 B/op	       0 allocs/op
+BenchmarkClassify-4                 	21784675	        54.73 ns/op	       0 B/op	       0 allocs/op
+BenchmarkClassifyGetObject-4        	48694748	        24.64 ns/op	       0 B/op	       0 allocs/op
+BenchmarkClassifyGetObject-4        	48477223	        24.66 ns/op	       0 B/op	       0 allocs/op
+BenchmarkClassifyGetObject-4        	48605296	        24.65 ns/op	       0 B/op	       0 allocs/op
+BenchmarkClassifyGetObject-4        	48641810	        24.76 ns/op	       0 B/op	       0 allocs/op
+BenchmarkClassifyGetObject-4        	48668798	        24.62 ns/op	       0 B/op	       0 allocs/op
+BenchmarkClassifyGetObject-4        	48524877	        24.63 ns/op	       0 B/op	       0 allocs/op
+BenchmarkParse-4                    	 4618476	       259.5 ns/op	       0 B/op	       0 allocs/op
+BenchmarkParse-4                    	 4621687	       261.1 ns/op	       0 B/op	       0 allocs/op
+BenchmarkParse-4                    	 4575295	       260.9 ns/op	       0 B/op	       0 allocs/op
+BenchmarkParse-4                    	 4596025	       262.0 ns/op	       0 B/op	       0 allocs/op
+BenchmarkParse-4                    	 4645248	       258.6 ns/op	       0 B/op	       0 allocs/op
+BenchmarkParse-4                    	 4627276	       261.6 ns/op	       0 B/op	       0 allocs/op
+BenchmarkParseGetObject100Rules-4   	 6157722	       192.1 ns/op	       0 B/op	       0 allocs/op
+BenchmarkParseGetObject100Rules-4   	 6285728	       190.4 ns/op	       0 B/op	       0 allocs/op
+BenchmarkParseGetObject100Rules-4   	 6302515	       191.4 ns/op	       0 B/op	       0 allocs/op
+BenchmarkParseGetObject100Rules-4   	 6251547	       191.5 ns/op	       0 B/op	       0 allocs/op
+BenchmarkParseGetObject100Rules-4   	 6295822	       191.0 ns/op	       0 B/op	       0 allocs/op
+BenchmarkParseGetObject100Rules-4   	 6300346	       190.8 ns/op	       0 B/op	       0 allocs/op
 PASS
-ok  	github.com/blakegolliher/tollbooth/internal/s3id	29.245s
-?   	github.com/blakegolliher/tollbooth/internal/showback	[no test files]
+ok  	github.com/blakegolliher/tollbooth/internal/s3id	28.819s
+goos: linux
+goarch: amd64
+pkg: github.com/blakegolliher/tollbooth/internal/showback
+cpu: INTEL(R) XEON(R) PLATINUM 8573C
+BenchmarkRecord-4              	 9254602	       129.2 ns/op	       0 B/op	       0 allocs/op
+BenchmarkRecord-4              	 9279422	       129.2 ns/op	       0 B/op	       0 allocs/op
+BenchmarkRecord-4              	 9130434	       130.5 ns/op	       0 B/op	       0 allocs/op
+BenchmarkRecord-4              	 9294177	       129.1 ns/op	       0 B/op	       0 allocs/op
+BenchmarkRecord-4              	 9302370	       128.9 ns/op	       0 B/op	       0 allocs/op
+BenchmarkRecord-4              	 9096802	       131.6 ns/op	       0 B/op	       0 allocs/op
+BenchmarkRecordParallel-4      	 6592093	       182.8 ns/op	       0 B/op	       0 allocs/op
+BenchmarkRecordParallel-4      	 7300965	       180.1 ns/op	       0 B/op	       0 allocs/op
+BenchmarkRecordParallel-4      	 6562755	       183.1 ns/op	       0 B/op	       0 allocs/op
+BenchmarkRecordParallel-4      	 6541735	       186.2 ns/op	       0 B/op	       0 allocs/op
+BenchmarkRecordParallel-4      	 6678340	       181.9 ns/op	       0 B/op	       0 allocs/op
+BenchmarkRecordParallel-4      	 6442356	       185.8 ns/op	       0 B/op	       0 allocs/op
+BenchmarkSnapshot10kTuples-4   	     147	   8029687 ns/op	  103386 B/op	      16 allocs/op
+BenchmarkSnapshot10kTuples-4   	     147	   8065872 ns/op	  103386 B/op	      16 allocs/op
+BenchmarkSnapshot10kTuples-4   	     147	   8046790 ns/op	  103386 B/op	      16 allocs/op
+BenchmarkSnapshot10kTuples-4   	     146	   8076618 ns/op	  104085 B/op	      16 allocs/op
+BenchmarkSnapshot10kTuples-4   	     145	   8132877 ns/op	  104795 B/op	      16 allocs/op
+BenchmarkSnapshot10kTuples-4   	     146	   8055490 ns/op	  104085 B/op	      16 allocs/op
+PASS
+ok  	github.com/blakegolliher/tollbooth/internal/showback	22.789s
+goos: linux
+goarch: amd64
+pkg: github.com/blakegolliher/tollbooth/test/bench/compare
+cpu: INTEL(R) XEON(R) PLATINUM 8573C
+BenchmarkParse-4   	    3944	    268415 ns/op	 1139663 B/op	    1045 allocs/op
+BenchmarkParse-4   	    4904	    280358 ns/op	 1139661 B/op	    1045 allocs/op
+BenchmarkParse-4   	    4365	    286803 ns/op	 1139661 B/op	    1045 allocs/op
+BenchmarkParse-4   	    3784	    272159 ns/op	 1139661 B/op	    1045 allocs/op
+BenchmarkParse-4   	    4332	    265051 ns/op	 1139661 B/op	    1045 allocs/op
+BenchmarkParse-4   	    4668	    267677 ns/op	 1139661 B/op	    1045 allocs/op
+PASS
+ok  	github.com/blakegolliher/tollbooth/test/bench/compare	7.120s
+PASS
+ok  	github.com/blakegolliher/tollbooth/test/e2e	0.006s
 ?   	github.com/blakegolliher/tollbooth/test/s3diff	[no test files]

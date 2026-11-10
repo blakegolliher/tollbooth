@@ -18,6 +18,10 @@ Runs one operation per line of the matrix through tollbooth and prints `op PASS|
 one per line, so clients.sh can fold the results into docs/COMPAT.md. Environment:
 ENDPOINT (http://host:port of tollbooth), REGION, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY,
 BUCKET (created and deleted here), ADDRESSING (path|virtual).
+
+With PREFIX set, BUCKET is an existing bucket that is not ours: it is neither created nor deleted
+(the mb and rb cells are not run), every key this script touches begins with PREFIX, and the keys
+under PREFIX are removed at the end.
 """
 
 import hashlib
@@ -32,7 +36,14 @@ from botocore.config import Config
 ENDPOINT = os.environ["ENDPOINT"]
 REGION = os.environ.get("REGION", "us-east-1")
 BUCKET = os.environ["BUCKET"]
+PREFIX = os.environ.get("PREFIX", "")
 ADDRESSING = os.environ.get("ADDRESSING", "path")
+
+
+def k(key):
+    """The key as this run writes it: under PREFIX in an existing bucket."""
+    return PREFIX + key
+
 
 s3 = boto3.client(
     "s3",
@@ -79,39 +90,40 @@ def mb():
 
 
 def cp_up():
-    s3.put_object(Bucket=BUCKET, Key="dir/small.bin", Body=SMALL)
-    s3.put_object(Bucket=BUCKET, Key="dir with space/ünï+%.bin", Body=b"x")
+    s3.put_object(Bucket=BUCKET, Key=k("dir/small.bin"), Body=SMALL)
+    s3.put_object(Bucket=BUCKET, Key=k("dir with space/ünï+%.bin"), Body=b"x")
 
 
 def cp_down():
-    got = s3.get_object(Bucket=BUCKET, Key="dir/small.bin")["Body"].read()
+    got = s3.get_object(Bucket=BUCKET, Key=k("dir/small.bin"))["Body"].read()
     assert got == SMALL, "body mismatch"
-    got = s3.get_object(Bucket=BUCKET, Key="dir/small.bin", Range="bytes=1-100")["Body"].read()
+    got = s3.get_object(Bucket=BUCKET, Key=k("dir/small.bin"), Range="bytes=1-100")["Body"].read()
     assert got == SMALL[1:101], "range mismatch"
 
 
 def ls():
-    keys = {o["Key"] for o in s3.list_objects_v2(Bucket=BUCKET, Prefix="dir").get("Contents", [])}
-    assert "dir/small.bin" in keys, keys
-    v1 = s3.list_objects(Bucket=BUCKET, Prefix="dir/")
-    assert any(o["Key"] == "dir/small.bin" for o in v1.get("Contents", [])), v1
+    keys = {o["Key"] for o in s3.list_objects_v2(Bucket=BUCKET, Prefix=k("dir")).get("Contents", [])}
+    assert k("dir/small.bin") in keys, keys
+    v1 = s3.list_objects(Bucket=BUCKET, Prefix=k("dir/"))
+    assert any(o["Key"] == k("dir/small.bin") for o in v1.get("Contents", [])), v1
     buckets = {b["Name"] for b in s3.list_buckets()["Buckets"]}
-    assert BUCKET in buckets, buckets
+    if not PREFIX:  # a bucket we did not make may belong to someone else and not be listed for us
+        assert BUCKET in buckets, buckets
 
 
 def sync():
     # The equivalent of `aws s3 sync`: HEAD, conditional re-upload, list, as the SDK does it.
     for i in range(5):
-        s3.put_object(Bucket=BUCKET, Key=f"sync/{i}.bin", Body=payload(1024, seed=i + 1))
+        s3.put_object(Bucket=BUCKET, Key=k(f"sync/{i}.bin"), Body=payload(1024, seed=i + 1))
     for i in range(5):
-        h = s3.head_object(Bucket=BUCKET, Key=f"sync/{i}.bin")
+        h = s3.head_object(Bucket=BUCKET, Key=k(f"sync/{i}.bin"))
         assert h["ContentLength"] == 1024, h
-    assert len(s3.list_objects_v2(Bucket=BUCKET, Prefix="sync/")["Contents"]) == 5
+    assert len(s3.list_objects_v2(Bucket=BUCKET, Prefix=k("sync/"))["Contents"]) == 5
 
 
 def rm():
-    s3.delete_object(Bucket=BUCKET, Key="dir with space/ünï+%.bin")
-    r = s3.delete_objects(Bucket=BUCKET, Delete={"Objects": [{"Key": f"sync/{i}.bin"} for i in range(5)], "Quiet": False})
+    s3.delete_object(Bucket=BUCKET, Key=k("dir with space/ünï+%.bin"))
+    r = s3.delete_objects(Bucket=BUCKET, Delete={"Objects": [{"Key": k(f"sync/{i}.bin")} for i in range(5)], "Quiet": False})
     assert len(r.get("Deleted", [])) == 5, r
 
 
@@ -125,17 +137,17 @@ def fetch(req):
 
 
 def presign():
-    url = s3.generate_presigned_url("get_object", Params={"Bucket": BUCKET, "Key": "dir/small.bin"}, ExpiresIn=300)
+    url = s3.generate_presigned_url("get_object", Params={"Bucket": BUCKET, "Key": k("dir/small.bin")}, ExpiresIn=300)
     status, body = fetch(url)
     assert body == SMALL, f"presigned body mismatch ({status})"
-    url = s3.generate_presigned_url("put_object", Params={"Bucket": BUCKET, "Key": "dir/presigned-put.bin"}, ExpiresIn=300)
+    url = s3.generate_presigned_url("put_object", Params={"Bucket": BUCKET, "Key": k("dir/presigned-put.bin")}, ExpiresIn=300)
     status, _ = fetch(urllib.request.Request(url, data=SMALL, method="PUT"))
     assert status == 200, status
-    assert s3.get_object(Bucket=BUCKET, Key="dir/presigned-put.bin")["Body"].read() == SMALL
+    assert s3.get_object(Bucket=BUCKET, Key=k("dir/presigned-put.bin"))["Body"].read() == SMALL
 
 
 def multipart():
-    key = "dir/multipart.bin"
+    key = k("dir/multipart.bin")
     up = s3.create_multipart_upload(Bucket=BUCKET, Key=key)
     uid = up["UploadId"]
     parts = []
@@ -149,27 +161,27 @@ def multipart():
     h = s3.head_object(Bucket=BUCKET, Key=key)
     assert h["ContentLength"] == 5 * 5 * 1024 * 1024 + 1024 * 1024, h
     # An aborted upload.
-    up2 = s3.create_multipart_upload(Bucket=BUCKET, Key="dir/aborted.bin")
-    s3.abort_multipart_upload(Bucket=BUCKET, Key="dir/aborted.bin", UploadId=up2["UploadId"])
+    up2 = s3.create_multipart_upload(Bucket=BUCKET, Key=k("dir/aborted.bin"))
+    s3.abort_multipart_upload(Bucket=BUCKET, Key=k("dir/aborted.bin"), UploadId=up2["UploadId"])
 
 
 def part_number():
-    g = s3.get_object(Bucket=BUCKET, Key="dir/multipart.bin", PartNumber=2)
+    g = s3.get_object(Bucket=BUCKET, Key=k("dir/multipart.bin"), PartNumber=2)
     assert g["Body"].read() == PART, "part 2 body mismatch"
-    h = s3.head_object(Bucket=BUCKET, Key="dir/multipart.bin", PartNumber=2)
+    h = s3.head_object(Bucket=BUCKET, Key=k("dir/multipart.bin"), PartNumber=2)
     assert h["ContentLength"] == len(PART), h
     assert h.get("PartsCount", 6) == 6, h
 
 
 def attributes():
-    a = s3.get_object_attributes(Bucket=BUCKET, Key="dir/small.bin", ObjectAttributes=["ETag", "ObjectSize"])
+    a = s3.get_object_attributes(Bucket=BUCKET, Key=k("dir/small.bin"), ObjectAttributes=["ETag", "ObjectSize"])
     assert a["ObjectSize"] == len(SMALL), a
 
 
 def checksums():
     algos = ["CRC32", "CRC32C", "SHA1", "SHA256", "CRC64NVME"]
     for algo in algos:
-        key = f"dir/checksum-{algo.lower()}.bin"
+        key = k(f"dir/checksum-{algo.lower()}.bin")
         s3.put_object(Bucket=BUCKET, Key=key, Body=SMALL, ChecksumAlgorithm=algo)
         h = s3.head_object(Bucket=BUCKET, Key=key, ChecksumMode="ENABLED")
         field = "Checksum" + algo.replace("NVME", "NVME")
@@ -178,7 +190,7 @@ def checksums():
         assert got == SMALL, f"{algo}: body mismatch"
     # A wrong declared checksum must be refused by the backend, through the proxy unchanged.
     try:
-        s3.put_object(Bucket=BUCKET, Key="dir/badsum.bin", Body=SMALL, ChecksumSHA256="AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=")
+        s3.put_object(Bucket=BUCKET, Key=k("dir/badsum.bin"), Body=SMALL, ChecksumSHA256="AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=")
         raise AssertionError("wrong SHA256 checksum was accepted")
     except Exception as e:  # noqa: BLE001
         if "accepted" in str(e):
@@ -187,17 +199,32 @@ def checksums():
             raise AssertionError(f"unexpected refusal: {e}")
 
 
+def empty():
+    """Delete what this run wrote: every key in a bucket of our own, only PREFIX in an existing one."""
+    while True:
+        keys = [o["Key"] for o in s3.list_objects_v2(Bucket=BUCKET, Prefix=PREFIX).get("Contents", [])]
+        if not keys:
+            return
+        s3.delete_objects(Bucket=BUCKET, Delete={"Objects": [{"Key": key} for key in keys], "Quiet": True})
+
+
 def rb():
-    keys = [o["Key"] for o in s3.list_objects_v2(Bucket=BUCKET).get("Contents", [])]
-    if keys:
-        s3.delete_objects(Bucket=BUCKET, Delete={"Objects": [{"Key": k} for k in keys], "Quiet": True})
+    empty()
     s3.delete_bucket(Bucket=BUCKET)
 
 
-for name, fn in [("mb", mb), ("cp", cp_up), ("get", cp_down), ("ls", ls), ("sync", sync), ("rm", rm),
-                 ("presign", presign), ("multipart", multipart), ("part-number", part_number),
-                 ("attributes", attributes), ("checksums", checksums), ("rb", rb)]:
+cases = [("cp", cp_up), ("get", cp_down), ("ls", ls), ("sync", sync), ("rm", rm),
+         ("presign", presign), ("multipart", multipart), ("part-number", part_number),
+         ("attributes", attributes), ("checksums", checksums)]
+if not PREFIX:  # the bucket is ours to make and remove
+    cases = [("mb", mb)] + cases + [("rb", rb)]
+for name, fn in cases:
     case(name, fn)
+if PREFIX:
+    try:
+        empty()
+    except Exception as e:  # noqa: BLE001 - cleanup is not a matrix cell
+        print(f"boto3: cleanup under {PREFIX} failed: {e}", file=sys.stderr)
 
 bad = 0
 for name, status, detail in results:

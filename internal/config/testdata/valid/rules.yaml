@@ -7,30 +7,39 @@ backend:
     insecure_skip_verify: true
 listen:
   trusted_proxies: [10.20.0.0/16, 192.0.2.1, fd00::/8]
-rate_limits:
-  default_on_limit: slowdown
-  rules:
-    - id: tenant-a-writes
-      match:
-        access_keys: [AKIAEXAMPLE1, AKIAEXAMPLE2]
-        buckets: [training-data, checkpoints]
-        prefixes: [ckpt/, logs/]
-        source_cidrs: [10.20.0.0/16]
-        ops: [WRITE]
-      group_by: [access_key, bucket]
-      limit: { rate: 2000, burst: 4000 }
-    - id: list-storm-per-client
-      match: { ops: [LIST] }
-      group_by: [source_ip]
-      limit: { rate: 50, burst: 200 }
-      on_limit: too_many_requests
-    - id: frozen-key
-      match: { access_keys: [AKIAREVOKED] }
-      limit: { rate: 0 }
-    - id: slow-prefix
-      match: { ops: [GetObject, HeadObject], prefixes: [cold/] }
-      group_by: [prefix]
-      limit: { rate: 0.5 }
+limits:
+  - name: tenant-a-uploads
+    operation: [PutObject, UploadPart, CompleteMultipartUpload]
+    access_key: [AKIAEXAMPLE1, AKIAEXAMPLE2]
+    bucket: [training-data, checkpoints]
+    prefix: [ckpt/, logs/]
+    source_ip: 10.20.0.0/16
+    limit_per_second: 2000
+    burst: 4000
+    per: [access_key, bucket]
+  - name: list-storm
+    operation: listobjectsv2          # any letter case; shown and stored in S3's spelling
+    limit_per_second: 20
+    per: source_ip
+    respond: 429
+  - name: revoked-key
+    access_key: AKIAREVOKED
+    blocked: true
+    note: "INC-1234, key leaked 2026-11-09"
+  - name: slow-prefix
+    operation: [GetObject, HeadObject]
+    prefix: cold/
+    limit_per_second: 0.5
+    per: prefix
+  - name: all-listings
+    operation: List*
+    limit_per_minute: 600
+    per: total
+  - name: hourly-quota
+    access_key: 1234567890           # an access key of digits stays a string
+    bucket: "no"
+    limit_per_hour: 20
+    per: access_key
 showback:
   dir: /var/lib/tollbooth/showback
   dimensions: [access_key, bucket, prefix, source_ip, operation, status_class]

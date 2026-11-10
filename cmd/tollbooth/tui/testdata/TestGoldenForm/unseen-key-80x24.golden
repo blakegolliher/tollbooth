@@ -1,0 +1,24 @@
+ 1 Overview  2 Limits  3 Usage  4 Backends  5 Config  6 Graphs  tui-node · v0.0.
+╭──────────────────────────────────────────────────────────────────────────────╮
+│ New limit                                                                    │
+│   Limit what     ListObjectsV2                                               │
+│   To at most     20  per second   at once: same as the limit                 │
+│   Counted        each source IP                                              │
+│ ▸ Only for       access key DEMO-TENANT-A                                    │
+│                  bucket     any                                              │
+│                  prefix     any                                              │
+│                  source IP  any                                              │
+│   Over the limit 503 SlowDown (what S3 itself answers)                       │
+│   Name           listobjectsv2-key-demo-tenant-a-per-source-ip               │
+│   Note           why this limit exists (optional)                            │
+│ ── seen by the proxy lately, busiest first: ↓ pick · enter accept ────────── │
+│   (nothing recorded lately that matches; type the value)                     │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│ Means   At most 20 ListObjectsV2 calls per second from each source IP. Only  │
+│         for requests by access key DEMO-TENANT-A. Over the limit, the clien… │
+│ Now     ⚠ no request from access key DEMO-TENANT-A seen in the last two hou… │
+╰──────────────────────────────────────────────────────────────────────────────╯
+tab next · arrows pick · enter accept · ctrl+r apply · ctrl+s save · esc cancel

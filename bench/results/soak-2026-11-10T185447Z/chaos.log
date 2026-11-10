@@ -1,0 +1,26 @@
+2026-11-10T18:55:26Z begin backend-503
+2026-11-10T18:55:56Z end backend-503
+2026-11-10T18:55:58Z begin backend-stall
+2026-11-10T18:56:18Z end backend-stall
+2026-11-10T18:56:19Z begin backend-reset
+2026-11-10T18:56:39Z end backend-reset
+2026-11-10T18:56:41Z begin backend-down
+2026-11-10T18:57:11Z end backend-down
+2026-11-10T18:57:13Z begin reload-invalid
+422
+2026-11-10T18:57:18Z end reload-invalid
+2026-11-10T18:57:36Z begin reload-valid
+200
+2026-11-10T18:57:41Z end reload-valid
+2026-11-10T18:57:59Z begin showback-ro
+2026-11-10T18:59:29Z end showback-ro
+2026-11-10T18:59:30Z begin sighup
+2026-11-10T18:59:35Z end sighup
+2026-11-10T18:59:53Z begin backend-503
+2026-11-10T19:00:23Z end backend-503
+2026-11-10T19:00:25Z begin backend-stall
+2026-11-10T19:00:45Z end backend-stall
+2026-11-10T19:00:46Z begin backend-reset
+2026-11-10T19:01:06Z end backend-reset
+2026-11-10T19:01:07Z begin backend-down
+2026-11-10T19:01:37Z end backend-down

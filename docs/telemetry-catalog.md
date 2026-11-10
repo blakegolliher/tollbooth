@@ -8,7 +8,7 @@ object key: that is showback's job and would blow up the time-series database.
 Bounded label values: `operation` (the 113 names in docs/OPERATIONS_TABLE.md), `op_class`
 (`LIST`, `READ`, `WRITE`, `DELETE`, `BUCKET`, `UNKNOWN`), `status_class` (`2xx`, `3xx`, `4xx`,
 `5xx`, `throttled`, `proxy_error`), `result` (`forwarded`, `throttled`, `shaped`, `error`), `rule`
-(configured rule ids; bounded by the config), `endpoint` (configured backend endpoints), `kind`,
+(configured rule names; bounded by the config), `endpoint` (configured backend endpoints), `kind`,
 `direction`, `side`.
 
 `shaped` as a `result` value is part of the specification's fixed label set for
@@ -27,12 +27,13 @@ nothing observes is scaffolding (Gate 2 review, D-045). Its row below carries th
 | `tollbooth_inflight_requests` | gauge | — | requests | — | Requests between handler entry and completion | 1 |
 | `tollbooth_connections_open` | gauge | `side` ∈ {`client`, `backend`} | connections | — | Open TCP connections on each side | 1 |
 | `tollbooth_backend_up` | gauge | `endpoint` | — | — | 1 when the endpoint passed its last health check, else 0 | 1 |
-| `tollbooth_backend_errors_total` | counter | `endpoint`, `kind` ∈ {`dial`, `tls`, `timeout`, `reset`, `other`} | errors | — | Backend request failures by endpoint and kind | 1 |
+| `tollbooth_backend_errors_total` | counter | `endpoint`, `kind` ∈ {`dial`, `tls`, `timeout`, `reset`, `other`, `resolve`} | errors | — | Backend request failures by endpoint and kind. `resolve` (ADR-0008) counts lookups of an endpoint's name that failed; with a remembered address the connection is still made, so `resolve` rising while `backend_up` stays 1 is a resolver outage being ridden out | 1, 5 |
 | `tollbooth_backend_retries_total` | counter | — | retries | — | Requests moved to another endpoint after a connect or TLS error before any request byte was sent | 1 |
 | `tollbooth_config_reload_total` | counter | `result` ∈ {`ok`, `error`} | reloads | — | Reload attempts via `SIGHUP` or `POST /admin/reload` | 1 |
 | `tollbooth_limiter_decision_seconds` | histogram | — | seconds | 100 ns … 1 ms, log-spaced, 14 buckets | Time for the whole rule pass (match plus GCRA for every matching rule) | 2 |
 | `tollbooth_limiter_keys` | gauge | — | keys | — | Live GCRA keys across all rules | 2 |
 | `tollbooth_limiter_keys_overflow_total` | counter | — | requests | — | Requests allowed without state because `limiter.max_keys` was reached (fail open) | 2 |
+| `tollbooth_limiter_matched_total` | counter | `rule` | requests | — | Requests a rule matched and charged against its budget, allowed or denied. Beside `denied` it is the share a rule throttles; a rule whose counter does not move while traffic flows matches nothing (ADR-0007) | 5 |
 | `tollbooth_limiter_denied_total` | counter | `rule` | requests | — | Requests denied, by the rule that denied them | 2 |
 | `tollbooth_limiter_shaped_wait_seconds` | histogram | `rule` | seconds | 1 ms … 60 s, log-spaced, 16 buckets | Time a shaped request waited before being forwarded; added with the hold-and-forward mode (ADR-0004), not registered before | 6 |
 | `tollbooth_limiter_errors_total` | counter | — | errors | — | Panics or internal errors inside the limiter, each failed open | 2 |

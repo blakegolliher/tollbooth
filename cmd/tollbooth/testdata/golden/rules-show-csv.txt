@@ -1,13 +1,15 @@
 FIELD,VALUE
-id,list-storm
-access_keys,any
-buckets,any
-prefixes,any
-source_cidrs,any
-ops,LIST
-group_by,source_ip
-rate,50 (25/node)
-burst,200 (100/node)
-on_limit,too_many_requests
+name,list-storm
+means,"At most 50 List* calls (11 operations) per second from each source IP, up to 200 at once. Over the limit, the client gets 429 TooManyRequests."
+operation,List*
+access_key,any
+bucket,any
+prefix,any
+source_ip,any
+limit,50 per second (25/s on this node)
+per,source_ip
+burst,200 (100 on this node)
+respond,429
 live_keys,0
+matched,0
 denied,0

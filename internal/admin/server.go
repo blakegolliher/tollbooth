@@ -123,20 +123,26 @@ type Usage struct {
 // BackendStatus is one endpoint's row in GET /admin/backends and GET /admin/status, filled by the
 // backend pool (internal/proxy owns the counters; this package only renders them).
 type BackendStatus struct {
-	Endpoint   string  `json:"endpoint"`
-	Up         bool    `json:"up"`
-	Inflight   int64   `json:"inflight"`
-	Requests   int64   `json:"requests"`
-	Errors     int64   `json:"errors"`
-	ErrorsDial int64   `json:"errors_dial"`
-	ErrorsTLS  int64   `json:"errors_tls"`
-	ErrorsTime int64   `json:"errors_timeout"`
-	ErrorsRst  int64   `json:"errors_reset"`
-	ErrorsOth  int64   `json:"errors_other"`
-	TTFBMeanMS float64 `json:"ttfb_mean_ms"` // mean over every response since start
-	TTFBLastMS float64 `json:"ttfb_last_ms"`
-	LastError  string  `json:"last_error,omitempty"`
-	LastErrAt  string  `json:"last_error_at,omitempty"`
+	Endpoint   string `json:"endpoint"`
+	Up         bool   `json:"up"`
+	Inflight   int64  `json:"inflight"`
+	Requests   int64  `json:"requests"`
+	Errors     int64  `json:"errors"`
+	ErrorsDial int64  `json:"errors_dial"`
+	ErrorsTLS  int64  `json:"errors_tls"`
+	ErrorsTime int64  `json:"errors_timeout"`
+	ErrorsRst  int64  `json:"errors_reset"`
+	ErrorsOth  int64  `json:"errors_other"`
+	// ErrorsResolve counts lookups of the endpoint's name that failed; Addresses is what the name
+	// last resolved to and ResolverFailingSince when lookups began to fail (ADR-0008). A failing
+	// resolver does not by itself take an endpoint down.
+	ErrorsResolve        int64    `json:"errors_resolve"`
+	Addresses            []string `json:"addresses,omitempty"`
+	ResolverFailingSince string   `json:"resolver_failing_since,omitempty"`
+	TTFBMeanMS           float64  `json:"ttfb_mean_ms"` // mean over every response since start
+	TTFBLastMS           float64  `json:"ttfb_last_ms"`
+	LastError            string   `json:"last_error,omitempty"`
+	LastErrAt            string   `json:"last_error_at,omitempty"`
 }
 
 // Rates is per-second request and throttle rates over the last 1, 10, and 60 seconds, from the

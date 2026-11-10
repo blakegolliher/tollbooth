@@ -1,0 +1,6 @@
+run 1/1 proxied warm-up 5s
+run 1/1 proxied measuring 20s … 32172 requests, 1608 req/s, p50 8008 µs, p99 36110 µs, p99.9 58393 µs, errors 0, attempts 32172, throttled 0
+
+median        req/s     p50 µs     p90 µs     p99 µs   p99.9 µs     max µs   errors   attempts  throttled
+proxied        1608       8008      20611      36110      58393      96928        0      32172          0
+wrote bench/results/soak-2026-11-09T183931Z/20261109T184001Z-sdk-calibrate.json

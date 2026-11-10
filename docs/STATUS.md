@@ -1,10 +1,10 @@
 # STATUS
 
-Current phase: **4 (Operator surface), gate report written** (`docs/reports/gate-4.md`), awaiting
-Fable's review and Blake's decision. Open, stacked on `phase-4`: #20 (`p4/admin`: status and
-backends routes, the remaining verbs, doctor, goldens, parity test) and #21 (`p4/tui`: the TUI,
-runbook tasks, the report). Started 2026-11-09 on Blake's go after Gate 3 passed; `phase-3`
-tagged, #19 brings it to `main`. Merge #20 first, then #21.
+Current phase: **5 (Hardening and v0.1.0), closing its gate** on `phase-5` (started 2026-11-09 on
+Blake's go after Gate 4 passed; `phase-4` tagged and in `main`). PRs #24 and #26 to #35 are merged;
+the final `docs/reports/gate-5.md` is in. Blake answered its questions on 2026-11-10 and the three
+things he asked for before the v0.1.0 tag are done (below). Next: his merge of `phase-5` into
+`main`, the tag, then Phase 6 on his word.
 
 ## Phases
 
@@ -15,8 +15,86 @@ tagged, #19 brings it to `main`. Merge #20 first, then #21.
 | 2 Rate limiting | rules, matchers, GCRA, single pass, both modes, `Expect: 100-continue` measured, hot reload, limiter metrics, `/admin/limits`, `rules *` verbs | limiter suite green (fake clock); 10 µs p99; reload under load zero failures; SDKs complete work under 1 req/s | **report written 2026-11-09**: limiter suite 25 tests green; p99 4.7 µs at 1,000,000 keys; 20 reloads under load, slowest 0.60 ms, 0 failed; SDK completion by retry mode (D-044) |
 | 3 Showback | aggregator, snapshot and seal, NDJSON, `usage` verbs, `/admin/usage`, dimensions and cap, restart, multi-node sum | reconciliation exact; rollover tests; kill between snapshots loses ≤ `flush_interval`; verify detects a removed hour | **report written 2026-11-09**: reconciliation exact; 19 clock-injected tests green; Record 198 ns, 0 allocs; 257 B per tuple |
 | 4 Operator surface | remaining verbs, shared admin client, `/admin/status`, `/admin/limits/test`, `/admin/backends`, `tollbooth tui` | parity test; CLI goldens ×3 formats; `teatest` goldens; runbook tasks from the TUI and CLI alone | **report written 2026-11-09**: parity test green; 38 CLI goldens ×3 formats; 30 TUI frames at 80×24 and 120×40; two runbook tasks |
-| 5 Hardening and v0.1.0 | bench runs with profiles, tuning, 24 h soak, caps, `OPERATIONS.md`, systemd, container, `CHANGELOG.md`, tag | all performance targets met or ADR'd; soak flat | not started |
-| 6 Backlog | shaping, cluster limits, bandwidth, Parquet, OpenTelemetry, connection caps, rule editing, drain, web UI | each starts with an ADR | not scheduled |
+| 5 Hardening and v0.1.0 | bench runs with profiles, tuning, 24 h soak, caps, `OPERATIONS.md`, systemd, container, `CHANGELOG.md`, tag | all performance targets met or ADR'd; soak flat | **report written 2026-11-10**: soak 24 h, 69.5 M requests, memory flat, 0 unexplained errors; four end-to-end performance rows unverified without the reference node (ADR-0005); gate pending |
+| 6 Backlog | shaping, cluster limits, bandwidth, Parquet, OpenTelemetry, connection caps, drain, web UI, observe-only rules, live per-key rates (rule editing moved to Phase 5: ADR-0006, ADR-0007) | each starts with an ADR | not scheduled |
+
+## Phase 5 record (in progress)
+
+Shipped (PR #24, `p5/release` → `phase-5`, merged 2026-11-09; the soak results and the final report
+follow on `p5/soak`): `deploy/tollbooth.service`, `deploy/Dockerfile`
+and `.dockerignore`, `make release` and `make image`, the CI `release` job (artifacts, unit verify,
+image), `CHANGELOG.md`, the null backend's fault-injection listener, `loadgen -rate`, the soak
+harness (`make soak`, D-056), `bench/crosscheck.sh` (elbencho, ADR-0005), the full
+`docs/OPERATIONS.md`, ADR-0005, the dev-box bench run with profiles
+(`bench/results/2026-11-09T181541Z/`), `docs/reports/gate-5.md` (draft; soak rows pending).
+
+Added in Phase 5 on Blake's direction, each by ADR: the TUI as the operator console (ADR-0006,
+PRs #27 to #32: the Graphs screen, the Config editor that saves, the palette and navigation), and
+rules an operator can read (ADR-0007, accepted 2026-11-10 after the first demo; `p5/readable-rules`):
+the `limits` schema in S3 operation names with the unit in the key, every rule read back as a
+sentence, `tollbooth_limiter_matched_total{rule}`, the Limits screen with live rates per rule and
+per operation, and the guided form that writes a rule into the file (D-058 to D-061). The rule
+schema of Phases 2 to 4 is replaced, not kept beside it; nothing was tagged with it. Numbers for
+that branch (dev box, 2026-11-10, with the soak running beside it): lint 0 issues; race suite
+green, coverage 89.7%; fuzz 6 targets × 60 s clean (the new `FuzzEditRules` 179,904 executions);
+s3diff 293 cases, 0 diffs; govulncheck, licenses, and tidy clean; `BenchmarkDecide100Rules` +3.5%
+with the matched counter, 0 allocations; the form driven against a running proxy under 100 req/s
+added, changed, and deleted a rule, each reload under 1 ms, and left the file byte-identical.
+
+Findings on that branch: CI's 60 s fuzz of `FuzzEditRules` found in 21 s what 60 s on the dev box
+(179,904 executions) had not: a rule ending in an empty block scalar (`note: |` as the last line
+of the file) was measured one line past the end of the text and `AddRule` panicked in the splice.
+Fixed (an empty block scalar is its header line; every splice is bounds-checked and refuses with
+`ErrLayout`; texts with line breaks other than `\n` or `\r\n` are refused), with the input as a
+seed and a unit test; 300 s of the target afterwards, 455,723 executions, clean. The same CI run
+failed the client throttling stage: `test/integration/throttle.sh` still read `id` from
+`GET /admin/limits`, which this branch renamed to `name`; that stage needs the Garage and
+versitygw binaries and so had not run on the dev box. Fixed, and the script was then run locally
+against the null backend (aws cli rows: 68 denials in default retry mode, 6 in adaptive).
+
+The 24 h soak ended 2026-11-10T18:40Z: 24.00 h at 804 req/s (half of the calibrated 1,608 req/s
+peak at concurrency 16), 69,520,214 requests, 141 fault steps, RSS 27 to 37 MiB with a slope of
+−0.19 MiB/h over the second half, 0 error events outside a fault window, p50 2.5 ms and p99 32 ms
+through the proxy on the shared box (`bench/results/soak-2026-11-09T183931Z/`). It ran the build
+of PR #24; the final build passes the six-minute soak smoke (246,314 requests, 12 fault steps, 0
+unexplained errors). G2 on the final build: all ten steps exit 0, race coverage 89.8%, fuzz 6 × 60
+s clean, s3diff 293 cases 0 diffs.
+
+Blake's answers (2026-11-10, `docs/reports/gate-5.md` §8): tag v0.1.0 with the four end-to-end
+rows marked unverified (ADR-0005 accepted: option (b), stay on Go, elbencho for warp); the builder
+tags on Blake's word after he merges `phase-5` into `main`; the dev-box soak is accepted without a
+rerun, with a second one on the reference node at v0.1.1; the specification is amended by Blake or
+Fable from `docs/reports/gate-5-spec-amendments.md`; and two things are to be done **before the
+tag**: the health check must not report a serving proxy as not ready when the resolver fails (an
+ADR and the fix), and the client matrix must be run against a VAST cluster.
+
+The nightly on the final build (42885875806) failed its benchmark comparison on 15 rows with no
+regression in the proxy: another CPU model, a comparison command that pooled same-named benchmarks
+of different packages, and a test backend that gained a response header (D-063). Corrected on
+`p5/gate5-closeout`, which also carries the resolver fix (ADR-0008): the backend pool remembers the
+addresses each endpoint's name last resolved to and connects and probes there when a lookup fails,
+so a resolver outage no longer marks a serving proxy not ready or fails new connections.
+
+Cut: nothing; the reference-node measurements are deferred, not cut (ADR-0005).
+
+Findings: the first soak smoke was voided by a stale null backend from an interrupted `bench/run.sh`
+holding port 19000 and by a `bin/tollbooth` four commits old; the script now refuses taken ports
+and rebuilds the binary (D-056). A pid sentinel of 0 made `kill -0` always succeed and would have
+made `kill` address the whole process group; fixed before any run used it.
+
+Numbers (dev box, 2 vCPUs): G2 all green, race coverage 90.2%, fuzz 5 × 60 s clean, s3diff 293
+cases 0 diffs; bench raw 4 KiB GET direct 7,065 versus proxied 2,243 req/s at concurrency 32
+(contention, ADR-0005); soak smoke 223,770 requests, 11 chaos steps, 0 unexplained errors, RSS 23
+to 34 MiB.
+
+Gate result: **pass; the three conditions are met** (Blake's answers, 2026-11-10): the resolver
+fix (ADR-0008, PR #37), the benchmark-gate correction (D-063, PR #37), and the client matrix
+against a VAST cluster (PRs #36, #38, #40; `docs/COMPAT-vast.md`: byte-equivalence 184 cases with 0
+diffs, 48 client cells with 43 passing, 0 failures, and 5 gaps that are the cluster's own). That
+run also moved the health probe's default timeout from 2 s to 5 s (D-064, PR #39): VAST answers
+the unsigned probe after 2.0 s. Remaining before the tag: Blake merges `phase-5` into `main` and
+says so; then the changelog's 0.1.0 entry and the `phase-5` and `v0.1.0` tags. Phase 6 starts
+after that, on Blake's word, one ADR per item.
 
 ## Phase 4 record
 
@@ -34,7 +112,7 @@ CI throttle runs; the runbook says "completed every run measured but one".
 Numbers (dev box): `doctor` 17 ms for 10 checks; forwarded path still 7 allocations with the
 status counters and per-endpoint atomics on; the data path is otherwise untouched.
 
-Gate result: pending.
+Gate result: **pass** (Blake, 2026-11-09: #20 to #23 merged, `phase-4` tagged, "start phase 5").
 
 ## Phase 3 record
 

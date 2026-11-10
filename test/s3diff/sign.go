@@ -165,7 +165,7 @@ func sha256Hex(b []byte) string {
 
 // rawPut uploads payload to bucket/key in signing mode m.
 func (t *target) rawPut(ctx context.Context, bucket, key string, payload []byte, m sigMode) error {
-	now := time.Now().UTC()
+	now := t.now()
 	u := t.objectURL(bucket, key)
 	n := int64(len(payload))
 	switch m.payload {
@@ -330,7 +330,7 @@ func (t *target) rawPresignedGet(ctx context.Context, bucket, key string, want [
 	if err != nil {
 		return err
 	}
-	signed, _, err := v4.NewSigner().PresignHTTP(ctx, t.creds(), req, unsignedPayload, "s3", t.region, time.Now().UTC())
+	signed, _, err := v4.NewSigner().PresignHTTP(ctx, t.creds(), req, unsignedPayload, "s3", t.region, t.now())
 	if err != nil {
 		return err
 	}
@@ -359,7 +359,7 @@ func (t *target) rawGetBadSignature(ctx context.Context, bucket, key string) err
 	}
 	bad := *t
 	bad.sk = "not-the-secret"
-	if err := bad.signV4(ctx, req, unsignedPayload, time.Now().UTC()); err != nil {
+	if err := bad.signV4(ctx, req, unsignedPayload, t.now()); err != nil {
 		return err
 	}
 	return t.send(req)
@@ -378,7 +378,7 @@ func (t *target) rawPutExpect(ctx context.Context, bucket, key string, payload [
 	if !good {
 		signer.sk = "not-the-secret"
 	}
-	if serr := signer.signV4(ctx, req, unsignedPayload, time.Now().UTC()); serr != nil {
+	if serr := signer.signV4(ctx, req, unsignedPayload, t.now()); serr != nil {
 		return serr
 	}
 	// A transport of its own, so the 100-continue timeout is the SDK's 1 s and the connection is
@@ -414,7 +414,7 @@ func (t *target) rawDeleteObjectsMD5(ctx context.Context, bucket string, keys []
 	sum := md5.Sum(body) //nolint:gosec // Content-MD5
 	req.Header.Set("Content-MD5", base64.StdEncoding.EncodeToString(sum[:]))
 	req.Header.Set("Content-Type", "application/xml")
-	if err := t.signV4(ctx, req, sha256Hex(body), time.Now().UTC()); err != nil {
+	if err := t.signV4(ctx, req, sha256Hex(body), t.now()); err != nil {
 		return err
 	}
 	return t.send(req)
@@ -422,7 +422,7 @@ func (t *target) rawDeleteObjectsMD5(ctx context.Context, bucket string, keys []
 
 // rawGetV2 reads bucket/key with a SigV2 header or presigned URL.
 func (t *target) rawGetV2(ctx context.Context, bucket, key string, presigned bool) error {
-	now := time.Now().UTC()
+	now := t.now()
 	u := t.objectURL(bucket, key)
 	var req *http.Request
 	var err error

@@ -2,8 +2,10 @@
 
 One YAML file. It is validated as a whole, published as an immutable value behind one
 `atomic.Pointer` on `SIGHUP` or `POST /admin/reload`, and an invalid file keeps the running config.
-Unknown keys are errors. Nothing in tollbooth ever writes this file. `tollbooth check-config <file>`
-validates without starting and exits 1 on any error.
+Unknown keys are errors. The only thing that writes this file is an explicit save in `tollbooth tui`
+(the guided form on the Limits screen and the editor on the Config screen; ADR-0006, ADR-0007); the
+CLI never does. `tollbooth check-config <file>` validates without starting, reads every rule back as
+a sentence, and exits 1 on any error.
 
 Types: `duration` is a Go duration string (`10s`, `5m`, `300ms`). `bytes` is an integer count of
 bytes. `cidr` is `a.b.c.d/n` or an IPv6 prefix; a bare address means `/32` or `/128`. Keys marked
@@ -39,7 +41,7 @@ The example file `deploy/tollbooth.example.yaml` sets every key to its default.
 | Key | Type | Default | Meaning |
 | --- | --- | --- | --- |
 | `backend.scheme` | `http` or `https` | **required** | Scheme for every endpoint. |
-| `backend.endpoints` | list of `host:port` | **required**, at least one | Backend endpoints, round-robin. No scheme, no path. `check-config` warns when an endpoint's host is not among `base_domains` (the vhost deployment constraint, docs/OPERATIONS.md). Example: `[vast-vip-1:443, vast-vip-2:443]`. |
+| `backend.endpoints` | list of `host:port` | **required**, at least one | Backend endpoints, round-robin. No scheme, no path. `check-config` warns when an endpoint's host is not among `base_domains` (the vhost deployment constraint, docs/OPERATIONS.md). Example: `[vast-vip-1:443, vast-vip-2:443]`. A name is looked up on every new connection, so a cluster that rotates its DNS answers spreads connections; the last answer is remembered and used when the resolver does not answer (ADR-0008). An address is dialed as it is. |
 | `backend.tls.ca_bundle` | path | `""` | PEM CA bundle for `https`. Empty means the system roots. Rejected when `scheme` is `http`. |
 | `backend.tls.insecure_skip_verify` | bool | `false` | Lab only. `serve` logs a warning at startup and `doctor` reports it. |
 | `backend.dial_timeout` | duration | `2s` | TCP connect timeout per endpoint. |
@@ -47,7 +49,7 @@ The example file `deploy/tollbooth.example.yaml` sets every key to its default.
 | `backend.idle_body_timeout` | duration | `60s` | Idle-body timeout in each direction: aborts when no bytes move for this long. Pushed forward on every copied chunk. There is no whole-request timeout. |
 | `backend.max_idle_conns_per_host` | int | `1024` | Keep-alive pool size per endpoint. |
 | `backend.health_check.interval` | duration | `5s` | Active check cadence: TCP connect plus `HEAD /`; any HTTP status, 403 included, means healthy. |
-| `backend.health_check.timeout` | duration | `2s` | Per-check timeout. |
+| `backend.health_check.timeout` | duration | `5s` | Per-check timeout. The probe is unsigned, and a backend may make an unsigned request wait before refusing it: a VAST cluster answers it after 2.0 s. A timeout at or under that wait marks a working backend down and the proxy not ready (D-064). |
 
 ## `proxy`
 
@@ -62,29 +64,50 @@ The example file `deploy/tollbooth.example.yaml` sets every key to its default.
 | --- | --- | --- | --- |
 | `cluster.node_count` | int 1 … 1024 | `1` | Number of identical proxy nodes behind the load balancer. Each node enforces `rate / node_count` and `burst / node_count` (rounded up; a burst never rounds below 1). No coordination. The upper bound keeps the per-node emission interval inside the limiter's arithmetic (D-037). |
 
-## `rate_limits`
+## `limits`
+
+The rules (ADR-0007). A rule answers four questions in S3's own words: which requests, how many,
+counted how, and what the client gets over the limit.
+
+```yaml
+limits:
+  # "We have too many ListObjectsV2 calls coming in; limit them to 20 a second."
+  - name: list-storm
+    operation: ListObjectsV2
+    limit_per_second: 20
+    per: source_ip
+```
+
+`tollbooth check-config` reads that back as: *At most 20 ListObjectsV2 calls per second from each
+source IP. Over the limit, the client gets 503 SlowDown.* The same sentence is in `rules list`, on
+the TUI's Limits screen, and in `GET /admin/limits`.
 
 | Key | Type | Default | Meaning |
 | --- | --- | --- | --- |
-| `rate_limits.default_on_limit` | `slowdown` or `too_many_requests` | `slowdown` | Response mode for rules that do not set `on_limit`. `slowdown` is HTTP 503 with the S3 `SlowDown` body; `too_many_requests` is HTTP 429 with `TooManyRequests`. Both carry `Retry-After`. |
-| `rate_limits.rules` | list of rule | `[]` | Evaluated in this order. No matching rule means unlimited. |
+| `limits` | list of rule | `[]` | No matching rule means unlimited. A request must pass every rule that matches it. Rules are tried in file order and the pass ends at the first one that denies: the rules above it have counted the request, the rules below it have not. |
 
 ### Rule
 
 | Key | Type | Default | Meaning |
 | --- | --- | --- | --- |
-| `id` | string | **required**, unique | Identifier for metrics (`limiter_denied_total{rule}`), the admin API, and the limiter key. Never shown to clients. `[A-Za-z0-9_.-]{1,64}`. |
-| `match.access_keys` | list of string | any | Exact access key IDs. `""` matches anonymous requests. |
-| `match.buckets` | list of string | any | Exact bucket names. `""` matches service-level operations. |
-| `match.prefixes` | list of string | any | Key prefixes relative to the bucket; longest match wins. For list operations the request's `prefix` query parameter is matched instead (ADR-0001). |
-| `match.source_cidrs` | list of cidr | any | Source address ranges. |
-| `match.ops` | list of string | any | Operation classes (`LIST`, `READ`, `WRITE`, `DELETE`, `BUCKET`, `UNKNOWN`) and/or operation names from `docs/OPERATIONS_TABLE.md`. Unknown names are errors. |
-| `group_by` | list of `access_key`, `bucket`, `prefix`, `source_ip` | `[]` | One GCRA state per distinct tuple of these dimensions. Empty means one shared state for everything the rule matches. `prefix` requires `match.prefixes` and means the matched configured prefix. |
-| `limit.rate` | number ≥ 0 | **required** | Requests per second. `0` blocks every matching request with `Retry-After: 1`. Fractional rates are allowed (`0.5` = one request every two seconds). A non-zero rate must lie between `0.000001` and `1000000000` (D-037). |
-| `limit.burst` | int ≥ 1 | `max(1, ceil(rate))` | Bucket capacity: exactly this many requests are admitted from a full bucket. Ignored when `rate` is `0`. `burst / rate` must not exceed `1000000000` seconds, the time a full refill may take (D-037). |
-| `on_limit` | `slowdown` or `too_many_requests` | `rate_limits.default_on_limit` | Response mode when this rule denies. |
+| `name` | string | **required**, unique | What the rule is called in the console, the metrics (`limiter_matched_total{rule}`, `limiter_denied_total{rule}`), and the logs. Never shown to clients. Letters, digits, and `_ . -`, at most 64. |
+| `operation` | one value or a list | every operation | **Which requests.** S3 API operation names as in `docs/OPERATIONS_TABLE.md` (`ListObjectsV2`, `GetObject`), in any letter case; a trailing star names a family (`Get*`, 33 operations; `List*`, 11). Omitted, the rule covers every request, including one the classifier cannot name. A typo is answered with the closest name. The class words older configs used (`READ`, `WRITE`, `LIST`, …) are not accepted. |
+| `access_key` | one value or a list | any | Exact access key IDs. `""` matches anonymous requests. |
+| `bucket` | one value or a list | any | Exact bucket names. `""` matches service-level operations. |
+| `prefix` | one value or a list | any | Key prefixes relative to the bucket; longest match wins. For list operations the request's `prefix` query parameter is matched instead (ADR-0001). |
+| `source_ip` | one address or CIDR, or a list | any | Client addresses. |
+| `limit_per_second`, `limit_per_minute`, `limit_per_hour` | number above 0 | exactly one of these or `blocked` is **required** | **How many.** The number is in the key's own unit; decimals are allowed (`limit_per_second: 0.5` is one request every two seconds). In requests per second it must lie between `0.000001` and `1000000000` (D-037). |
+| `blocked` | bool | `false` | `blocked: true` refuses every matching request with `Retry-After: 1`, in place of a limit. |
+| `burst` | int ≥ 1 | the limit's own number, rounded up | How many may arrive at once before the rate applies. Two settings have names. **In a burst** (the default, no `burst` key): `limit_per_hour: 20` lets 20 through at once and then refills one every three minutes, so a client that arrives with a full allowance can make up to twice the number in its first hour. **Evenly spaced** (`burst: 1`, strict): one request at a time and the next after an even interval, one every three minutes for 20 an hour, so the number is never exceeded in any period; the sentence then says "evenly spaced (one every 3 minutes)". Any other number is that many at once. The refill time `burst ÷ rate` must not exceed `1000000000` seconds (D-037). Not allowed on a blocked rule. |
+| `per` | `total`, or one or several of `access_key`, `bucket`, `prefix`, `source_ip` | **required** for a limit | **Counted how.** `total` is one budget shared by every request the rule matches; a dimension gives each of its values a budget of its own; a list gives each combination one (`[access_key, bucket]`). `prefix` needs a `prefix` list and means the matched one. On a blocked rule `per` is optional and only decides how `rules top` tells the refusals apart. |
+| `respond` | `503` or `429` | `503` | **What the client gets over the limit.** `503` is the S3 `SlowDown` body, what S3 itself answers; `429` is `TooManyRequests`. Both carry `Retry-After`. |
+| `note` | string | none | Why the rule exists; one line, at most 200 characters, shown beside the rule in the console. |
 
-Every listed match condition must hold (AND); an omitted condition matches anything. `limit.bandwidth` is reserved for Phase 6 and is rejected as an unknown key until then.
+The filters (`operation`, `access_key`, `bucket`, `prefix`, `source_ip`) must all hold; an omitted
+one matches anything. The four filter nouns are also the values of `per` and the showback column
+names. Keys the earlier schema used (`rate_limits`, `id`, `match`, `ops`, `group_by`, `limit`,
+`on_limit`) are unknown keys, and the error says what to write instead. A bandwidth limit is Phase 6
+work and has no key yet.
 
 ## `limiter`
 
@@ -136,7 +159,7 @@ document what breaks when flipped.
 
 - Unknown keys anywhere are errors, with the key path named.
 - `node_id`, `showback.dir`, `backend.scheme`, `backend.endpoints` are required.
-- Rule ids are unique; `group_by: [prefix]` needs `match.prefixes`; `match.ops` names must exist; CIDRs parse; `on_limit` and `default_on_limit` are one of the two modes; a non-zero `limit.rate` is between `1e-6` and `1e9`, `limit.burst / limit.rate` is at most `1e9` seconds, and `cluster.node_count` is at most 1024 (D-037).
+- Rule names are unique; every `operation` entry resolves to at least one S3 operation; `source_ip` values parse; exactly one of `limit_per_second`, `limit_per_minute`, `limit_per_hour`, or `blocked: true` is set; a limit is above 0 and, per second, between `1e-6` and `1e9`; `per` is set for a limit, `total` stands alone, and `per: prefix` has a `prefix` list; `burst ÷ rate` is at most `1e9` seconds; `respond` is `503` or `429`; and `cluster.node_count` is between 1 and 1024.
 - `listen.tls.cert` and `listen.tls.key` are set together, the files exist, and the pair loads.
 - `admin.token` and `admin.token_file` are not both set; a `token_file` must exist and be non-empty.
 - `backend.tls.*` is rejected with `scheme: http`.
@@ -149,7 +172,7 @@ document what breaks when flipped.
 and matchers, and swaps one pointer. The route answers 200 with the result (`ok`, `generation`,
 `rules`, `duration_ms`) when the new config is published and 422 with the validation error when the
 file is rejected (D-040); `GET /admin/config` repeats the last result. Requests in flight finish under the config they started with.
-Limiter state is keyed by rule id and is never reset: a changed `rate` or `burst` applies from the
+Limiter state is keyed by rule name and is never reset: a changed limit or `burst` applies from the
 next decision; state of removed rules is swept. `listen.address`, `listen.proxy_protocol`,
 `admin.address`, `node_id`, `showback.dir`, `showback.dimensions`, `showback.prefixes` (the row
 shape and prefix tables are fixed for the process, D-046), `proxy.copy_buffer_bytes`, and every

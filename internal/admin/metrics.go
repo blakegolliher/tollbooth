@@ -190,7 +190,7 @@ func NewMetrics() *Metrics {
 			Name: "tollbooth_backend_up", Help: "1 when the endpoint passed its last health check, else 0.",
 		}, []string{"endpoint"}),
 		BackendErrors: prometheus.NewCounterVec(prometheus.CounterOpts{
-			Name: "tollbooth_backend_errors_total", Help: "Backend request failures by endpoint and kind (dial, tls, timeout, reset, other).",
+			Name: "tollbooth_backend_errors_total", Help: "Backend request failures by endpoint and kind (dial, tls, timeout, reset, other) and failed lookups of an endpoint's name (resolve).",
 		}, []string{"endpoint", "kind"}),
 		BackendRetries: prometheus.NewCounter(prometheus.CounterOpts{
 			Name: "tollbooth_backend_retries_total", Help: "Requests moved to another endpoint after a connect or TLS error before any request byte was sent.",
@@ -210,6 +210,9 @@ func NewMetrics() *Metrics {
 		Overflow: prometheus.NewCounter(prometheus.CounterOpts{
 			Name: "tollbooth_limiter_keys_overflow_total", Help: "Requests allowed without state because limiter.max_keys was reached (fail open).",
 		}),
+		Matched: prometheus.NewCounterVec(prometheus.CounterOpts{
+			Name: "tollbooth_limiter_matched_total", Help: "Requests a rule matched and charged against its budget, allowed or denied.",
+		}, []string{"rule"}),
 		Denied: prometheus.NewCounterVec(prometheus.CounterOpts{
 			Name: "tollbooth_limiter_denied_total", Help: "Requests denied, by the rule that denied them.",
 		}, []string{"rule"}),
@@ -237,7 +240,7 @@ func NewMetrics() *Metrics {
 	}
 	reg.MustRegister(m.requestsTotal, m.requestDuration, m.proxyOverhead, m.backendTTFB, m.bytesTotal, m.connectionsOpen,
 		m.Inflight, m.BackendUp, m.BackendErrors, m.BackendRetries, m.ConfigReload,
-		m.Limiter.Decision.(prometheus.Collector), m.Limiter.Keys, m.Limiter.Overflow, m.Limiter.Denied, m.Limiter.Errors,
+		m.Limiter.Decision.(prometheus.Collector), m.Limiter.Keys, m.Limiter.Overflow, m.Limiter.Matched, m.Limiter.Denied, m.Limiter.Errors,
 		m.Showback.Tuples, m.Showback.FlushDuration.(prometheus.Collector), m.Showback.FlushErrors, m.Showback.Collapsed, m.Showback.ClockSkew,
 		collectors.NewGoCollector(), collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))
 
