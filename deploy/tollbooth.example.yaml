@@ -53,7 +53,7 @@ limits: []                          # the rules; check-config reads each one bac
   #   prefix: [ckpt/, logs/]
   #   source_ip: 10.20.0.0/16
   #   limit_per_second: 2000
-  #   burst: 4000                   # how many may arrive at once; default is the limit's own number
+  #   burst: 4000                   # how many may arrive at once; default is the limit's own number; 1 is strict (evenly spaced)
   #   per: [access_key, bucket]     # each access key gets its own 2,000 a second on each bucket
   #   respond: 429                  # 503 SlowDown (default, what S3 itself answers) or 429 TooManyRequests
   #   note: "why this rule exists"

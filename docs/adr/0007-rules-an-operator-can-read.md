@@ -16,11 +16,11 @@ built differs in these places (D-058 to D-061 give the reasons):
 | The proposal said | What was built |
 | --- | --- |
 | `limit: 20/s`, `limit: 20/min`, `limit: blocked` | `limit_per_second: 20`, `limit_per_minute: 20`, `limit_per_hour: 20`, `blocked: true`; exactly one per rule (Blake's direction) |
-| `burst` defaults to one second's worth | `burst` defaults to the limit's own number, so `limit_per_hour: 20` passes 20 at once and then refills one every 180 s (measured: the twenty-first request is told `Retry-After: 180`) |
+| `burst` defaults to one second's worth | `burst` defaults to the limit's own number, so `limit_per_hour: 20` passes 20 at once and then refills one every 180 s (measured: the twenty-first request is told `Retry-After: 180`). Blake, 2026-11-10: keep the burst as the default, with strict as an option; strict is `burst: 1`, offered in the form as "evenly spaced" and read back as "evenly spaced (one every 3 minutes)" (measured: of five requests at once, one passes) |
 | `per` is required | required for a limit; optional on a blocked rule, where it only groups `rules top` |
 | The sentence: "Each source IP may make at most 20 ListObjectsV2 calls per second. Over that, the client gets 503 SlowDown." | "At most 20 ListObjectsV2 calls per second from each source IP. Over the limit, the client gets 503 SlowDown." One word order for every combination of filters and `per` |
 | The editor shows the sentence for the rule under the cursor | not built; the editor's verdict line is unchanged. The sentence is in `check-config`, `rules list`, `rules show`, `GET /admin/limits`, the Limits screen, and the form |
-| A rule that matches nothing for five minutes is flagged on the Limits screen and in `rules list` | flagged on the Limits screen after one minute; `rules list` and `rules show` print the matched count |
+| A rule that matches nothing for five minutes is flagged on the Limits screen and in `rules list` | flagged on the Limits screen after one minute; `rules list` and `rules show` print the matched count. The mark also appears on a rule for an idle tenant; Blake, 2026-11-10: keep the mark |
 | `l` limits the selected operation | not built; `n` opens the form with the operations in traffic listed first |
 | The form's fields: Limit what, To at most, Counted, Only for, When over, Name, Note | the same, plus the unit and "at once" (the burst) beside the number; "When over" is labelled "Over the limit" |
 | Pickers offer the values recorded in the current showback hour | the last two hours of `GET /admin/usage`, so the list is not empty just after the hour turns |

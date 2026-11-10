@@ -172,7 +172,7 @@ The console needs `--config` (the file it will change) to open the form.
    | Field | What to enter |
    | --- | --- |
    | Limit what | Type a few letters of the operation; the list under the field shows the matching S3 operations, the ones in traffic first with their rates. `↓` and `enter` pick one; a comma adds another; `List*` is a family; empty means every operation. |
-   | To at most | The number, then `tab` to the unit: `←`/`→` chooses per second, per minute, per hour, or blocked. "At once" is the burst; leave it empty for the same as the number. |
+   | To at most | The number, then `tab` to the unit: `←`/`→` chooses per second, per minute, per hour, or blocked. `tab` again to "at once", how the requests may arrive: `↓` and `enter` choose **in a burst** (the default: the limit's own number may arrive at once, then the allowance refills evenly) or **evenly spaced** (strict: one at a time, for example one every 3 minutes for 20 an hour); or type a number of your own. |
    | Counted | **Required.** Everyone together (one shared budget), or each source IP, each access key, each bucket, each access key on each bucket, or, when a prefix is listed, each listed prefix (a budget of its own for every one). A combination written by hand in the file is kept as written. |
    | Only for | Optional filters: access key, bucket, prefix, source IP. The access key and bucket fields list the values seen in the last two hours of showback, busiest first, so nobody types a 20-character key; a value the proxy has not seen is allowed and flagged. |
    | Over the limit | `503 SlowDown` (what S3 itself answers) or `429 TooManyRequests`. |
@@ -286,11 +286,15 @@ standard retry mode gives up after three to five attempts with random backoff an
 3. Wait for hold-and-forward (Phase 6), which queues a denied request up to a bound instead of
    answering 503.
 
-A per-minute or per-hour limit is a budget, not a pace. `limit_per_hour: 20` lets 20 requests
+A per-minute or per-hour limit is a budget by default. `limit_per_hour: 20` lets 20 requests
 through at once and then refills one every 180 s; the twenty-first is told `Retry-After: 180`
 (measured), which no SDK's retries outlast, so the client's operation fails. That is the right
-behavior for "this job may list 20 times an hour" and the wrong one for slowing a client down; to
-pace, use `limit_per_second`.
+behavior for "this job may list 20 times an hour". With `burst: 1` ("evenly spaced" in the form)
+the same limit is strict: one request passes and the next is admitted three minutes later
+(measured: of five at once, one passed and four were told `Retry-After: 180`), so the count is
+never exceeded in any hour, and a client that makes two quick calls has its second one refused.
+Neither slows a client down gently; to pace a busy client, use `limit_per_second`, where the wait
+between refills is inside what SDK retries cover.
 
 Expect a herd: N clients denied together receive the same `Retry-After` and retry together, so
 N − 1 are denied again. Adaptive clients spread out on their own; default-mode clients do not.

@@ -45,7 +45,8 @@ Decisions behind entries are in `docs/DECISIONS.md` (D-nnn) and `docs/adr/`.
   (`operation: ListObjectsV2`, a trailing star for a family, a typo answered with the closest
   name), with the unit in the key (`limit_per_second`, `limit_per_minute`, `limit_per_hour`, or
   `blocked: true`), a required `per` (who gets a budget of their own, or `total`), `respond: 503`
-  or `429`, and a `note`. Every rule is read back as a sentence by `check-config`, `rules list`,
+  or `429`, and a `note`. A limit is kept in a burst by default (its own number may arrive at once)
+  or evenly spaced with `burst: 1` (strict: one at a time), and the read-back says which. Every rule is read back as a sentence by `check-config`, `rules list`,
   `rules show`, `GET /admin/limits`, and the console. `tollbooth_limiter_matched_total{rule}`
   counts what each rule matches, beside what it denies. The TUI's Limits screen shows the rules
   in words with matched and throttled per second and the busiest S3 operations, flags a rule that

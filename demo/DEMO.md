@@ -442,8 +442,9 @@ s3 ls s3://$LOAD_BUCKET/                            # real listing, through the 
    their retries and fail with SlowDown. That is what a tenant over its limit should see, and
    `demo/state/loadgen.log` counts them as errors at the end of the run.
 4. **Change it, then remove it.** `2`, select the rule, `enter`: the cursor is on the number. Type
-   a higher one, `ctrl+r`, and watch the lines cross back. "At once" is the burst and defaults to
-   the limit's own number; a burst far above the limit passes that many requests before the limit
+   a higher one, `ctrl+r`, and watch the lines cross back. "At once" is the burst: it defaults to
+   the limit's own number, and `↓`, `enter` on the field chooses "evenly spaced" (strict, one at a
+   time); a burst far above the limit passes that many requests before the limit
    bites (`limit_per_second: 30` with `burst: 250` is about six seconds of GetObject at 70/s). `d`, `y`
    deletes the rule. `demo/run.sh load 300` restarts the generator at another rate;
    `demo/run.sh stop` ends the load and the proxy. The same changes by hand: `5`, `e` opens the
