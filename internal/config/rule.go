@@ -269,7 +269,8 @@ func ResolveOperation(entry string) (ops []s3id.Op, canonical string, err error)
 			return []s3id.Op{op}, op.String(), nil
 		}
 	}
-	if c, ok := s3id.ParseClass(strings.ToUpper(e)); ok {
+	// One of the class words tollbooth's rules used before ADR-0007, written the way they were.
+	if c, ok := s3id.ParseClass(e); ok {
 		var members []string
 		for _, op := range s3id.Ops() {
 			if op.Class() == c {
@@ -277,6 +278,17 @@ func ResolveOperation(entry string) (ops []s3id.Op, canonical string, err error)
 			}
 		}
 		return nil, "", fmt.Errorf("%q is not an S3 operation; name the operations themselves (it used to mean %s)", e, joinSome(members, 6))
+	}
+	// The start of several names: the operator is partway to one of them, or wants the family.
+	var starts []string
+	for _, op := range s3id.Ops() {
+		if name := op.String(); len(name) > len(e) && strings.EqualFold(name[:len(e)], e) {
+			starts = append(starts, name)
+		}
+	}
+	if len(starts) > 1 {
+		family := starts[0][:len(e)] + "*"
+		return nil, "", fmt.Errorf("%q is the start of %d S3 operations (%s); name one, or write %s for all of them", e, len(starts), joinSome(starts, 3), family)
 	}
 	if s := closestOperation(e); s != "" {
 		return nil, "", fmt.Errorf("unknown S3 operation %q; did you mean %s?", e, s)

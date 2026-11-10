@@ -142,7 +142,9 @@ func TestResolveOperation(t *testing.T) {
 		"PutObjcet":    "did you mean PutObject?",
 		"headobject2":  "did you mean HeadObject?",
 		"READ":         "is not an S3 operation; name the operations themselves (it used to mean GetObject, HeadObject",
-		"list":         "is not an S3 operation",
+		"list":         "is the start of 11 S3 operations (ListBuckets, ListObjects, ListObjectsV2, and 8 more); name one, or write List* for all of them",
+		"LIST":         "is not an S3 operation; name the operations themselves (it used to mean ListBuckets",
+		"GetObjectA":   "is the start of 3 S3 operations (GetObjectAcl, GetObjectAttributes, GetObjectAnnotation); name one, or write GetObjectA* for all of them",
 		"Frobnicate":   "docs/OPERATIONS_TABLE.md",
 	}
 	for in, want := range bad {
