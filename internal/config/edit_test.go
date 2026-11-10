@@ -332,6 +332,10 @@ func FuzzEditRules(f *testing.F) {
 	f.Add([]byte("limits: [{name: a, blocked: true}]"))
 	f.Add([]byte("limits:\n- name: a\n  operation: [\n    GetObject]\n  blocked: true\n"))
 	f.Add([]byte("limits:\n  - name: a\n    note: |\n      two\n      lines\n    blocked: true\n"))
+	f.Add([]byte("limits:\n- note: |"))                                  // CI's crasher: an empty block scalar at the end
+	f.Add([]byte("limits:\n- name: a\n  blocked: true\n  note: |+\n\n")) // kept blank lines
+	f.Add([]byte("limits:\r- name: a\r  blocked: true\r"))               // lines the parser counts and a split on \n does not
+	f.Add([]byte("limits:\r\n- name: a\r\n  blocked: true\r\n"))
 	f.Fuzz(func(t *testing.T, text []byte) {
 		before, err := RulesIn(text)
 		if err != nil {
@@ -371,5 +375,49 @@ func BenchmarkReplaceRule(b *testing.B) {
 		if _, err := ReplaceRule(text, "list-storm", &r); err != nil {
 			b.Fatal(err)
 		}
+	}
+}
+
+// Texts whose lines the YAML parser and a split on "\n" count differently, or whose last value is
+// a block scalar with no content: the edits must refuse or succeed, never index past the text.
+// The first case is the input CI's fuzzer found (run 42867295463): lastLine put an empty block
+// scalar one line past the end of the file and rewriteAll spliced there.
+func TestEditOddLineStructure(t *testing.T) {
+	add := Rule{Name: "added", Operation: StringList{"ListObjectsV2"}, LimitPerSecond: num(20), Per: StringList{"source_ip"}}
+	blocked := Rule{Name: "a", Blocked: true}
+	for name, text := range map[string]string{
+		"empty block scalar at the end":   "limits:\n- note: |",
+		"empty folded scalar, named rule": "limits:\n- name: a\n  blocked: true\n  note: >-",
+		"keep-chomped blank lines":        "limits:\n- name: a\n  blocked: true\n  note: |+\n\n\n",
+		"flow list with a block neighbor": "limits: [{name: a, blocked: true}]\nnode_id: |",
+		"lone carriage returns":           "limits:\r- name: a\r  blocked: true\r",
+		"next-line characters":            "limits:\u0085- name: a\u0085  blocked: true\u0085",
+		"line separators":                 "limits: - name: a   blocked: true ",
+		"carriage return and newline":     "limits:\r\n- name: a\r\n  blocked: true\r\n",
+	} {
+		t.Run(name, func(t *testing.T) {
+			before, err := RulesIn([]byte(text))
+			if err != nil {
+				return // not a rule list at all; nothing to edit
+			}
+			if out, err := AddRule([]byte(text), &add); err == nil {
+				if after, rerr := RulesIn(out); rerr != nil || len(after) != len(before)+1 {
+					t.Errorf("AddRule: %d rules after, want %d (%v)\n%q", len(after), len(before)+1, rerr, out)
+				}
+			}
+			if len(before) == 0 {
+				return
+			}
+			if out, err := ReplaceRule([]byte(text), before[0].Name, &blocked); err == nil {
+				if after, rerr := RulesIn(out); rerr != nil || len(after) != len(before) || !after[0].Blocked {
+					t.Errorf("ReplaceRule: %v\n%q", rerr, out)
+				}
+			}
+			if out, err := DeleteRule([]byte(text), before[0].Name); err == nil {
+				if after, rerr := RulesIn(out); rerr != nil || len(after) != len(before)-1 {
+					t.Errorf("DeleteRule: %d rules after, want %d (%v)\n%q", len(after), len(before)-1, rerr, out)
+				}
+			}
+		})
 	}
 }

@@ -73,7 +73,9 @@ func AddRule(text []byte, r *Rule) ([]byte, error) {
 		if rerr != nil {
 			return nil, rerr
 		}
-		out = f.splice(last.end, last.end, block)
+		if out, err = f.splice(last.end, last.end, block); err != nil {
+			return nil, err
+		}
 	} else if out, err = f.rewriteAll(want); err != nil {
 		return nil, err
 	}
@@ -123,7 +125,11 @@ func ReplaceRule(text []byte, name string, r *Rule) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	return verify(f.splice(it.start-1, it.end, block), want)
+	out, err := f.splice(it.start-1, it.end, block)
+	if err != nil {
+		return nil, err
+	}
+	return verify(out, want)
 }
 
 // DeleteRule removes the rule called name.
@@ -150,7 +156,9 @@ func DeleteRule(text []byte, name string) ([]byte, error) {
 	items := f.blockItems()
 	var out []byte
 	if len(items) == len(old) && len(old) > 1 {
-		out = f.splice(items[idx].start-1, items[idx].end, nil)
+		if out, err = f.splice(items[idx].start-1, items[idx].end, nil); err != nil {
+			return nil, err
+		}
 	} else if out, err = f.rewriteAll(want); err != nil {
 		return nil, err
 	}
@@ -184,6 +192,9 @@ func locate(text []byte) (*file, error) {
 	if err := yaml.Unmarshal(text, &root); err != nil {
 		return nil, fmt.Errorf("the file does not parse: %w", err)
 	}
+	if oddLineBreaks(text) {
+		return nil, ErrLayout
+	}
 	f := &file{lines: strings.Split(string(text), "\n")}
 	if root.Kind != yaml.DocumentNode || len(root.Content) == 0 {
 		return f, nil // an empty document: no limits
@@ -198,6 +209,18 @@ func locate(text []byte) (*file, error) {
 		}
 	}
 	return f, nil
+}
+
+// oddLineBreaks reports a text with a line break other than "\n" or "\r\n". YAML also ends a line
+// at a lone carriage return and at U+0085, U+2028, and U+2029; the parser's line numbers then
+// disagree with a split on "\n", and every position these functions use would be wrong.
+func oddLineBreaks(text []byte) bool {
+	for i, c := range text {
+		if c == '\r' && (i+1 == len(text) || text[i+1] != '\n') {
+			return true
+		}
+	}
+	return bytes.ContainsAny(text, "\u0085\u2028\u2029")
 }
 
 func (f *file) rules() ([]Rule, error) {
@@ -248,7 +271,11 @@ func (f *file) blockItems() []item {
 func lastLine(n *yaml.Node) int {
 	m := n.Line
 	if n.Kind == yaml.ScalarNode && n.Style&(yaml.LiteralStyle|yaml.FoldedStyle) != 0 {
-		m += strings.Count(strings.TrimRight(n.Value, "\n"), "\n") + 1
+		// The header line, then one line per line of content. A block scalar with no content
+		// (`note: |` at the end of the file) is its header alone.
+		if body := strings.TrimRight(n.Value, "\n"); body != "" {
+			m += strings.Count(body, "\n") + 1
+		}
 	}
 	for _, c := range n.Content {
 		if l := lastLine(c); l > m {
@@ -259,13 +286,17 @@ func lastLine(n *yaml.Node) int {
 }
 
 // splice returns the text with lines (after, upTo] replaced by block: splice(n, n, b) inserts b
-// after line n, splice(a-1, b, nil) deletes lines a..b.
-func (f *file) splice(after, upTo int, block []string) []byte {
+// after line n, splice(a-1, b, nil) deletes lines a..b. A range that is not inside the text means
+// the parser's positions and the text's lines disagree, and nothing is spliced.
+func (f *file) splice(after, upTo int, block []string) ([]byte, error) {
+	if after < 0 || upTo < after || upTo > len(f.lines) {
+		return nil, ErrLayout
+	}
 	out := make([]string, 0, len(f.lines)+len(block))
 	out = append(out, f.lines[:after]...)
 	out = append(out, block...)
 	out = append(out, f.lines[upTo:]...)
-	return []byte(strings.Join(out, "\n"))
+	return []byte(strings.Join(out, "\n")), nil
 }
 
 // rewriteAll replaces the whole `limits` section (or appends one) with the rules in canonical
@@ -302,7 +333,7 @@ func (f *file) rewriteAll(rules []Rule) ([]byte, error) {
 	if i := strings.Index(f.lines[f.key.Line-1], " #"); i >= 0 && f.seq.Line == f.key.Line {
 		block[0] += "  " + strings.TrimSpace(f.lines[f.key.Line-1][i:])
 	}
-	return f.splice(f.key.Line-1, end, block), nil
+	return f.splice(f.key.Line-1, end, block)
 }
 
 // renderItem writes a rule as a block list item whose dash sits at column dash.
