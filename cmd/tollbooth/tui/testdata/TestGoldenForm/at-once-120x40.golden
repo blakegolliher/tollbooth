@@ -1,0 +1,40 @@
+ 1 Overview  2 Limits  3 Usage  4 Backends  5 Config  6 Graphs  tui-node · v0.0.0-tui
+╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ New limit                                                                                                            │
+│   Limit what     ListObjectsV2                                                                                       │
+│ ▸ To at most     20  per hour   at once:                                                                             │
+│   Counted        choose…                                                                                             │
+│   Only for       access key any                                                                                      │
+│                  bucket     any                                                                                      │
+│                  prefix     any                                                                                      │
+│                  source IP  any                                                                                      │
+│   Over the limit 503 SlowDown (what S3 itself answers)                                                               │
+│   Name           listobjectsv2                                                                                       │
+│   Note           why this limit exists (optional)                                                                    │
+│ ── how they may arrive: ↓ pick · enter accept · or type a number ─────────────────────────────────────────────────── │
+│     (•) in a burst              20 may arrive at once, then refill                                                   │
+│   ▸ ( ) evenly spaced (strict)  one at a time, one every 3 minutes                                                   │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│ Means   ✗ Counted: choose who gets their own budget                                                                  │
+│                                                                                                                      │
+│ Now     ListObjectsV2: 312/s right now                                                                               │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+
+
+
+
+
+
+
+
+
+
+
+tab next · arrows pick · enter accept · ctrl+r apply · ctrl+s save · esc cancel

@@ -99,7 +99,7 @@ func TestGoldenLimits(t *testing.T) {
 
 // TestGoldenForm renders the guided form in the states an operator passes through: empty with the
 // busiest operations offered, a family among the suggestions, the required "counted" choice, a
-// valid rule read back, a typo answered with the right name, an access key the proxy has not
+// valid rule read back, the choice between a burst and an even pace, a typo answered with the right name, an access key the proxy has not
 // seen, a block, an existing rule opened on its number, and the discard prompt.
 func TestGoldenForm(t *testing.T) {
 	base, _ := baseModel(t)
@@ -114,6 +114,7 @@ func TestGoldenForm(t *testing.T) {
 			{"operation-family", seq(open, typed("List"))},
 			{"counted-required", seq(open, typed("listobjectsv2"), "tab", typed("20"), "tab", "tab", "tab")},
 			{"valid", filled},
+			{"at-once", seq(open, typed("listobjectsv2"), "tab", typed("20"), "tab", "right", "right", "tab", "down", "down")},
 			{"typo", seq(open, typed("ListObjectV2"), "tab", typed("20"))},
 			{"unseen-key", seq(filled, "tab", typed("DEMO-TENANT-A"))},
 			{"key-picker", seq(filled, "tab", typed("akia"), "down")},
@@ -420,5 +421,66 @@ func TestLimitedBy(t *testing.T) {
 	m.snap.limits.Rules = m.snap.limits.Rules[:3]
 	if got := m.limitedBy("PutObject"); got != "" {
 		t.Errorf("limitedBy(PutObject) with no rule about it = %q", got)
+	}
+}
+
+// "At once" offers the two ways a limit can be kept: in a burst (the default, no `burst` key) or
+// evenly spaced (strict pacing, `burst: 1`). Choosing one writes exactly that, and choosing the
+// default again removes the line.
+func TestFormStrictPacing(t *testing.T) {
+	base, cfgPath := baseModel(t)
+	before, _ := os.ReadFile(cfgPath)
+
+	// 20 ListObjectsV2 an hour for each source IP, evenly spaced.
+	m := drive(t, base, seq(size(100, 30), "2", "n", typed("listobjectsv2"), "tab", typed("20"), "tab", "right", "right", "tab")...)
+	if m.form.focus != fBurst {
+		t.Fatalf("focus %d, want the at-once field", m.form.focus)
+	}
+	choices := m.suggestions()
+	if len(choices) != 2 || choices[0].label != "(•) in a burst" || choices[0].detail != "20 may arrive at once, then refill" ||
+		choices[1].label != "( ) evenly spaced (strict)" || choices[1].detail != "one at a time, one every 3 minutes" {
+		t.Fatalf("choices %+v", choices)
+	}
+	m = drive(t, m, seq("down", "down", "enter", "tab", "right", "right")...)
+	if got := m.form.inputs[fBurst].Value(); got != "1" {
+		t.Fatalf("at once %q after choosing evenly spaced", got)
+	}
+	const want = "At most 20 ListObjectsV2 calls per hour from each source IP, evenly spaced (one every 3 minutes). Over the limit, the client gets 503 SlowDown."
+	if m.form.err != "" || m.form.r.Sentence() != want {
+		t.Fatalf("verdict %q, sentence %q", m.form.err, m.form.r.Sentence())
+	}
+	if !strings.Contains(m.View(), "(evenly spaced)") {
+		t.Fatalf("the row does not say the limit is evenly spaced:\n%s", m.View())
+	}
+	m = drive(t, m, key("ctrl+s"))
+	block := "  - name: listobjectsv2-per-source-ip\n    operation: ListObjectsV2\n    limit_per_hour: 20\n    burst: 1\n    per: source_ip\n"
+	if after, _ := os.ReadFile(cfgPath); string(after) != string(before)+block {
+		t.Fatalf("file after the save (notice %q):\n%s", m.notice, after)
+	}
+
+	// An existing rule with a number of its own at once: strict replaces the number in place.
+	saved := string(before) + block
+	m = drive(t, m, seq("enter", "tab", "tab")...)
+	if !m.form.open || m.form.editing != "tenant-a-writes" || m.form.focus != fBurst || m.form.inputs[fBurst].Value() != "8000" {
+		t.Fatalf("open %v editing %q focus %d at once %q", m.form.open, m.form.editing, m.form.focus, m.form.inputs[fBurst].Value())
+	}
+	if c := m.suggestions(); c[0].label != "( ) in a burst" || c[1].label != "( ) evenly spaced (strict)" {
+		t.Fatalf("a typed number is neither named choice: %+v", c)
+	}
+	m = drive(t, m, seq("down", "down", "enter", "ctrl+s")...)
+	strict := strings.Replace(saved, "    burst: 8000\n", "    burst: 1\n", 1)
+	if after, _ := os.ReadFile(cfgPath); string(after) != strict {
+		t.Fatalf("file after choosing evenly spaced (notice %q):\n%s", m.notice, after)
+	}
+
+	// Back to a burst: the default is the absence of the key.
+	m = drive(t, m, seq("enter", "tab", "tab")...)
+	if c := m.suggestions(); c[1].label != "(•) evenly spaced (strict)" {
+		t.Fatalf("the choice in effect is not marked: %+v", c)
+	}
+	m = drive(t, m, seq("down", "enter", "ctrl+s")...)
+	relaxed := strings.Replace(saved, "    burst: 8000\n", "", 1)
+	if after, _ := os.ReadFile(cfgPath); string(after) != relaxed {
+		t.Fatalf("file after choosing a burst again (notice %q):\n%s", m.notice, after)
 	}
 }

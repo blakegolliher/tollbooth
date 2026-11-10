@@ -18,6 +18,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"net/http"
 	"net/url"
 	"path/filepath"
@@ -81,7 +82,10 @@ type seen struct {
 }
 
 // suggestion is one row of a picker.
-type suggestion struct{ value, detail string }
+type suggestion struct {
+	value, detail string
+	label         string // shown in place of value when the two differ (the "at once" choices)
+}
 
 // perChoice is one answer to "counted how".
 type perChoice struct {
@@ -132,7 +136,9 @@ type (
 func (f formField) isText() bool { return f != fUnit && f != fPer && f != fRespond }
 
 // isPicker reports whether a text field offers suggestions.
-func (f formField) isPicker() bool { return f == fOperation || f == fAccessKey || f == fBucket }
+func (f formField) isPicker() bool {
+	return f == fOperation || f == fAccessKey || f == fBucket || f == fBurst
+}
 
 // openForm opens the form on a rule in the file (name) or on a new one ("").
 func (m Model) openForm(name string) (tea.Model, tea.Cmd) {
@@ -492,6 +498,9 @@ func (m Model) suggestions() []suggestion {
 	if !f.focus.isPicker() {
 		return nil
 	}
+	if f.focus == fBurst {
+		return f.burstChoices()
+	}
 	val := f.inputs[f.focus].Value()
 	_, tok := lastToken(val)
 	already := map[string]bool{}
@@ -515,7 +524,7 @@ func (m Model) suggestions() []suggestion {
 			if s.requests == 1 {
 				word = " request lately"
 			}
-			out = append(out, suggestion{s.value, config.FormatCount(float64(s.requests)) + word})
+			out = append(out, suggestion{value: s.value, detail: config.FormatCount(float64(s.requests)) + word})
 		}
 		return out
 	}
@@ -553,11 +562,11 @@ func (m Model) suggestions() []suggestion {
 		if c.rate > 0 {
 			detail = fmtRate(c.rate) + "/s right now"
 		}
-		out = append(out, suggestion{c.name, detail})
+		out = append(out, suggestion{value: c.name, detail: detail})
 	}
 	if low != "" && family > 1 {
 		if ops, canonical, err := config.ResolveOperation(low + "*"); err == nil && !already[strings.ToLower(canonical)] {
-			fam := suggestion{canonical, fmt.Sprintf("all %d operations that start with %s", len(ops), strings.TrimSuffix(canonical, "*"))}
+			fam := suggestion{value: canonical, detail: fmt.Sprintf("all %d operations that start with %s", len(ops), strings.TrimSuffix(canonical, "*"))}
 			at := min(len(out), 3) // after the closest names, still on the first screenful
 			out = append(out[:at], append([]suggestion{fam}, out[at:]...)...)
 		}
@@ -580,6 +589,28 @@ func commonRank(name string) int {
 		}
 	}
 	return len(commonOperations)
+}
+
+// burstChoices are the two named answers to "how may the requests arrive": in a burst (the default:
+// the limit's own number at once, written as no `burst` at all) or evenly spaced (strict pacing,
+// written `burst: 1`). Any other number is typed into the field.
+func (f *formState) burstChoices() []suggestion {
+	cur := strings.TrimSpace(f.inputs[fBurst].Value())
+	mark := func(on bool) string {
+		if on {
+			return "(•) "
+		}
+		return "( ) "
+	}
+	burst, paced := "the limit's own number at once", "one at a time, at an even pace"
+	if n, _, ok := f.r.Count(); ok {
+		burst = config.FormatCount(math.Ceil(n)) + " may arrive at once, then refill"
+		paced = "one at a time, one every " + f.r.Spacing()
+	}
+	return []suggestion{
+		{value: "", label: mark(cur == "") + "in a burst", detail: burst},
+		{value: "1", label: mark(cur == "1") + "evenly spaced (strict)", detail: paced},
+	}
 }
 
 // highlight is the suggestion enter would accept: the one the arrows chose, or, in the operation
@@ -668,6 +699,9 @@ func (m Model) keyForm(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "enter":
 		if f.focus.isPicker() && pick >= 0 {
 			head, _ := lastToken(f.inputs[f.focus].Value())
+			if f.focus == fBurst {
+				head = "" // one number, not a list
+			}
 			f.inputs[f.focus].SetValue(head + sugs[pick].value)
 			f.inputs[f.focus].CursorEnd()
 			f.sug, f.dirty = -1, true
@@ -930,11 +964,15 @@ func (m Model) formRows(cw int) []string {
 	if lead != fAmount && lead != fUnit && lead != fBurst {
 		lead = fAmount
 	}
+	paced := ""
+	if f.r.Strict() {
+		paced = styleDim.Render(" (evenly spaced)")
+	}
 	if f.unit == unitBlocked {
 		rows = append(rows, label(fUnit, "Limit")+choice(fUnit, unitLabels[f.unit])+styleDim.Render("  every matching request is refused"))
 	} else {
 		rows = append(rows, label(lead, "To at most")+text(fAmount, 10, "a number")+"  "+choice(fUnit, unitLabels[f.unit])+
-			styleDim.Render("   at once: ")+text(fBurst, 10, "same as the limit"))
+			styleDim.Render("   at once: ")+text(fBurst, 10, "same as the limit")+paced)
 	}
 
 	per, perLabel := styleWarn.Render("choose…"), "Counted"
@@ -1007,10 +1045,8 @@ func (m Model) formContext(cw, room int) []string {
 		choices(respondLabels, nil, f.respond)
 	case fAmount:
 		head("how many")
-		lines = append(lines, "  A number, for example 20.", "  That many may also arrive at once; the allowance then refills evenly.")
-	case fBurst:
-		head("how many at once")
-		lines = append(lines, "  How many may arrive at once before the rate applies.", "  Empty: the same as the limit's own number.")
+		lines = append(lines, "  A number, for example 20.", "  That many may also arrive at once; the allowance then refills evenly.",
+			"  For an even pace instead, choose \"evenly spaced\" under \"at once\".")
 	case fPrefix:
 		head("only for these key prefixes")
 		lines = append(lines, "  Prefixes inside the bucket, for example logs/ (a comma between several).")
@@ -1024,10 +1060,14 @@ func (m Model) formContext(cw, room int) []string {
 		head("note")
 		lines = append(lines, "  Why the limit exists: a ticket, a date, who asked. Shown beside the rule.")
 	default:
-		none := "  (no S3 operation matches; names are as in the S3 API, such as ListObjectsV2)"
-		if f.focus == fOperation {
+		none, nameW := "  (no S3 operation matches; names are as in the S3 API, such as ListObjectsV2)", 36
+		switch f.focus {
+		case fOperation:
 			head("S3 operations, busiest first: ↓ pick · enter accept · comma for another")
-		} else {
+		case fBurst:
+			head("how they may arrive: ↓ pick · enter accept · or type a number")
+			nameW = 27
+		default:
 			head("seen by the proxy lately, busiest first: ↓ pick · enter accept")
 			none = "  (nothing recorded lately that matches; type the value)"
 		}
@@ -1040,9 +1080,13 @@ func (m Model) formContext(cw, room int) []string {
 			first = pick - (room - 2)
 		}
 		for i := first; i < len(sugs) && len(lines) < room; i++ {
-			row := fmt.Sprintf("    %-36s %s", sugs[i].value, sugs[i].detail)
+			name := sugs[i].value
+			if sugs[i].label != "" {
+				name = sugs[i].label
+			}
+			row := fmt.Sprintf("    %-*s %s", nameW, name, sugs[i].detail)
 			if i == pick {
-				row = styleSel.Render(fmt.Sprintf("  ▸ %-36s %s ", sugs[i].value, sugs[i].detail))
+				row = styleSel.Render(fmt.Sprintf("  ▸ %-*s %s ", nameW, name, sugs[i].detail))
 			}
 			lines = append(lines, row)
 		}
