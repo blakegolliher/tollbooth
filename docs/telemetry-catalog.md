@@ -8,7 +8,7 @@ object key: that is showback's job and would blow up the time-series database.
 Bounded label values: `operation` (the 113 names in docs/OPERATIONS_TABLE.md), `op_class`
 (`LIST`, `READ`, `WRITE`, `DELETE`, `BUCKET`, `UNKNOWN`), `status_class` (`2xx`, `3xx`, `4xx`,
 `5xx`, `throttled`, `proxy_error`), `result` (`forwarded`, `throttled`, `shaped`, `error`), `rule`
-(configured rule ids; bounded by the config), `endpoint` (configured backend endpoints), `kind`,
+(configured rule names; bounded by the config), `endpoint` (configured backend endpoints), `kind`,
 `direction`, `side`.
 
 `shaped` as a `result` value is part of the specification's fixed label set for

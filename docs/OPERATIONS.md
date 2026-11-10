@@ -56,17 +56,17 @@ checks the environment: file-descriptor limit against the in-flight budget, `GOM
 `GOMEMLIMIT`, the TLS pair and its expiry, every backend by TCP connect and `HEAD /`, the kernel's
 clock-sync flag, and the showback directory (writable, 2 GiB free, not tmpfs).
 
-Rules: `rate_limits.rules`, evaluated in order; a request must pass every matching rule. See the
-`Task: change a rule` section and `docs/CONFIG.md` for the schema. Size a rule for the tenant that
-misbehaves, not the steady state, and read section 8 before setting a rate below a client's
-concurrency.
+Limits: the `limits` list, written in S3's own operation names; a request must pass every rule
+that matches it. Section 7 (add or change a limit) is the task, `docs/CONFIG.md` has every key.
+Size a rule for the tenant that misbehaves, not the steady state, and read section 9 before setting
+a limit below a client's concurrency.
 
 ## 3. Reload
 
 `systemctl reload tollbooth` (SIGHUP), `tollbooth config reload`, or `POST /admin/reload`. The whole
 file is parsed and validated, the rule set compiled, and one pointer swapped; requests in flight
-finish under the config they started with. Limiter state is keyed by rule id and never reset: a
-changed rate applies from the next decision, removed rules' keys are swept. TLS certificates are
+finish under the config they started with. Limiter state is keyed by rule name and never reset: a
+changed limit applies from the next decision, removed rules' keys are swept. TLS certificates are
 re-read. A rejected file keeps the running config, is logged, and shows in `tollbooth config show`
 and `GET /admin/config` as the last reload result; the exit code of `config reload` is 1.
 
@@ -100,7 +100,7 @@ Memory, measured on the dev box (`internal/limiter` and `internal/showback` gate
 
 | Item | Per unit | At the default cap | Knob |
 | --- | --- | --- | --- |
-| Limiter key (one GCRA state per rule × group_by tuple) | 226 B | 1,000,000 keys ≈ 215 MiB | `limiter.max_keys` (2,000,000) |
+| Limiter key (one GCRA state per rule × `per` value) | 226 B | 1,000,000 keys ≈ 215 MiB | `limiter.max_keys` (2,000,000) |
 | Showback tuple (one row per hour per dimension tuple) | 257 B | 250,000 tuples ≈ 61 MiB | `showback.max_tuples_per_hour` |
 | Copy buffers | `proxy.copy_buffer_bytes` (128 KiB) × in-flight bodies | 4,096 × 128 KiB = 512 MiB worst case | `listen.max_inflight`, `proxy.copy_buffer_bytes` |
 | Deny rings | 1,024 × ~100 B per rule that has denied | 100 rules ≈ 10 MiB | — |
@@ -139,8 +139,8 @@ Prefix `tollbooth_`; labels never carry a key, bucket, or address (showback does
 | `backend_errors_total{endpoint,kind}` | dial, tls, timeout, reset, other | `dial`/`tls`: network or certificates; `timeout`: `backend.response_header_timeout` (300 s) expired, a slow list or a stuck backend; `reset`: the backend closed mid-request |
 | `backend_retries_total` | requests moved to another endpoint before any byte was sent | flapping endpoints |
 | `limiter_decision_seconds` | the whole rule pass | p99 above 10 µs: too many rules match every request (see `rules list`); 100 rules all matching one request cost 25 µs on the dev box |
-| `limiter_keys`, `limiter_keys_overflow_total` | live GCRA keys; requests allowed without state at the cap | overflow rising: a flood of distinct `group_by` tuples (a `source_ip` rule under a scan); raise `max_keys` or narrow the rule; nothing is denied by the overflow |
-| `limiter_denied_total{rule}` | denials per rule | the rule is doing its job or is misconfigured; `rules test` tells which |
+| `limiter_keys`, `limiter_keys_overflow_total` | live GCRA keys; requests allowed without state at the cap | overflow rising: a flood of distinct `per` values (a `per: source_ip` rule under a scan); raise `max_keys` or narrow the rule; nothing is denied by the overflow |
+| `limiter_matched_total{rule}`, `limiter_denied_total{rule}` | requests each rule matched; requests it denied | matched at 0 while traffic flows: the rule names something that is not in the traffic (the Limits screen marks it `none ⚠`). Denied rising: the rule is doing its job or is set too low; `rules test` and `rules top` tell which and for whom |
 | `limiter_errors_total` | panics inside the limiter, each failed open | any value is a bug report; the request was forwarded |
 | `showback_tuples`, `showback_collapsed_total` | tuples in the open hour; requests folded into `__overflow__` | collapsed rising: add `max_tuples_per_hour` or drop a dimension (`source_ip` is the usual culprit) |
 | `showback_flush_duration_seconds`, `showback_flush_errors_total` | snapshot or seal time; failures | errors: disk full, read-only, or permissions on `showback.dir`; counting continues in memory and the next successful flush writes everything; the log has one line per minute |
@@ -152,32 +152,83 @@ throttle decisions at `debug` sampled one in `logging.throttle_sample`; access k
 never appear in logs at any level. `logging.access: true` is a debugging aid, not an accounting
 source: showback is the record.
 
-## 7. Task: change a rule
+## 7. Task: add or change a limit
 
-The CLI never writes the config file; the TUI's editor writes it only when you press save. A rule
-change is an edit, a reload, and a check.
+The request this section is written for: *"We have too many ListObjectsV2 calls coming in; limit
+them to 20 a second."* The CLI never writes the config file; the TUI writes it only when you save.
 
-1. Edit `tollbooth.yaml` (the `rate_limits.rules` list; keys and semantics in `docs/CONFIG.md`),
-   with your editor or in the TUI: screen `5` (Config), `e` opens the file; `i` inserts, `esc`
-   returns to NORMAL mode; every keystroke is validated and the verdict (or the first error with
-   its key and line) sits under the text; `ctrl+s` saves (atomically, with `tollbooth.yaml.<UTC
-   time>.bak` beside it; refused if the file changed on disk since it was opened, `L` reloads the
-   buffer), `ctrl+r` saves and reloads in one step, `E` opens `$EDITOR` on the buffer. Steps 2 to 4
-   are then already done; go to step 5.
+### From the console (`tollbooth tui --config tollbooth.yaml`)
+
+The console needs `--config` (the file it will change) to open the form.
+
+1. Screen `2` (Limits). The top table is the limits in force, each read back in words, with how
+   many requests per second each one matches and throttles right now. Under it, **Busiest
+   operations right now** shows every S3 operation in traffic, its rate, and which limit covers it.
+   That table is where "too many ListObjectsV2 calls" is visible as a number.
+2. `n` opens the form for a new limit (`enter` opens it on the selected one, with the cursor on the
+   number; `d` deletes the selected one and applies, after a `y`). The fields are the questions, in
+   order:
+
+   | Field | What to enter |
+   | --- | --- |
+   | Limit what | Type a few letters of the operation; the list under the field shows the matching S3 operations, the ones in traffic first with their rates. `↓` and `enter` pick one; a comma adds another; `List*` is a family; empty means every operation. |
+   | To at most | The number, then `tab` to the unit: `←`/`→` chooses per second, per minute, per hour, or blocked. "At once" is the burst; leave it empty for the same as the number. |
+   | Counted | **Required.** Everyone together (one shared budget), or each source IP, each access key, each bucket, each access key on each bucket, or, when a prefix is listed, each listed prefix (a budget of its own for every one). A combination written by hand in the file is kept as written. |
+   | Only for | Optional filters: access key, bucket, prefix, source IP. The access key and bucket fields list the values seen in the last two hours of showback, busiest first, so nobody types a 20-character key; a value the proxy has not seen is allowed and flagged. |
+   | Over the limit | `503 SlowDown` (what S3 itself answers) or `429 TooManyRequests`. |
+   | Name, Note | The name is suggested from the fields; the note says why the limit exists. |
+
+   `tab` and `shift+tab` move between fields. The **Means** line at the bottom is the rule as a
+   sentence, rewritten on every keystroke (or the first thing still missing); **Now** is the live
+   rate of the operations the rule names.
+3. `ctrl+r` saves and applies: the rule is written into the config file as the block a person would
+   have written, every other byte of the file is left alone (comments included), a
+   `tollbooth.yaml.<UTC time>.bak` appears beside it, and the proxy reloads. `ctrl+s` saves without
+   reloading. The save is refused if the file changed on disk since the form opened, and `esc` asks
+   before discarding changes.
+4. Back on the Limits screen the new rule is in the table within one poll. **Matched/s** above zero
+   says the rule is seeing the traffic it was written for; **Throttled/s** says how much of it is
+   being refused. A rule that has matched nothing since it was loaded, a minute or more ago, while
+   traffic flows is marked `none ⚠`: check the names it uses (`t` tests a request against the
+   rules). A rule for a tenant that is idle shows the same mark; it is a fact, not an error.
+
+### By hand
+
+1. Edit `tollbooth.yaml` (the `limits` list; `docs/CONFIG.md` has every key), with your editor or
+   in the TUI: screen `5` (Config), `e` opens the file; `i` inserts, `esc` returns to NORMAL mode;
+   every keystroke is validated and the verdict (or the first error with its key and line) sits
+   under the text; `ctrl+s` saves (atomically, with a `.bak` beside it; refused if the file changed
+   on disk since it was opened, `L` reloads the buffer), `ctrl+r` saves and reloads in one step,
+   `E` opens `$EDITOR` on the buffer. Steps 2 to 4 are then already done; go to step 5.
+
+   ```yaml
+   limits:
+     - name: list-storm
+       operation: ListObjectsV2
+       limit_per_second: 20
+       per: source_ip
+   ```
 2. Validate the file before touching the running proxy: `tollbooth check-config tollbooth.yaml`
-   prints every problem with its key path and exits 1 on any. In the TUI, screen `5` (Config), key
-   `v` runs the same check on the file and shows the verdict on the bottom line.
-3. See what will change: `tollbooth config diff --config tollbooth.yaml` lists every key that differs
-   between the running config and the file (the Config screen shows the same table under "Running
-   config versus …").
+   reads every rule back as a sentence, prints every problem with its key path, and exits 1 on any.
+   A mistyped operation is answered with the closest name (`unknown S3 operation "ListObjectV2";
+   did you mean ListObjectsV2?`). In the TUI, screen `5` (Config), key `v` runs the same check on
+   the file and shows the verdict on the bottom line.
+3. See what will change: `tollbooth config diff --config tollbooth.yaml` lists every key that
+   differs between the running config and the file, by rule
+   (`limits[list-storm].limit_per_second  20  50`); the Config screen shows the same table under
+   "Running config versus …".
 4. Reload: `tollbooth config reload` (exit 1 and the error if the file was rejected; the running
    config is kept), or press `r` on the Overview or Config screen (the bottom line says
    "reloaded: generation N" or "reload REJECTED: …"). `SIGHUP` does the same.
-5. Verify: `tollbooth rules list` shows the rules in force with live keys and denials;
-   `tollbooth rules test --op PutObject --access-key AKIA… --bucket b --key k` answers "which rules
-   match and what would each do" without consuming a token (screen `2`, key `t` is the same form);
-   `tollbooth rules top` (screen `2`, `enter` on a rule) shows who is being denied right now.
-   `tollbooth status` shows the config generation and the last reload result.
+5. Verify: `tollbooth rules list` shows the rules in force, each with its sentence, live keys, and
+   how many requests it has matched and denied; `tollbooth rules test --op PutObject --access-key
+   AKIA… --bucket b --key k` answers "which rules match and what would each do" without consuming a
+   token (screen `2`, key `t` is the same form); `tollbooth rules top` shows who is being denied
+   right now. `tollbooth status` shows the config generation and the last reload result.
+
+A rule that is in force with `matched 0` after traffic has passed is matching nothing: the usual
+causes are an access key or bucket that is not the one in the traffic, and a filter on an operation
+the client does not send (`aws s3 ls` sends ListObjectsV2, not ListObjects).
 
 The endpoint and token come from `--admin` and `--token`, then `TOLLBOOTH_ADMIN` and
 `TOLLBOOTH_TOKEN`, then the config file's `admin.address` and `admin.token_file`.
@@ -223,9 +274,10 @@ standard retry mode gives up after three to five attempts with random backoff an
 `Retry-After`. Three levers, in order of preference:
 
 1. Size rules above the clients' concurrency: `burst` at least the client's parallelism (aws cli
-   `max_concurrent_requests`, default 10; s5cmd `--numworkers`, default 256) and `rate` at or above
-   the sustained request rate you intend to allow. A rule is for the tenant that misbehaves, not for
-   the steady state.
+   `max_concurrent_requests`, default 10; s5cmd `--numworkers`, default 256) and the limit at or
+   above the sustained request rate you intend to allow. `burst` defaults to the limit's own
+   number, so `limit_per_second: 5` lets 5 arrive at once; write `burst: 10` for an aws cli client.
+   A rule is for the tenant that misbehaves, not for the steady state.
 2. Tell clients that will be throttled to use adaptive retry mode (`AWS_RETRY_MODE=adaptive`, or
    `retry_mode = adaptive` in `~/.aws/config`; aws cli and every AWS SDK support it) or to raise
    `AWS_MAX_ATTEMPTS`. Adaptive mode paces itself to the rule and completed every run measured but
@@ -233,6 +285,12 @@ standard retry mode gives up after three to five attempts with random backoff an
    a guarantee.
 3. Wait for hold-and-forward (Phase 6), which queues a denied request up to a bound instead of
    answering 503.
+
+A per-minute or per-hour limit is a budget, not a pace. `limit_per_hour: 20` lets 20 requests
+through at once and then refills one every 180 s; the twenty-first is told `Retry-After: 180`
+(measured), which no SDK's retries outlast, so the client's operation fails. That is the right
+behavior for "this job may list 20 times an hour" and the wrong one for slowing a client down; to
+pace, use `limit_per_second`.
 
 Expect a herd: N clients denied together receive the same `Retry-After` and retry together, so
 N − 1 are denied again. Adaptive clients spread out on their own; default-mode clients do not.
