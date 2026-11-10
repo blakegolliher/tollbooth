@@ -15,6 +15,7 @@
 package config
 
 import (
+	"strconv"
 	"strings"
 	"testing"
 
@@ -235,6 +236,21 @@ func BenchmarkSentence(b *testing.B) {
 	for b.Loop() {
 		for i := range c.Limits {
 			_ = c.Limits[i].Sentence()
+		}
+	}
+}
+
+func TestModeText(t *testing.T) {
+	for mode, want := range map[string]string{
+		ModeSlowDown:        "503 SlowDown",
+		ModeTooManyRequests: "429 TooManyRequests",
+		"":                  "503 SlowDown",
+	} {
+		if got := ModeText(mode); got != want {
+			t.Errorf("ModeText(%q) = %q, want %q", mode, got, want)
+		}
+		if got := strconv.Itoa(ModeStatus(mode)); !strings.HasPrefix(want, got+" ") {
+			t.Errorf("ModeStatus(%q) = %s, want the number in %q", mode, got, want)
 		}
 	}
 }

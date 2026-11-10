@@ -143,18 +143,18 @@ func TestRulesTest(t *testing.T) {
 	if rc != 0 {
 		t.Fatalf("rc %d: %s", rc, errOut)
 	}
-	if !strings.Contains(out, "PutObject WRITE (key level): allowed; 1 rules match") || !strings.Contains(out, "tenant-a-writes") || !strings.Contains(out, "key=AKIAEXAMPLE1 bucket=training-data") || !strings.Contains(out, "allow") {
+	if !strings.Contains(out, "PutObject (key level): allowed; 1 rule matches") || !strings.Contains(out, "tenant-a-writes") || !strings.Contains(out, "key=AKIAEXAMPLE1 bucket=training-data") || !strings.Contains(out, "allow") {
 		t.Fatalf("%s", out)
 	}
 	if lim.Keys() != 0 {
 		t.Fatal("rules test consumed a token")
 	}
 	rc, out, _ = runOut(t, "rules", "test", "--admin", addr, "--token", "tok", "--op", "ListBuckets", "--access-key", "AKIAREVOKED")
-	if rc != 0 || !strings.Contains(out, "denied by frozen (slowdown, Retry-After 1s)") || !strings.Contains(out, "(shared)") || !strings.Contains(out, "deny") {
+	if rc != 0 || !strings.Contains(out, "denied by frozen (503 SlowDown, Retry-After 1s); 2 rules match") || !strings.Contains(out, "(shared)") || !strings.Contains(out, "deny") {
 		t.Fatalf("rc %d\n%s", rc, out)
 	}
 	rc, out, _ = runOut(t, "rules", "test", "--admin", addr, "--token", "tok", "--op", "GetObject", "--bucket", "other", "--key", "k")
-	if rc != 0 || !strings.Contains(out, "allowed; 0 rules match") {
+	if rc != 0 || !strings.Contains(out, "allowed; no rule matches") {
 		t.Fatalf("rc %d\n%s", rc, out)
 	}
 	rc, out, _ = runOut(t, "rules", "test", "--admin", addr, "--token", "tok", "--op", "ListObjectsV2", "--bucket", "b", "--ip", "10.0.0.9", "--format", "json")
@@ -163,7 +163,7 @@ func TestRulesTest(t *testing.T) {
 		t.Fatalf("json: rc %d\n%s", rc, out)
 	}
 	rc, out, _ = runOut(t, "rules", "test", "--admin", addr, "--token", "tok", "--op", "ListObjectsV2", "--bucket", "b", "--ip", "10.0.0.9", "--format", "csv")
-	if rc != 0 || !strings.Contains(out, "RULE,KEY,LIVE_KEYS,VERDICT,RETRY_AFTER,MODE\nlist-storm,ip=10.0.0.9,0,allow,-,too_many_requests\n") {
+	if rc != 0 || !strings.Contains(out, "RULE,KEY,LIVE_KEYS,VERDICT,RETRY_AFTER,RESPOND\nlist-storm,ip=10.0.0.9,0,allow,-,429\n") {
 		t.Fatalf("csv: rc %d\n%s", rc, out)
 	}
 	if rc, _, errOut := runOut(t, "rules", "test", "--admin", addr, "--token", "tok"); rc != 1 || !strings.Contains(errOut, "--op is required") {

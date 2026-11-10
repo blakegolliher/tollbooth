@@ -27,6 +27,7 @@ import (
 	"time"
 
 	"github.com/blakegolliher/tollbooth/internal/admin"
+	"github.com/blakegolliher/tollbooth/internal/config"
 	"github.com/blakegolliher/tollbooth/internal/limiter"
 )
 
@@ -296,26 +297,37 @@ func rulesTest(args []string, stdout, stderr *os.File) error {
 	if err != nil {
 		return err
 	}
-	g := &grid{header: []string{"RULE", "KEY", "LIVE_KEYS", "VERDICT", "RETRY_AFTER", "MODE"}}
+	g := &grid{header: []string{"RULE", "KEY", "LIVE_KEYS", "VERDICT", "RETRY_AFTER", "RESPOND"}}
 	for _, m := range res.Result.Matches {
 		verdict, ra := "allow", "-"
 		if !m.Allowed {
 			verdict, ra = "deny", strconv.Itoa(m.RetryAfter)+"s"
 		}
-		g.add(m.Rule, keyDims(m.AccessKey, m.Bucket, m.Prefix, m.SourceIP), strconv.FormatInt(m.LiveKeys, 10), verdict, ra, m.Mode)
+		g.add(m.Rule, keyDims(m.AccessKey, m.Bucket, m.Prefix, m.SourceIP), strconv.FormatInt(m.LiveKeys, 10), verdict, ra, strconv.Itoa(config.ModeStatus(m.Mode)))
 	}
 	if af.format != "table" {
 		return render(stdout, af.format, g, raw)
 	}
 	decision := "allowed"
 	if !res.Result.Allowed {
-		decision = fmt.Sprintf("denied by %s (%s, Retry-After %ds)", res.Result.DeniedBy, res.Result.Mode, res.Result.RetryAfter)
+		decision = fmt.Sprintf("denied by %s (%s, Retry-After %ds)", res.Result.DeniedBy, config.ModeText(res.Result.Mode), res.Result.RetryAfter)
 	}
-	_, _ = fmt.Fprintf(stdout, "%s %s (%s level): %s; %d rules match\n", res.Operation, res.Class, res.Level, decision, len(res.Result.Matches))
+	_, _ = fmt.Fprintf(stdout, "%s (%s level): %s; %s\n", res.Operation, res.Level, decision, rulesMatch(len(res.Result.Matches)))
 	if len(res.Result.Matches) == 0 {
 		return nil
 	}
 	return render(stdout, af.format, g, raw)
+}
+
+// rulesMatch says how many rules a dry run matched: "no rule matches", "1 rule matches", "3 rules match".
+func rulesMatch(n int) string {
+	switch n {
+	case 0:
+		return "no rule matches"
+	case 1:
+		return "1 rule matches"
+	}
+	return strconv.Itoa(n) + " rules match"
 }
 
 // keyDims renders the `per` dimensions a rule resolved; "(shared)" for per: total.

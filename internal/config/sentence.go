@@ -204,6 +204,18 @@ func joinAnd(v []string) string {
 	return strings.Join(v[:len(v)-1], ", ") + ", and " + v[len(v)-1]
 }
 
+// ModeStatus is the HTTP status a response mode answers with, the number `respond:` takes. The dry
+// run reports the mode; operators are shown the status.
+func ModeStatus(mode string) int {
+	if mode == ModeTooManyRequests {
+		return RespondTooManyRequests
+	}
+	return RespondSlowDown
+}
+
+// ModeText is ModeStatus with S3's error code beside it: "503 SlowDown" or "429 TooManyRequests".
+func ModeText(mode string) string { return statusText(ModeStatus(mode)) }
+
 func statusText(code int) string {
 	if code == RespondTooManyRequests {
 		return "429 TooManyRequests"

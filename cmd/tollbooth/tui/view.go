@@ -22,6 +22,7 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 
+	"github.com/blakegolliher/tollbooth/internal/config"
 	"github.com/blakegolliher/tollbooth/internal/showback"
 )
 
@@ -296,9 +297,16 @@ func (m Model) testFormLines() []string {
 		r := m.testResult
 		verdict := "ALLOWED"
 		if !r.Result.Allowed {
-			verdict = fmt.Sprintf("DENIED by %s (%s, Retry-After %ds)", r.Result.DeniedBy, r.Result.Mode, r.Result.RetryAfter)
+			verdict = fmt.Sprintf("DENIED by %s (%s, Retry-After %ds)", r.Result.DeniedBy, config.ModeText(r.Result.Mode), r.Result.RetryAfter)
 		}
-		lines = append(lines, "", fmt.Sprintf("  %s %s (%s level): %s; %d rules match", r.Operation, r.Class, r.Level, verdict, len(r.Result.Matches)))
+		matched := fmt.Sprintf("%d rules match", len(r.Result.Matches))
+		switch len(r.Result.Matches) {
+		case 0:
+			matched = "no rule matches"
+		case 1:
+			matched = "1 rule matches"
+		}
+		lines = append(lines, "", fmt.Sprintf("  %s (%s level): %s; %s", r.Operation, r.Level, verdict, matched))
 		for _, mt := range r.Result.Matches {
 			v := "allow"
 			if !mt.Allowed {

@@ -1,2 +1,2 @@
-RULE,KEY,LIVE_KEYS,VERDICT,RETRY_AFTER,MODE
-list-storm,ip=10.0.0.9,0,allow,-,too_many_requests
+RULE,KEY,LIVE_KEYS,VERDICT,RETRY_AFTER,RESPOND
+list-storm,ip=10.0.0.9,0,allow,-,429
