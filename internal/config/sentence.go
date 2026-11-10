@@ -39,7 +39,10 @@ func (r *Rule) Sentence() string {
 	}
 	var b strings.Builder
 	fmt.Fprintf(&b, "At most %s %s per %s %s", FormatCount(n), r.callsPhrase(n != 1), unit, r.perPhrase())
-	if r.Burst > 0 && r.Burst != int(math.Max(1, math.Ceil(n))) {
+	switch {
+	case r.Strict():
+		fmt.Fprintf(&b, ", evenly spaced (one every %s)", r.Spacing())
+	case r.Burst > 0 && r.Burst != int(math.Max(1, math.Ceil(n))):
 		fmt.Fprintf(&b, ", up to %s at once", FormatCount(float64(r.Burst)))
 	}
 	b.WriteString(".")
@@ -65,6 +68,9 @@ func (r *Rule) Summary() string {
 	var limit string
 	if n, unit, ok := r.Count(); ok {
 		limit = fmt.Sprintf("%s per %s %s", FormatCount(n), unit, r.perPhrase())
+		if r.Strict() {
+			limit += ", evenly spaced"
+		}
 	} else {
 		limit = "blocked"
 	}
@@ -87,6 +93,56 @@ func (r *Rule) Summary() string {
 		out += "; " + strings.Join(scope, ", ")
 	}
 	return out
+}
+
+// Strict reports a limit that is paced rather than budgeted: `burst: 1` on a limit above one per
+// unit. One request passes at a time and the next after an even interval (20 per hour is one every
+// three minutes), so the count is never exceeded in any period; without it the limit's own number
+// may arrive at once and the allowance then refills at that pace.
+func (r *Rule) Strict() bool {
+	n, _, ok := r.Count()
+	return ok && n > 1 && r.Burst == 1
+}
+
+// Spacing is the interval at which a limit's allowance refills, and so the gap between requests
+// of a strict one: "3 minutes" for 20 per hour. Empty for a rule without a limit.
+func (r *Rule) Spacing() string {
+	n, unit, ok := r.Count()
+	if !ok || n <= 0 {
+		return ""
+	}
+	return spacing(unitSeconds(unit) / n)
+}
+
+// spacing prints an interval between requests: "3 minutes", "1 second", "50 ms".
+func spacing(seconds float64) string {
+	round := func(f float64) float64 { // three significant digits are plenty for a sentence
+		if f == 0 {
+			return 0
+		}
+		scale := math.Pow(10, 2-math.Floor(math.Log10(math.Abs(f))))
+		return math.Round(f*scale) / scale
+	}
+	unit := func(f float64, one, many string) string {
+		f = round(f)
+		if f == 1 {
+			return "1 " + one
+		}
+		return FormatCount(f) + " " + many
+	}
+	switch {
+	case seconds >= 3600:
+		return unit(seconds/3600, "hour", "hours")
+	case seconds >= 60:
+		return unit(seconds/60, "minute", "minutes")
+	case seconds >= 1:
+		return unit(seconds, "second", "seconds")
+	case seconds >= 1e-3:
+		return unit(seconds*1e3, "ms", "ms")
+	case seconds >= 1e-6:
+		return unit(seconds*1e6, "µs", "µs")
+	}
+	return "under 1 µs"
 }
 
 // LimitText is the limit alone: "20 per second", or "blocked".

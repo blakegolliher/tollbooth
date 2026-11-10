@@ -63,6 +63,21 @@ func TestSentences(t *testing.T) {
 			"At most 20 requests per hour for each access key. Only for requests by access key AKIAEXAMPLE1. Over the limit, the client gets 503 SlowDown.",
 			"all requests: 20 per hour for each access key; key AKIAEXAMPLE1",
 		},
+		{ // strict pacing: burst 1 on a limit above one per unit
+			"name: paced\noperation: ListObjectsV2\nlimit_per_hour: 20\nburst: 1\nper: source_ip",
+			"At most 20 ListObjectsV2 calls per hour from each source IP, evenly spaced (one every 3 minutes). Over the limit, the client gets 503 SlowDown.",
+			"ListObjectsV2: 20 per hour from each source IP, evenly spaced",
+		},
+		{
+			"name: paced-fast\noperation: GetObject\nlimit_per_second: 20\nburst: 1\nper: total",
+			"At most 20 GetObject calls per second in total, evenly spaced (one every 50 ms). Over the limit, the client gets 503 SlowDown.",
+			"GetObject: 20 per second in total, evenly spaced",
+		},
+		{ // one a second is already one at a time: nothing to add
+			"name: slow\noperation: GetObject\nlimit_per_second: 1\nburst: 1\nper: total",
+			"At most 1 GetObject call per second in total. Over the limit, the client gets 503 SlowDown.",
+			"GetObject: 1 per second in total",
+		},
 		{
 			"name: gets\noperation: Get*\nlimit_per_minute: 600\nper: bucket",
 			"At most 600 Get* calls (33 operations) per minute on each bucket. Over the limit, the client gets 503 SlowDown.",
@@ -252,5 +267,31 @@ func TestModeText(t *testing.T) {
 		if got := strconv.Itoa(ModeStatus(mode)); !strings.HasPrefix(want, got+" ") {
 			t.Errorf("ModeStatus(%q) = %s, want the number in %q", mode, got, want)
 		}
+	}
+}
+
+func TestSpacing(t *testing.T) {
+	for seconds, want := range map[float64]string{
+		7200:      "2 hours",
+		3600:      "1 hour",
+		180:       "3 minutes",
+		90:        "1.5 minutes",
+		60:        "1 minute",
+		2:         "2 seconds",
+		1:         "1 second",
+		0.05:      "50 ms",
+		1.0 / 3:   "333 ms",
+		0.0005:    "500 µs",
+		1.0 / 3e6: "under 1 µs",
+	} {
+		if got := spacing(seconds); got != want {
+			t.Errorf("spacing(%g) = %q, want %q", seconds, got, want)
+		}
+	}
+	strict := Rule{LimitPerMinute: num(30), Burst: 1}
+	budget := Rule{LimitPerMinute: num(30)}
+	blocked := Rule{Blocked: true}
+	if !strict.Strict() || budget.Strict() || blocked.Strict() {
+		t.Errorf("Strict: %v %v %v", strict.Strict(), budget.Strict(), blocked.Strict())
 	}
 }
