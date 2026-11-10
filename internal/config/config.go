@@ -163,18 +163,21 @@ const (
 	DefaultIdleBodyTimeout       = 60 * time.Second
 	DefaultMaxIdleConnsPerHost   = 1024
 	DefaultHealthInterval        = 5 * time.Second
-	DefaultHealthTimeout         = 2 * time.Second
-	DefaultCopyBufferBytes       = 128 << 10
-	DefaultDrainTimeout          = 30 * time.Second
-	DefaultNodeCount             = 1
-	DefaultMaxKeys               = 2_000_000
-	DefaultSweepInterval         = 10 * time.Second
-	DefaultFlushInterval         = 60 * time.Second
-	DefaultRetentionDays         = 400
-	DefaultMaxTuplesPerHour      = 250_000
-	DefaultAdminAddress          = "127.0.0.1:9900"
-	DefaultLogLevel              = "info"
-	DefaultThrottleSample        = 100
+	// A VAST cluster answers the unsigned HEAD / of the health probe after 2.0 s (measured 2.003
+	// to 2.007 s, 2026-11-10); at the earlier default of 2 s every probe timed out and a working
+	// backend was marked down (D-064).
+	DefaultHealthTimeout    = 5 * time.Second
+	DefaultCopyBufferBytes  = 128 << 10
+	DefaultDrainTimeout     = 30 * time.Second
+	DefaultNodeCount        = 1
+	DefaultMaxKeys          = 2_000_000
+	DefaultSweepInterval    = 10 * time.Second
+	DefaultFlushInterval    = 60 * time.Second
+	DefaultRetentionDays    = 400
+	DefaultMaxTuplesPerHour = 250_000
+	DefaultAdminAddress     = "127.0.0.1:9900"
+	DefaultLogLevel         = "info"
+	DefaultThrottleSample   = 100
 )
 
 // Bounds on the limiter arithmetic (D-037): with these, every GCRA quantity (emission interval,

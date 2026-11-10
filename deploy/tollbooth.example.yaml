@@ -32,7 +32,7 @@ backend:
   max_idle_conns_per_host: 1024
   health_check:
     interval: 5s
-    timeout: 2s
+    timeout: 5s                       # the probe is an unsigned HEAD /; a VAST cluster answers it after 2 s
 
 proxy:
   copy_buffer_bytes: 131072
