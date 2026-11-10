@@ -36,7 +36,9 @@ type series struct {
 // chart renders a title line followed by h rows of braille, each at most w cells wide, from the
 // last 2w samples of every series. The y axis runs from 0 to the maximum seen across the series
 // (or ymax when larger), printed at the top-right of the title. With no samples it draws the empty
-// grid so the layout does not jump when data arrives.
+// grid so the layout does not jump when data arrives. Series names are never shortened: the legend
+// (each name with its current value) sits beside the title when it fits and wraps onto lines of
+// its own under the title when it does not, so the result is h+1 lines or more.
 func chart(title string, ss []series, w, h int, ymax float64) []string {
 	if w < 8 {
 		w = 8
@@ -91,7 +93,7 @@ func chart(title string, ss []series, w, h int, ymax float64) []string {
 		}
 		cur = append(cur, s.name+" "+fmtVal(s.values[len(s.values)-1])+s.unit)
 	}
-	lines = append(lines, fit(styleTitle.Render("  "+title)+"  "+styleOK.Render(strings.Join(cur, " · ")), w))
+	lines = append(lines, legend(title, cur, w)...)
 	for row := h - 1; row >= 0; row-- {
 		var b strings.Builder
 		for col := 0; col < plotW; col++ {
@@ -106,6 +108,38 @@ func chart(title string, ss []series, w, h int, ymax float64) []string {
 		}
 		lines = append(lines, styleDim.Render(fmt.Sprintf("%7s ⎹", label))+lipgloss.NewStyle().Foreground(colorBlue).Render(b.String()))
 	}
+	return lines
+}
+
+// legend lays out a chart's title and its series entries: one line when everything fits in w
+// cells, otherwise the title alone and the entries packed greedily onto indented lines below it.
+// An entry wider than a whole line is the only thing ever cut.
+func legend(title string, entries []string, w int) []string {
+	const sep, indent = " · ", "    "
+	head := styleTitle.Render("  " + title)
+	if one := head + "  " + styleOK.Render(strings.Join(entries, sep)); lipgloss.Width(one) <= w {
+		return []string{one}
+	}
+	lines := []string{fit(head, w)}
+	row := ""
+	flush := func() {
+		if row != "" {
+			lines = append(lines, fit(indent+styleOK.Render(row), w))
+			row = ""
+		}
+	}
+	for _, e := range entries {
+		switch {
+		case row == "":
+			row = e
+		case lipgloss.Width(indent+row+sep+e) <= w:
+			row += sep + e
+		default:
+			flush()
+			row = e
+		}
+	}
+	flush()
 	return lines
 }
 

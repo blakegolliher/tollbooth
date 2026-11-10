@@ -118,3 +118,46 @@ func BenchmarkChart(b *testing.B) {
 		chart("bench", ss, 120, 6, 0)
 	}
 }
+
+// TestChartLegendNeverShortensNames: a long endpoint name is printed in full, beside the title when
+// it fits and on its own line under the title when it does not; several long names wrap onto more
+// lines; no line exceeds the width.
+func TestChartLegendNeverShortensNames(t *testing.T) {
+	const fqdn = "main.selab-var204.selab.vastdata.com:80"
+	one := []series{{name: fqdn, values: []float64{3.4}, unit: " ms"}}
+	wide := chart("backend time to first byte", one, 119, 4, 0)
+	if len(wide) != 5 || !strings.Contains(wide[0], fqdn+" 3.4 ms") {
+		t.Fatalf("at 119 cells the name belongs on the title line: %q", wide[0])
+	}
+	narrow := chart("backend time to first byte", one, 60, 4, 0)
+	if len(narrow) != 6 || strings.Contains(narrow[0], "main.") || !strings.Contains(narrow[1], fqdn+" 3.4 ms") {
+		t.Fatalf("at 60 cells the legend must wrap under the title:\n%s", strings.Join(narrow, "\n"))
+	}
+	three := []series{
+		{name: "vip1.selab-var204.selab.vastdata.com:443", values: []float64{1}, unit: " ms"},
+		{name: "vip2.selab-var204.selab.vastdata.com:443", values: []float64{2}, unit: " ms"},
+		{name: "vip3.selab-var204.selab.vastdata.com:443", values: []float64{3}, unit: " ms"},
+	}
+	many := chart("backend time to first byte", three, 79, 4, 0)
+	joined := strings.Join(many, "\n")
+	for _, s := range three {
+		if !strings.Contains(joined, s.name) {
+			t.Fatalf("%s is missing or shortened:\n%s", s.name, joined)
+		}
+	}
+	if len(many) != 4+1+3 { // title, one name per legend line at this width, four rows
+		t.Fatalf("%d lines:\n%s", len(many), joined)
+	}
+	for _, lines := range [][]string{wide, narrow, many} {
+		for i, l := range lines {
+			if lipgloss.Width(l) > 119 {
+				t.Fatalf("line %d is %d cells wide: %q", i, lipgloss.Width(l), l)
+			}
+		}
+	}
+	for i, l := range many {
+		if lipgloss.Width(l) > 79 {
+			t.Fatalf("line %d is %d cells wide at 79: %q", i, lipgloss.Width(l), l)
+		}
+	}
+}

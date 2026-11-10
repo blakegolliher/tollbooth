@@ -296,3 +296,29 @@ func TestEditorViewFollowsCursor(t *testing.T) {
 		t.Fatalf("g must return to the first line: %d", m.ed.ta.Line())
 	}
 }
+
+// TestGraphsShowFullEndpointNames: a cluster's full host:port appears on the Graphs screen at both
+// sizes, the frame keeps its height, and the charts that no longer fit are dropped from the bottom.
+func TestGraphsShowFullEndpointNames(t *testing.T) {
+	const fqdn = "main.selab-var204.selab.vastdata.com:80"
+	client, cfgPath := fixture(t)
+	for _, sz := range []struct{ w, h int }{{80, 24}, {120, 40}} {
+		base := New(Options{Client: client, Interval: 2 * time.Second, ConfigPath: cfgPath, Now: func() time.Time { return fixedNow }})
+		m := drive(t, base, size(sz.w, sz.h), key("6"))
+		h := synthHistory(120)
+		for i := range h {
+			h[i].ttfb = map[string]float64{fqdn: 2.5, "vip2.selab-var204.selab.vastdata.com:80": 3.5}
+		}
+		m.history = h
+		out := frame(m)
+		assertSize(t, out, sz.w, sz.h)
+		for _, name := range []string{fqdn, "vip2.selab-var204.selab.vastdata.com:80"} {
+			if !strings.Contains(string(out), name) {
+				t.Fatalf("%dx%d: %s is missing or shortened:\n%s", sz.w, sz.h, name, out)
+			}
+		}
+		if !strings.Contains(string(out), "polls over") {
+			t.Fatalf("%dx%d: the history line was pushed off the screen:\n%s", sz.w, sz.h, out)
+		}
+	}
+}
