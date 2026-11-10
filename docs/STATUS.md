@@ -38,6 +38,17 @@ s3diff 293 cases, 0 diffs; govulncheck, licenses, and tidy clean; `BenchmarkDeci
 with the matched counter, 0 allocations; the form driven against a running proxy under 100 req/s
 added, changed, and deleted a rule, each reload under 1 ms, and left the file byte-identical.
 
+Findings on that branch: CI's 60 s fuzz of `FuzzEditRules` found in 21 s what 60 s on the dev box
+(179,904 executions) had not: a rule ending in an empty block scalar (`note: |` as the last line
+of the file) was measured one line past the end of the text and `AddRule` panicked in the splice.
+Fixed (an empty block scalar is its header line; every splice is bounds-checked and refuses with
+`ErrLayout`; texts with line breaks other than `\n` or `\r\n` are refused), with the input as a
+seed and a unit test; 300 s of the target afterwards, 455,723 executions, clean. The same CI run
+failed the client throttling stage: `test/integration/throttle.sh` still read `id` from
+`GET /admin/limits`, which this branch renamed to `name`; that stage needs the Garage and
+versitygw binaries and so had not run on the dev box. Fixed, and the script was then run locally
+against the null backend (aws cli rows: 68 denials in default retry mode, 6 in adaptive).
+
 Running: the 24 h soak, started 2026-11-09T18:40Z at 804 req/s (half of the calibrated 1,608 req/s
 peak at concurrency 16), chaos every 10 min, under `bench/results/soak-2026-11-09T183931Z/`; it
 ends 2026-11-10T18:40Z and its report fills in gate-5.md §3 row 9 and §4's memory row.
