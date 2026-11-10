@@ -26,7 +26,7 @@ Decisions behind entries are in `docs/DECISIONS.md` (D-nnn) and `docs/adr/`.
   `/healthz`, `/readyz`, `/metrics`, `/admin/reload`, `/admin/config`, `/admin/limits`,
   `/admin/limits/top`, `/admin/limits/test`, `/admin/usage`, `/admin/status`, `/admin/backends`
   (Phases 2 to 4; D-050 to D-055).
-- Prometheus metrics (21), catalogued in `docs/telemetry-catalog.md`; `log/slog` JSON logging;
+- Prometheus metrics (22), catalogued in `docs/telemetry-catalog.md`; `log/slog` JSON logging;
   optional access log.
 - Byte-equivalence harness (`test/s3diff`) with a recording backend, client compatibility matrix
   against Garage and versitygw (`docs/COMPAT.md`), client throttling rows (`docs/THROTTLE.md`),
@@ -41,6 +41,30 @@ Decisions behind entries are in `docs/DECISIONS.md` (D-nnn) and `docs/adr/`.
   config file; the CLI never writes it. A shared color palette across the screens, a bordered
   editor pane with a mode badge and an always-visible block cursor, and `tab`, `shift+tab`, and the
   arrow keys to move between screens (Phase 5).
+- Rules an operator can read (ADR-0007). The `limits` list is written in S3's own operation names
+  (`operation: ListObjectsV2`, a trailing star for a family, a typo answered with the closest
+  name), with the unit in the key (`limit_per_second`, `limit_per_minute`, `limit_per_hour`, or
+  `blocked: true`), a required `per` (who gets a budget of their own, or `total`), `respond: 503`
+  or `429`, and a `note`. Every rule is read back as a sentence by `check-config`, `rules list`,
+  `rules show`, `GET /admin/limits`, and the console. `tollbooth_limiter_matched_total{rule}`
+  counts what each rule matches, beside what it denies. The TUI's Limits screen shows the rules
+  in words with matched and throttled per second and the busiest S3 operations, flags a rule that
+  matches nothing, and has a guided form (`n` new, `enter` change, `d` delete) with pickers for
+  operations and for the access keys and buckets seen in traffic; it writes the rule into the
+  config file with every other byte left alone. `config show` and `config diff` list each rule by
+  name (Phase 5).
+
+### Changed
+
+- **The rule schema is replaced, not extended** (nothing was tagged). `rate_limits.rules` with
+  `id`, `match: {ops, access_keys, buckets, prefixes, source}`, `group_by`, `limit: {rate, burst}`,
+  and `on_limit` is gone, as is `rate_limits.default_on_limit`; a file in the old shape fails
+  `check-config` with errors that name the new keys. The operation-class words (`READ`, `WRITE`,
+  `LIST`, `DELETE`, `BUCKET`) are no longer accepted in rules; they remain only as the `op_class`
+  metric label. `rules test` prints the operation and the status (`503 SlowDown`) instead of the
+  class and the mode; the `rules list` columns are `NAME, LIMIT, PER, OPERATION, ONLY_FOR,
+  RESPOND, KEYS, MATCHED, DENIED`; `GET /admin/limits` returns rules in the file's vocabulary with
+  `sentence`, `summary`, and `matched`.
 
 ### Known limitations
 

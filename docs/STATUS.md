@@ -14,7 +14,7 @@ container image, `make release`, `CHANGELOG.md`, the soak harness, the runbook, 
 | 3 Showback | aggregator, snapshot and seal, NDJSON, `usage` verbs, `/admin/usage`, dimensions and cap, restart, multi-node sum | reconciliation exact; rollover tests; kill between snapshots loses ≤ `flush_interval`; verify detects a removed hour | **report written 2026-11-09**: reconciliation exact; 19 clock-injected tests green; Record 198 ns, 0 allocs; 257 B per tuple |
 | 4 Operator surface | remaining verbs, shared admin client, `/admin/status`, `/admin/limits/test`, `/admin/backends`, `tollbooth tui` | parity test; CLI goldens ×3 formats; `teatest` goldens; runbook tasks from the TUI and CLI alone | **report written 2026-11-09**: parity test green; 38 CLI goldens ×3 formats; 30 TUI frames at 80×24 and 120×40; two runbook tasks |
 | 5 Hardening and v0.1.0 | bench runs with profiles, tuning, 24 h soak, caps, `OPERATIONS.md`, systemd, container, `CHANGELOG.md`, tag | all performance targets met or ADR'd; soak flat | in progress |
-| 6 Backlog | shaping, cluster limits, bandwidth, Parquet, OpenTelemetry, connection caps, rule editing, drain, web UI | each starts with an ADR | not scheduled |
+| 6 Backlog | shaping, cluster limits, bandwidth, Parquet, OpenTelemetry, connection caps, drain, web UI, observe-only rules, live per-key rates (rule editing moved to Phase 5: ADR-0006, ADR-0007) | each starts with an ADR | not scheduled |
 
 ## Phase 5 record (in progress)
 
@@ -24,6 +24,14 @@ image), `CHANGELOG.md`, the null backend's fault-injection listener, `loadgen -r
 harness (`make soak`, D-056), `bench/crosscheck.sh` (elbencho, ADR-0005), the full
 `docs/OPERATIONS.md`, ADR-0005, the dev-box bench run with profiles
 (`bench/results/2026-11-09T181541Z/`), `docs/reports/gate-5.md` (draft; soak rows pending).
+
+Added in Phase 5 on Blake's direction, each by ADR: the TUI as the operator console (ADR-0006,
+PRs #27 to #32: the Graphs screen, the Config editor that saves, the palette and navigation), and
+rules an operator can read (ADR-0007, accepted 2026-11-10 after the first demo; `p5/readable-rules`):
+the `limits` schema in S3 operation names with the unit in the key, every rule read back as a
+sentence, `tollbooth_limiter_matched_total{rule}`, the Limits screen with live rates per rule and
+per operation, and the guided form that writes a rule into the file (D-058 to D-061). The rule
+schema of Phases 2 to 4 is replaced, not kept beside it; nothing was tagged with it.
 
 Running: the 24 h soak, started 2026-11-09T18:40Z at 804 req/s (half of the calibrated 1,608 req/s
 peak at concurrency 16), chaos every 10 min, under `bench/results/soak-2026-11-09T183931Z/`; it
