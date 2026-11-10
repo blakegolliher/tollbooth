@@ -111,7 +111,7 @@ func TestRulesList(t *testing.T) {
 	}
 
 	rc, out, _ = runOut(t, "rules", "list", "--admin", addr, "--token", "tok", "--format", "csv")
-	if rc != 0 || !strings.HasPrefix(out, "NAME,LIMIT,PER,OPERATION,ONLY_FOR,RESPOND,KEYS,DENIED\n") || !strings.Contains(out, "frozen,blocked,-,any,access_key=AKIAREVOKED,503,0,3\n") {
+	if rc != 0 || !strings.HasPrefix(out, "NAME,LIMIT,PER,OPERATION,ONLY_FOR,RESPOND,KEYS,MATCHED,DENIED\n") || !strings.Contains(out, "frozen,blocked,-,any,access_key=AKIAREVOKED,503,0,3,3\n") {
 		t.Fatalf("csv: rc %d\n%s", rc, out)
 	}
 }

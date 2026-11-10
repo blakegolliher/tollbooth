@@ -11,4 +11,5 @@ per,source_ip
 burst,200 (100 on this node)
 respond,429
 live_keys,0
+matched,0
 denied,0

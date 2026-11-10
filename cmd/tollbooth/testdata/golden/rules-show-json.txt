@@ -16,5 +16,6 @@
   "effective_burst": 100,
   "respond": 429,
   "live_keys": 0,
+  "matched": 0,
   "denied": 0
 }

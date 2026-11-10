@@ -1,7 +1,7 @@
-NAME             LIMIT                                   PER                OPERATION                        ONLY_FOR                                         RESPOND  KEYS  DENIED
-tenant-a-writes  2,000 per second (1000/s on this node)  access_key,bucket  PutObject,UploadPart,CopyObject  access_key(2) bucket=training-data prefix=ckpt/  503      0     0
-list-storm       50 per second (25/s on this node)       source_ip          List*                            any                                              429      0     0
-frozen           blocked                                 -                  any                              access_key=AKIAREVOKED                           503      0     3
+NAME             LIMIT                                   PER                OPERATION                        ONLY_FOR                                         RESPOND  KEYS  MATCHED  DENIED
+tenant-a-writes  2,000 per second (1000/s on this node)  access_key,bucket  PutObject,UploadPart,CopyObject  access_key(2) bucket=training-data prefix=ckpt/  503      0     0        0
+list-storm       50 per second (25/s on this node)       source_ip          List*                            any                                              429      0     0        0
+frozen           blocked                                 -                  any                              access_key=AKIAREVOKED                           503      0     3        3
 
 tenant-a-writes  At most 2,000 PutObject, UploadPart, and CopyObject calls per second for each access key on each bucket, up to 4,000 at once. Only for requests by access keys AKIAEXAMPLE1 and AKIAEXAMPLE2 on bucket training-data under prefix ckpt/. Over the limit, the client gets 503 SlowDown.
 list-storm       At most 50 List* calls (11 operations) per second from each source IP, up to 200 at once. Over the limit, the client gets 429 TooManyRequests.

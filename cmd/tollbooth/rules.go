@@ -33,8 +33,8 @@ import (
 const rulesUsage = `usage: tollbooth rules <verb> [flags]
 
 verbs:
-  list                         rules in force, each read back as a sentence, with live key counts
-                               and denials (GET /admin/limits)
+  list                         rules in force, each read back as a sentence, with live key counts,
+                               the requests each has matched, and the ones it denied (GET /admin/limits)
   show <name>                  one rule in full
   test --op OP [--access-key K] [--bucket B] [--key P] [--prefix Q] [--ip A]
                                dry run: which rules match, the key each resolves to, the decision now;
@@ -107,10 +107,10 @@ func rulesList(args []string, stdout, stderr *os.File) error {
 	if err != nil {
 		return err
 	}
-	g := &grid{header: []string{"NAME", "LIMIT", "PER", "OPERATION", "ONLY_FOR", "RESPOND", "KEYS", "DENIED"}}
+	g := &grid{header: []string{"NAME", "LIMIT", "PER", "OPERATION", "ONLY_FOR", "RESPOND", "KEYS", "MATCHED", "DENIED"}}
 	for i := range lim.Rules {
 		r := &lim.Rules[i]
-		g.add(r.Name, limitString(r), perString(r), listOrAny(r.Operation), onlyFor(r), strconv.Itoa(r.Respond), strconv.FormatInt(r.LiveKeys, 10), strconv.FormatInt(r.Denied, 10))
+		g.add(r.Name, limitString(r), perString(r), listOrAny(r.Operation), onlyFor(r), strconv.Itoa(r.Respond), strconv.FormatInt(r.LiveKeys, 10), strconv.FormatInt(r.Matched, 10), strconv.FormatInt(r.Denied, 10))
 	}
 	if af.format != "table" {
 		return render(stdout, af.format, g, raw)
@@ -252,6 +252,7 @@ func rulesShow(args []string, stdout, stderr *os.File) error {
 			g.add("note", r.Note)
 		}
 		g.add("live_keys", strconv.FormatInt(r.LiveKeys, 10))
+		g.add("matched", strconv.FormatInt(r.Matched, 10))
 		g.add("denied", strconv.FormatInt(r.Denied, 10))
 		return render(stdout, af.format, g, raw)
 	}
