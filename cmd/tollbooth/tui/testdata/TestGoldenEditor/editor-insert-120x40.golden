@@ -1,40 +1,40 @@
  1 Overview  2 Limits  3 Usage  4 Backends  5 Config  6 Graphs  tui-node · v0.0.0-tui
-  tollbooth.yaml  -- NORMAL -- · modified  line 1 col 4
- 1 # xnode_id: tui-node                                                                                               
- 2 backend: {scheme: http, endpoints: [10.0.0.1:9000, 10.0.0.2:9000]}                                                 
- 3 showback: {dir: /tmp/x}                                                                                            
- 4 admin: {token: tok}                                                                                                
- 5 rate_limits:                                                                                                       
- 6   rules:                                                                                                           
- 7     - id: tenant-a-writes                                                                                          
- 8       match: {access_keys: [AKIAEXAMPLE1], buckets: [training-data], prefixes: [ckpt/], ops: [WRITE]}              
- 9       group_by: [access_key, bucket]                                                                               
- 10       limit: {rate: 2000, burst: 8000}                                                                            
- 11     - id: list-storm                                                                                              
- 12       match: {ops: [LIST]}                                                                                        
- 13       group_by: [source_ip]                                                                                       
- 14       limit: {rate: 50, burst: 200}                                                                               
- 15       on_limit: too_many_requests                                                                                 
- 16     - id: frozen                                                                                                  
- 17       match: {access_keys: [AKIAREVOKED]}                                                                         
- 18       limit: {rate: 0}                                                                                            
- 19                                                                                                                   
-                                                                                                                      
-                                                                                                                      
-                                                                                                                      
-                                                                                                                      
-                                                                                                                      
-                                                                                                                      
-                                                                                                                      
-                                                                                                                      
-                                                                                                                      
-                                                                                                                      
-                                                                                                                      
-                                                                                                                      
-                                                                                                                      
-   INVALID: node_id: required; must be stable across restarts (a pod name is the wrong choice) 
-
-
-
+╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ tollbooth.yaml   NORMAL  ● modified  line 1 col 4 · 19 lines                                                         │
+│                                                                                                                      │
+│  1 # xnode_id: tui-node                                                                                              │
+│  2 backend: {scheme: http, endpoints: [10.0.0.1:9000, 10.0.0.2:9000]}                                                │
+│  3 showback: {dir: /tmp/x}                                                                                           │
+│  4 admin: {token: tok}                                                                                               │
+│  5 rate_limits:                                                                                                      │
+│  6   rules:                                                                                                          │
+│  7     - id: tenant-a-writes                                                                                         │
+│  8       match: {access_keys: [AKIAEXAMPLE1], buckets: [training-data], prefixes: [ckpt/], ops: [WRITE]}             │
+│  9       group_by: [access_key, bucket]                                                                              │
+│  10       limit: {rate: 2000, burst: 8000}                                                                           │
+│  11     - id: list-storm                                                                                             │
+│  12       match: {ops: [LIST]}                                                                                       │
+│  13       group_by: [source_ip]                                                                                      │
+│  14       limit: {rate: 50, burst: 200}                                                                              │
+│  15       on_limit: too_many_requests                                                                                │
+│  16     - id: frozen                                                                                                 │
+│  17       match: {access_keys: [AKIAREVOKED]}                                                                        │
+│  18       limit: {rate: 0}                                                                                           │
+│  19                                                                                                                  │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│  INVALID  node_id: required; must be stable across restarts (a pod name is the wrong choice)                         │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
 
 NORMAL · i insert · ctrl+s save · ctrl+r save and reload · E $EDITOR · L reload buffer · esc close

@@ -27,6 +27,7 @@ import (
 	"github.com/charmbracelet/bubbles/cursor"
 	"github.com/charmbracelet/bubbles/textarea"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 
 	"github.com/blakegolliher/tollbooth/internal/config"
 )
@@ -75,30 +76,40 @@ func (m Model) openEditor() (tea.Model, tea.Cmd) {
 	}
 	ta := textarea.New()
 	ta.ShowLineNumbers = true
-	ta.Cursor.SetMode(cursor.CursorStatic) // a steady cursor in a config file; also keeps the tests from waiting on blinks
 	ta.Prompt = ""
 	ta.CharLimit = 0
 	ta.MaxHeight = 0
 	ta.MaxWidth = 0
+	// A solid block cursor that is visible in both modes: the textarea stays focused (NORMAL mode
+	// routes keys itself and never inserts), static so a frame is deterministic and the operator
+	// always sees where they are.
+	ta.Cursor.SetMode(cursor.CursorStatic)
+	ta.Cursor.Style = lipgloss.NewStyle().Reverse(true)
+	ta.Cursor.TextStyle = lipgloss.NewStyle()
+	ta.FocusedStyle.CursorLine = lipgloss.NewStyle()
+	ta.FocusedStyle.LineNumber = styleDim
+	ta.FocusedStyle.CursorLineNumber = lipgloss.NewStyle().Foreground(colorBlue)
+	ta.FocusedStyle.EndOfBuffer = styleDim
+	ta.BlurredStyle = ta.FocusedStyle
 	ta.SetValue(text)
 	ta.CursorStart()
 	for ta.Line() > 0 {
 		ta.CursorUp()
 	}
 	m.ed = editorState{open: true, ta: ta, loaded: text, loadedAt: mod}
-	m.ed.ta.Blur()
 	m.sizeEditor()
 	m.ed.validate()
-	return m, nil
+	return m, m.ed.ta.Focus()
 }
 
 func (m *Model) sizeEditor() {
-	w := m.width - 2
+	w := m.width - 6 // the pane's border and padding
 	if w < 20 {
 		w = 20
 	}
-	// tabs, header, findings (up to 3), footer, blank
-	h := m.height - 8
+	// tabs, footer, the pane's two border rows, the header and its blank line, the blank line
+	// and the verdict, and the prompt row kept free so opening it never clips the border
+	h := m.height - 9
 	if m.stale {
 		h--
 	}
@@ -163,7 +174,6 @@ func (m Model) keyEditor(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if m.ed.insert {
 		if msg.Type == tea.KeyEsc {
 			m.ed.insert = false
-			m.ed.ta.Blur()
 			return m, nil
 		}
 		var cmd tea.Cmd
@@ -174,7 +184,7 @@ func (m Model) keyEditor(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "i":
 		m.ed.insert = true
-		return m, m.ed.ta.Focus()
+		return m, nil
 	case "esc", "q":
 		if m.ed.dirty() {
 			m.ed.prompt = true
@@ -340,31 +350,51 @@ func (m Model) updateEditor(msg tea.Msg) (Model, tea.Cmd, bool) {
 	return m, nil, false
 }
 
-// editorLines renders the editor: a header, the textarea, and the findings.
+// editorLines renders the editor as one bordered pane: a header with the file, a mode badge, and
+// the cursor position; the text; the verdict line; the save prompt when open. The border takes the
+// mode's color (blue NORMAL, orange INSERT, red while the buffer is invalid).
 func (m Model) editorLines() []string {
-	mode := "NORMAL"
+	badge, border := badgeNormal.Render("NORMAL"), colorBlue
 	if m.ed.insert {
-		mode = "INSERT"
+		badge, border = badgeInsert.Render("INSERT"), colorOrange
+	}
+	if !m.ed.valid() {
+		border = colorRed
 	}
 	dirty := ""
 	if m.ed.dirty() {
-		dirty = " · modified"
+		dirty = styleWarn.Render(" ● modified")
+	}
+	w := m.width - 2
+	if w < 24 {
+		w = 24
 	}
 	li := m.ed.ta.LineInfo()
-	hdr := fmt.Sprintf("  %s  -- %s --%s  line %d col %d", filepath.Base(m.opts.ConfigPath), mode, dirty, m.ed.ta.Line()+1, li.ColumnOffset+1)
-	lines := []string{styleTitle.Render(hdr)}
-	lines = append(lines, strings.Split(m.ed.ta.View(), "\n")...)
+	pos := styleDim.Render(fmt.Sprintf("line %d col %d · %d lines", m.ed.ta.Line()+1, li.ColumnOffset+1, m.ed.ta.LineCount()))
+	hdr := styleTitle.Render(filepath.Base(m.opts.ConfigPath)) + "  " + badge + dirty + "  " + pos
+	body := []string{hdr, ""}
+	body = append(body, strings.Split(m.ed.ta.View(), "\n")...)
+	verdict := ""
 	for i, f := range m.ed.findings {
-		if i >= 3 {
+		if i >= 2 {
 			break
 		}
-		if strings.HasPrefix(f, "INVALID") {
-			f = styleStale.Render(" " + f + " ")
+		switch {
+		case strings.HasPrefix(f, "INVALID"):
+			verdict += badgeAlert.Render("INVALID") + " " + styleErr.Render(strings.TrimPrefix(f, "INVALID: "))
+		case strings.HasPrefix(f, "warning"):
+			verdict += styleWarn.Render("⚠ " + strings.TrimPrefix(f, "warning: "))
+		default:
+			verdict += styleOK.Render("✓ " + f)
 		}
-		lines = append(lines, "  "+f)
+		if i == 0 && len(m.ed.findings) > 1 {
+			verdict += "   "
+		}
 	}
+	body = append(body, "", fit(verdict, w-4)) // one line, so the pane's height is fixed
 	if m.ed.prompt {
-		lines = append(lines, "", styleStale.Render("  Unsaved changes. y save · n discard · esc keep editing  "))
+		body = append(body, badgeAlert.Render("Unsaved changes")+"  "+styleTitle.Render("y")+" save  "+styleTitle.Render("n")+" discard  "+styleTitle.Render("esc")+" keep editing")
 	}
-	return lines
+	pane := lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(border).Padding(0, 1).Width(w)
+	return strings.Split(pane.Render(strings.Join(body, "\n")), "\n")
 }

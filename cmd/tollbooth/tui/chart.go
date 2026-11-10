@@ -18,6 +18,8 @@ import (
 	"fmt"
 	"math"
 	"strings"
+
+	"github.com/charmbracelet/lipgloss"
 )
 
 // A braille line chart (ADR-0006): each cell is a 2×4 dot matrix, so a chart of h rows and w
@@ -89,7 +91,7 @@ func chart(title string, ss []series, w, h int, ymax float64) []string {
 		}
 		cur = append(cur, s.name+" "+fmtVal(s.values[len(s.values)-1])+s.unit)
 	}
-	lines = append(lines, fit(styleTitle.Render("  "+title)+"  "+styleDim.Render(strings.Join(cur, " · ")), w))
+	lines = append(lines, fit(styleTitle.Render("  "+title)+"  "+styleOK.Render(strings.Join(cur, " · ")), w))
 	for row := h - 1; row >= 0; row-- {
 		var b strings.Builder
 		for col := 0; col < plotW; col++ {
@@ -102,7 +104,7 @@ func chart(title string, ss []series, w, h int, ymax float64) []string {
 		case 0:
 			label = "0"
 		}
-		lines = append(lines, fmt.Sprintf("%7s ⎹%s", label, b.String()))
+		lines = append(lines, styleDim.Render(fmt.Sprintf("%7s ⎹", label))+lipgloss.NewStyle().Foreground(colorBlue).Render(b.String()))
 	}
 	return lines
 }
