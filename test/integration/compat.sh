@@ -12,13 +12,17 @@
 # Against a cluster that already exists (test plan category 6: "and against a VAST cluster in the
 # lab, manual, results committed"):
 #
-#   BACKENDS=vast VAST_ENDPOINT=host:port AWS_ACCESS_KEY_ID=… AWS_SECRET_ACCESS_KEY=… compat.sh
+#   BACKENDS=vast VAST_ENDPOINT=host:port VAST_BUCKET=<existing bucket> \
+#     AWS_ACCESS_KEY_ID=… AWS_SECRET_ACCESS_KEY=… compat.sh
 #
 # runs the s3diff and client stages through tollbooth in front of that endpoint and writes
-# docs/COMPAT-vast.md (docs/COMPAT.md stays CI's). It CREATES AND DELETES BUCKETS on the cluster:
-# s3diff-vast, and compat-<tool>-vast-direct / -via for each client tool, so the credential must
-# be allowed to, and the names must be free. Plaintext HTTP only (VAST_REGION, default us-east-1).
-# The throttle stage is not run there: it measures the tools, and Garage is enough for that.
+# docs/COMPAT-vast.md (docs/COMPAT.md stays CI's). With VAST_BUCKET no bucket is created or
+# deleted: everything is written under the key prefixes s3diff/ and compat-<tool>-vast-direct/ and
+# -via/ inside that bucket and removed afterwards, the make-bucket and remove-bucket cells are not
+# run, and nothing else in the bucket is named. Without VAST_BUCKET the run CREATES AND DELETES
+# BUCKETS (s3diff-vast, compat-<tool>-vast-direct and -via), which the credential must be allowed
+# to do. Plaintext HTTP, path-style addressing only (VAST_REGION, default us-east-1). The throttle
+# stage is not run there: it measures the tools, and Garage is enough for that.
 set -euo pipefail
 
 HERE=$(cd "$(dirname "$0")" && pwd)
@@ -37,9 +41,13 @@ case " $BACKENDS " in *" vast "*)
     cat >&2 <<'USAGE'
 compat: a run against an existing cluster needs three things in the environment:
 
-  export AWS_ACCESS_KEY_ID=<a key that may create and delete buckets on the cluster>
+  export AWS_ACCESS_KEY_ID=<a key that may read, write, and delete objects in the bucket>
   export AWS_SECRET_ACCESS_KEY=<its secret>
-  VAST_ENDPOINT=<host or address>:<port> make compat-vast      # the cluster's S3 endpoint, plaintext HTTP
+  VAST_ENDPOINT=<host or address>:<port> VAST_BUCKET=<an existing bucket> make compat-vast
+
+VAST_ENDPOINT is the cluster's S3 endpoint over plaintext HTTP. With VAST_BUCKET the run writes
+and removes only keys under s3diff/ and compat-<tool>-vast-direct/ and -via/ in that bucket.
+Without it the run creates and deletes buckets of its own, which the key must be allowed to do.
 
 Nothing was downloaded, started, or sent.
 USAGE
@@ -73,7 +81,11 @@ for b in $BACKENDS; do
       region=${VAST_REGION:-us-east-1}
       ak=${AWS_ACCESS_KEY_ID:?set AWS_ACCESS_KEY_ID to a key that may create and delete buckets on the cluster}
       sk=${AWS_SECRET_ACCESS_KEY:?set AWS_SECRET_ACCESS_KEY}
-      echo "compat: vast: this run creates and deletes the buckets s3diff-vast and compat-<tool>-vast-{direct,via} on $ep" ;;
+      if [ -n "${VAST_BUCKET:-}" ]; then
+        echo "compat: vast: using the existing bucket $VAST_BUCKET on $ep: keys under s3diff/ and compat-<tool>-vast-{direct,via}/ are written and removed; no bucket is created or deleted"
+      else
+        echo "compat: vast: this run creates and deletes the buckets s3diff-vast and compat-<tool>-vast-{direct,via} on $ep"
+      fi ;;
     *) echo "compat: unknown backend $b" >&2; exit 2 ;;
   esac
   listen=127.0.0.1:18${RANDOM:0:3}
@@ -95,11 +107,19 @@ YAML
   pid=$!
   for _ in $(seq 1 100); do curl -s -o /dev/null "http://$admin/readyz" && break; sleep 0.1; done
   echo "compat: $b: tollbooth on $listen (admin $admin), backend $ep"
+  # An existing cluster is addressed path-style only (tb.example.com is not a domain it serves) and,
+  # given a bucket, inside that bucket under a prefix of the run's own.
+  existing=""; s3diff_extra=()
+  if [ "$b" = vast ]; then
+    existing=${VAST_BUCKET:-}
+    s3diff_extra=(-styles path)
+    [ -z "$existing" ] || s3diff_extra+=(-existing-bucket "$existing")
+  fi
   case " $STAGES " in *" s3diff "*)
     if AWS_ACCESS_KEY_ID=$ak AWS_SECRET_ACCESS_KEY=$sk go run "$ROOT/test/s3diff" \
          -direct "http://tb.example.com" -direct-addr "$ep" -via "http://tb.example.com" -via-addr "$listen" \
          -domain tb.example.com -region "$region" -bucket "s3diff-$b" -sizes 0,1,4096,1048576,67108864 \
-         > "$RUN/s3diff-$b.log" 2>&1; then
+         "${s3diff_extra[@]}" > "$RUN/s3diff-$b.log" 2>&1; then
       echo "compat: $b: s3diff ok ($(tail -1 "$RUN/s3diff-$b.log"))"
       printf 'aws-sdk-go-v2\ts3diff\tPASS\t%s\n' "$(tail -1 "$RUN/s3diff-$b.log")" > "$RUN/results-s3diff-$b.tsv"
     else
@@ -109,7 +129,7 @@ YAML
     fi ;;
   esac
   case " $STAGES " in *" clients "*)
-    if "$HERE/clients.sh" run "$b" "http://$ep" "http://$listen" "$region" "$ak" "$sk" "$RUN/results-clients-$b.tsv" > "$RUN/clients-$b.log" 2>&1; then :; fi
+    if "$HERE/clients.sh" run "$b" "http://$ep" "http://$listen" "$region" "$ak" "$sk" "$RUN/results-clients-$b.tsv" "$existing" > "$RUN/clients-$b.log" 2>&1; then :; fi
     fails=$(awk -F'\t' '$3=="FAIL"' "$RUN/results-clients-$b.tsv" | wc -l)
     gaps=$(awk -F'\t' '$3=="GAP"' "$RUN/results-clients-$b.tsv" | wc -l)
     echo "compat: $b: clients $(wc -l < "$RUN/results-clients-$b.tsv") cells, $fails failures, $gaps backend gaps"

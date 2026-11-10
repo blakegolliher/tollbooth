@@ -94,12 +94,15 @@ s3diff-record: ## byte-equivalence matrix against the in-process recording backe
 	$(GO) run ./test/s3diff -record > $(RUN)/s3diff-record.log 2>&1; rc=$$?; tail -3 $(RUN)/s3diff-record.log; exit $$rc
 
 compat: build backends ## byte-equivalence against Garage and versitygw, the client matrix (docs/COMPAT.md), and the client throttling rows (docs/THROTTLE.md)
+	$(INTEGRATION_DIR)/selftest.sh
 	$(INTEGRATION_DIR)/compat.sh
 
-# The same matrix by hand against a cluster that already exists (test plan category 6). It creates
-# and deletes buckets there: s3diff-vast and compat-<tool>-vast-{direct,via}.
-#   VAST_ENDPOINT=host:port AWS_ACCESS_KEY_ID=… AWS_SECRET_ACCESS_KEY=… make compat-vast
-compat-vast: build ## byte-equivalence and the client matrix through tollbooth against an existing VAST cluster (VAST_ENDPOINT, AWS_*); writes docs/COMPAT-vast.md
+# The same matrix by hand against a cluster that already exists (test plan category 6). With
+# VAST_BUCKET it works inside that bucket under prefixes of its own and creates or deletes no
+# bucket; without it, it creates and deletes s3diff-vast and compat-<tool>-vast-{direct,via}.
+#   VAST_ENDPOINT=host:port VAST_BUCKET=bucket AWS_ACCESS_KEY_ID=… AWS_SECRET_ACCESS_KEY=… make compat-vast
+compat-vast: build ## byte-equivalence and the client matrix through tollbooth against an existing VAST cluster (VAST_ENDPOINT, VAST_BUCKET, AWS_*); writes docs/COMPAT-vast.md
+	$(INTEGRATION_DIR)/selftest.sh
 	BACKENDS=vast STAGES="s3diff clients" $(INTEGRATION_DIR)/compat.sh
 
 # Release artifacts: static binaries for linux/amd64 and linux/arm64, the systemd unit, the
