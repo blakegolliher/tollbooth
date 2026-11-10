@@ -23,8 +23,9 @@ $ tollbooth check-config tollbooth.yaml
 Or without opening the file: `tollbooth tui --config tollbooth.yaml`, screen `2`, `n` is a guided
 form that lists the operations and access keys in live traffic and writes the same four lines.
 
-Status: **Phase 5 (hardening, v0.1.0)**: every feature of the specification is built and gated;
-the reference-node performance run and the tag are what remain (`docs/STATUS.md`,
+Status: **v0.1.0**. Every feature of the specification is built and gated. Four end-to-end
+performance targets are stated for a 16 vCPU reference node and are **not yet verified** there;
+`CHANGELOG.md` lists what is measured and what is not (`docs/STATUS.md`,
 `docs/adr/0005-performance-targets-at-v0.1.0.md`).
 
 Quick start:

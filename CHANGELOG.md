@@ -5,6 +5,11 @@ Decisions behind entries are in `docs/DECISIONS.md` (D-nnn) and `docs/adr/`.
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-11-10
+
+The first tagged release: a transparent S3 reverse proxy with inline rate limiting and hourly
+showback, one binary, with a CLI and a terminal console. Gate 5 report: `docs/reports/gate-5.md`.
+
 ### Added
 
 - Transparent S3 reverse proxy lifted from shunt's passthrough pipeline: raw request-target in
@@ -12,8 +17,11 @@ Decisions behind entries are in `docs/DECISIONS.md` (D-nnn) and `docs/adr/`.
   response chunk flushed, no header added to requests or responses (Phase 1).
 - Identity pass and classifier over 113 S3 operations, path and virtual-hosted addressing, SigV4
   and SigV2 in header and query forms, PROXY protocol and trusted `X-Forwarded-For` (Phase 1).
-- Backend pool with round-robin, active health checks, passive marking, retry before any request
-  byte; TLS listener with certificate reload (Phase 1).
+- Backend pool with round-robin, active health checks (an unsigned `HEAD /` every 5 s with a 5 s
+  timeout; any HTTP status is healthy), passive marking, retry before any request byte; TLS
+  listener with certificate reload. A backend given by name is looked up on every new connection
+  and the answer remembered: when the resolver does not answer, the proxy connects and probes at
+  the last known addresses, stays ready, and keeps serving (ADR-0008).
 - Rate limiting: GCRA per rule and key, rules compiled with precomputed matchers, one pass in
   config order, `503 SlowDown` and `429 TooManyRequests` with `Retry-After` and
   `x-amz-retry-after`, hot reload by one pointer swap, per-rule deny ring for `/admin/limits/top`,
@@ -45,9 +53,10 @@ Decisions behind entries are in `docs/DECISIONS.md` (D-nnn) and `docs/adr/`.
   (`operation: ListObjectsV2`, a trailing star for a family, a typo answered with the closest
   name), with the unit in the key (`limit_per_second`, `limit_per_minute`, `limit_per_hour`, or
   `blocked: true`), a required `per` (who gets a budget of their own, or `total`), `respond: 503`
-  or `429`, and a `note`. A limit is kept in a burst by default (its own number may arrive at once)
-  or evenly spaced with `burst: 1` (strict: one at a time), and the read-back says which. Every rule is read back as a sentence by `check-config`, `rules list`,
-  `rules show`, `GET /admin/limits`, and the console. `tollbooth_limiter_matched_total{rule}`
+  or `429`, and a `note`. A limit is kept in a burst by default (its own number may arrive at
+  once) or evenly spaced with `burst: 1` (strict: one at a time), and the read-back says which.
+  Every rule is read back as a sentence by `check-config`, `rules list`, `rules show`,
+  `GET /admin/limits`, and the console. `tollbooth_limiter_matched_total{rule}`
   counts what each rule matches, beside what it denies. The TUI's Limits screen shows the rules
   in words with matched and throttled per second and the busiest S3 operations, flags a rule that
   matches nothing, and has a guided form (`n` new, `enter` change, `d` delete) with pickers for
@@ -55,29 +64,36 @@ Decisions behind entries are in `docs/DECISIONS.md` (D-nnn) and `docs/adr/`.
   config file with every other byte left alone. `config show` and `config diff` list each rule by
   name (Phase 5).
 
-### Changed
+### Verified, and not yet verified
 
-- The default of `backend.health_check.timeout` is `5s`, was `2s`. A VAST cluster answers the
-  health probe's unsigned `HEAD /` after 2.0 s, so with the old default every probe timed out, the
-  backend was marked down, and the proxy reported not ready while it forwarded requests (D-064).
+Measured on a 2 vCPU development machine (`docs/reports/gate-5.md` §3 and §4):
 
-- **Backends through a resolver outage (ADR-0008).** A backend given by name is still looked up on
-  every new connection, and the answer is now remembered: when the resolver does not answer, the
-  proxy connects and probes at the last known addresses, stays ready, and keeps serving. Before
-  this a DNS outage marked a serving proxy not ready and failed every request that needed a new
-  connection. `tollbooth_backend_errors_total` gains `kind="resolve"`; `backends list` gains a
-  `RESOLVE` column and `GET /admin/backends` the fields `errors_resolve`, `addresses`, and
-  `resolver_failing_since`.
+- Limiter decision: p99 4.7 µs with 100 rules and 1,000,000 live keys, 0 allocations.
+- Showback increment: 198 ns, 0 allocations.
+- Config reload under load: 0.6 ms, 0 failed requests.
+- Startup to ready: 65 to 78 ms.
+- Memory: 226 bytes per limiter key and 257 bytes per showback tuple (about 290 MiB at 1,000,000
+  keys and 250,000 tuples).
+- 24 h soak at 804 req/s with a fault injected every 10 minutes: 69.5 million requests, RSS 27 to
+  37 MiB with no upward slope, 0 errors outside a fault window.
+- Byte-equivalence: 293 cases with 0 differences against the recording backend, Garage 2.5.0, and
+  versitygw 1.11.0; 184 cases with 0 differences against a VAST 5.5.3.0 cluster.
+- Client tools (aws cli, boto3, s5cmd, rclone, s3cmd, elbencho): 122 cells with 0 failures against
+  Garage and versitygw (`docs/COMPAT.md`); 48 cells with 0 failures against VAST 5.5.3.0, where 5
+  cells fail the same way with and without the proxy (`docs/COMPAT-vast.md`).
 
-- **The rule schema is replaced, not extended** (nothing was tagged). `rate_limits.rules` with
-  `id`, `match: {ops, access_keys, buckets, prefixes, source}`, `group_by`, `limit: {rate, burst}`,
-  and `on_limit` is gone, as is `rate_limits.default_on_limit`; a file in the old shape fails
-  `check-config` with errors that name the new keys. The operation-class words (`READ`, `WRITE`,
-  `LIST`, `DELETE`, `BUCKET`) are no longer accepted in rules; they remain only as the `op_class`
-  metric label. `rules test` prints the operation and the status (`503 SlowDown`) instead of the
-  class and the mode; the `rules list` columns are `NAME, LIMIT, PER, OPERATION, ONLY_FOR,
-  RESPOND, KEYS, MATCHED, DENIED`; `GET /admin/limits` returns rules in the file's vocabulary with
-  `sentence`, `summary`, and `matched`.
+**Not yet verified.** These targets are stated for a 16 vCPU reference node that this project has
+not had; they are unmeasured there, and the numbers from the 2 vCPU machine are not evidence for
+them (ADR-0005). The reference-node run is the gate for 0.1.1.
+
+- Added latency per request (target: p50 at most 150 µs, p99 at most 1 ms).
+- Small-object throughput over plaintext (target: at least 50,000 requests per second).
+- Small-object throughput with TLS terminated (target: at least 30,000 requests per second).
+- Large-object streaming (target: at least 80% of line rate).
+
+Also not yet done: the cost of showback on versus off under load; against VAST, make-bucket and
+remove-bucket, virtual-hosted addressing, and TLS to the cluster; a run of the container image
+and of the systemd unit on a real host.
 
 ### Known limitations
 
@@ -85,9 +101,18 @@ Decisions behind entries are in `docs/DECISIONS.md` (D-nnn) and `docs/adr/`.
   adaptive retry mode does (D-044, `docs/OPERATIONS.md`). Hold-and-forward is a Phase 6 ADR.
 - A backend that answers and closes before reading the whole request body can surface as a 503
   from the proxy (D-034); every SDK avoids it with `Expect: 100-continue` above its threshold.
-- Performance targets are stated for a 16 vCPU reference node; see `docs/adr/0005-performance-targets-at-v0.1.0.md`
-  for what has and has not been measured.
+- Four end-to-end performance targets are unverified; see "Verified, and not yet verified" above
+  and `docs/adr/0005-performance-targets-at-v0.1.0.md`.
+- A proxy started while the resolver is not answering cannot locate a backend given by name and
+  reports not ready until the resolver returns; one that was already running keeps serving
+  (ADR-0008).
+- A per-minute or per-hour limit is a budget, not a pace: once it is spent the client is told to
+  wait up to the refill interval (`Retry-After: 180` for 20 an hour), which no SDK's retries
+  outlast (`docs/OPERATIONS.md` §9).
 
-## [0.1.0] - unreleased
+### If you ran a build from before this release
 
-The first tagged release follows the Gate 5 decision (docs/reports/gate-5.md).
+- The rule schema changed. `rate_limits.rules` with `id`, `match`, `group_by`, `limit: {rate,
+  burst}`, and `on_limit` is replaced by the `limits` list; a file in the old shape fails
+  `check-config` with errors that name the new keys (`docs/CONFIG.md`).
+- `backend.health_check.timeout` defaults to `5s`, was `2s` (D-064).
