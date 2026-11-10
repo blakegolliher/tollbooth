@@ -49,20 +49,24 @@ const fixtureConfig = `node_id: tui-node
 backend: {scheme: http, endpoints: [10.0.0.1:9000, 10.0.0.2:9000]}
 showback: {dir: /tmp/x}
 admin: {token: tok}
-rate_limits:
-  rules:
-    - id: tenant-a-writes
-      match: {access_keys: [AKIAEXAMPLE1], buckets: [training-data], prefixes: [ckpt/], ops: [WRITE]}
-      group_by: [access_key, bucket]
-      limit: {rate: 2000, burst: 4000}
-    - id: list-storm
-      match: {ops: [LIST]}
-      group_by: [source_ip]
-      limit: {rate: 50, burst: 200}
-      on_limit: too_many_requests
-    - id: frozen
-      match: {access_keys: [AKIAREVOKED]}
-      limit: {rate: 0}
+limits:
+  - name: tenant-a-writes
+    operation: [PutObject, UploadPart, CopyObject]
+    access_key: AKIAEXAMPLE1
+    bucket: training-data
+    prefix: ckpt/
+    limit_per_second: 2000
+    burst: 4000
+    per: [access_key, bucket]
+  - name: list-storm
+    operation: [ListObjectsV2, ListObjects]
+    limit_per_second: 50
+    burst: 200
+    per: source_ip
+    respond: 429
+  - name: frozen
+    access_key: AKIAREVOKED
+    blocked: true
 `
 
 var fixedNow = time.Date(2026, 11, 9, 12, 30, 0, 0, time.UTC)
@@ -113,7 +117,7 @@ func fixture(t *testing.T) (*admin.Client, string) {
 			if reloads == 1 {
 				return admin.ReloadResult{OK: true, At: at, Generation: 3, Rules: 3, DurationMS: 0.4}
 			}
-			return admin.ReloadResult{Error: "rate_limits.rules[0].limit.rate: must be >= 0", At: at, Generation: 3}
+			return admin.ReloadResult{Error: "limits[0].limit_per_second: must be a number above 0, got -1", At: at, Generation: 3}
 		},
 		Backends: func() []admin.BackendStatus {
 			return []admin.BackendStatus{
@@ -156,14 +160,10 @@ func drive(t *testing.T, m Model, msgs ...tea.Msg) Model {
 			return
 		}
 		switch msg := got.(type) {
-		case pollMsg, reloadMsg, testMsg, barsMsg, exportMsg, noticeMsg, editorSavedMsg, editorExternalMsg:
+		case pollMsg, reloadMsg, testMsg, barsMsg, exportMsg, noticeMsg, editorSavedMsg, editorExternalMsg, seenMsg, formSavedMsg:
 			var next tea.Cmd
 			cur, next = cur.Update(msg)
-			if next != nil { // a save-and-reload chains the reload; follow one more step
-				if r, ok := next().(reloadMsg); ok {
-					cur, _ = cur.Update(r)
-				}
-			}
+			follow(&cur, next)
 		}
 	}
 	// First poll, synchronous and unbounded: every frame depends on it.
@@ -176,6 +176,30 @@ func drive(t *testing.T, m Model, msgs ...tea.Msg) Model {
 	return cur.(Model)
 }
 
+// follow runs what a message's handling asked for next, one level deep: a save-and-apply chains
+// the reload, alone or in a batch beside the notice timer (which is not waited for).
+func follow(cur *tea.Model, next tea.Cmd) {
+	if next == nil {
+		return
+	}
+	ch := make(chan tea.Msg, 1)
+	go func() { ch <- next() }()
+	var got tea.Msg
+	select {
+	case got = <-ch:
+	case <-time.After(500 * time.Millisecond):
+		return
+	}
+	switch msg := got.(type) {
+	case reloadMsg:
+		*cur, _ = (*cur).Update(msg)
+	case tea.BatchMsg:
+		for _, c := range msg {
+			follow(cur, c)
+		}
+	}
+}
+
 func key(s string) tea.KeyMsg {
 	switch s {
 	case "enter":
@@ -186,6 +210,16 @@ func key(s string) tea.KeyMsg {
 		return tea.KeyMsg{Type: tea.KeyTab}
 	case "down":
 		return tea.KeyMsg{Type: tea.KeyDown}
+	case "up":
+		return tea.KeyMsg{Type: tea.KeyUp}
+	case "left":
+		return tea.KeyMsg{Type: tea.KeyLeft}
+	case "right":
+		return tea.KeyMsg{Type: tea.KeyRight}
+	case "shift+tab":
+		return tea.KeyMsg{Type: tea.KeyShiftTab}
+	case "backspace":
+		return tea.KeyMsg{Type: tea.KeyBackspace}
 	case "ctrl+s":
 		return tea.KeyMsg{Type: tea.KeyCtrlS}
 	case "ctrl+r":
@@ -227,7 +261,7 @@ func TestGoldenFrames(t *testing.T) {
 			{"overview", []tea.Msg{size(sz.w, sz.h)}},
 			{"help", []tea.Msg{size(sz.w, sz.h), key("?")}},
 			{"limits", []tea.Msg{size(sz.w, sz.h), key("2")}},
-			{"limits-detail", []tea.Msg{size(sz.w, sz.h), key("2"), key("down"), key("down"), key("enter")}},
+			{"limits-selected", []tea.Msg{size(sz.w, sz.h), key("2"), key("down"), key("down")}},
 			{"limits-filter", []tea.Msg{size(sz.w, sz.h), key("2"), key("/"), key("l"), key("i"), key("s"), key("t"), key("enter")}},
 			{"limits-test", []tea.Msg{size(sz.w, sz.h), key("2"), key("t"), key("A"), key("K"), key("I"), key("A"), key("R"), key("E"), key("V"), key("O"), key("K"), key("E"), key("D"), key("enter")}},
 			{"usage", []tea.Msg{size(sz.w, sz.h), key("3")}},
@@ -337,7 +371,7 @@ func TestKeysAndNotices(t *testing.T) {
 	}
 	// A filter that matches nothing leaves an empty table and a valid frame.
 	m = drive(t, base, size(100, 30), key("2"), key("/"), key("z"), key("z"), key("enter"))
-	if len(m.visibleRules()) != 0 || !strings.Contains(m.View(), "(no rules)") {
+	if len(m.visibleRules()) != 0 || !strings.Contains(m.View(), "(no limits; press n to add one)") {
 		t.Fatalf("%s", m.View())
 	}
 	// q quits.

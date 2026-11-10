@@ -117,7 +117,7 @@ func configShow(args []string, stdout, stderr *os.File) error {
 		return uErr
 	}
 	g := &grid{header: []string{"KEY", "VALUE"}}
-	for _, kv := range flatten("", top.Config) {
+	for _, kv := range config.Flatten(top.Config) {
 		g.add(kv[0], kv[1])
 	}
 	if af.format != "table" {
@@ -136,30 +136,6 @@ func configShow(args []string, stdout, stderr *os.File) error {
 	}
 	_, err = fmt.Fprintf(stdout, "\ngeneration %d, loaded %s; last reload: %s\n", view.Generation, view.LoadedAt.UTC().Format(time.RFC3339), last)
 	return err
-}
-
-// flatten renders a JSON object as sorted dotted key paths; lists become one value.
-func flatten(prefix string, v any) [][2]string {
-	var out [][2]string
-	switch x := v.(type) {
-	case map[string]any:
-		keys := make([]string, 0, len(x))
-		for k := range x {
-			keys = append(keys, k)
-		}
-		sort.Strings(keys)
-		for _, k := range keys {
-			p := k
-			if prefix != "" {
-				p = prefix + "." + k
-			}
-			out = append(out, flatten(p, x[k])...)
-		}
-	default:
-		b, _ := json.Marshal(v)
-		out = append(out, [2]string{prefix, string(b)})
-	}
-	return out
 }
 
 func configReload(args []string, stdout, stderr *os.File) error {
@@ -239,11 +215,11 @@ func configDiff(args []string, stdout, stderr *os.File) error {
 		return uErr
 	}
 	running := map[string]string{}
-	for _, kv := range flatten("", top.Config) {
+	for _, kv := range config.Flatten(top.Config) {
 		running[kv[0]] = kv[1]
 	}
 	file := map[string]string{}
-	for _, kv := range flatten("", disk) {
+	for _, kv := range config.Flatten(disk) {
 		file[kv[0]] = kv[1]
 	}
 	keys := map[string]bool{}

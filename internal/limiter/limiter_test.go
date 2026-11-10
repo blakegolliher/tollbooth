@@ -35,7 +35,7 @@ const (
 
 const base = "node_id: t\nbackend: {scheme: http, endpoints: [127.0.0.1:1]}\nshowback: {dir: /tmp/x}\n"
 
-// cfg parses base plus the given YAML (rate_limits, limiter, cluster) through the real loader,
+// cfg parses base plus the given YAML (limits, limiter, cluster) through the real loader,
 // so every test runs against validated, defaulted config.
 func cfg(t testing.TB, yaml string) *config.Config {
 	t.Helper()
@@ -57,6 +57,20 @@ func lim(t testing.TB, yaml string) (*Limiter, *Metrics) {
 	return l, m
 }
 
+// seriesCount is how many series a collector exposes.
+func seriesCount(c prometheus.Collector) int {
+	ch := make(chan prometheus.Metric, 64)
+	go func() {
+		c.Collect(ch)
+		close(ch)
+	}()
+	n := 0
+	for range ch {
+		n++
+	}
+	return n
+}
+
 // value reads a counter or gauge without the testutil package (and its extra module).
 func value(m prometheus.Metric) float64 {
 	var out dto.Metric
@@ -74,6 +88,7 @@ func testMetrics() *Metrics {
 		Decision: prometheus.NewHistogram(prometheus.HistogramOpts{Name: "d"}),
 		Keys:     prometheus.NewGauge(prometheus.GaugeOpts{Name: "k"}),
 		Overflow: prometheus.NewCounter(prometheus.CounterOpts{Name: "o"}),
+		Matched:  prometheus.NewCounterVec(prometheus.CounterOpts{Name: "test_matched"}, []string{"rule"}),
 		Denied:   prometheus.NewCounterVec(prometheus.CounterOpts{Name: "den"}, []string{"rule"}),
 		Errors:   prometheus.NewCounter(prometheus.CounterOpts{Name: "e"}),
 	}
@@ -110,12 +125,12 @@ func admitted(l *Limiter, id *s3id.RequestIdentity, now int64, attempts int) int
 }
 
 const oneRule = `
-rate_limits:
-  rules:
-    - id: r1
-      match: {ops: [READ]}
-      group_by: [access_key]
-      limit: {rate: 100, burst: 50}
+limits:
+  - name: r1
+    operation: [GetObject, HeadObject]
+    limit_per_second: 100
+    burst: 50
+    per: access_key
 `
 
 // Exactly burst requests pass from a full bucket and the next is denied; with tau = burst × T it
@@ -157,11 +172,10 @@ func TestExactTokenCountOverTenSeconds(t *testing.T) {
 
 func TestRateZeroAlwaysDenies(t *testing.T) {
 	l, m := lim(t, `
-rate_limits:
-  rules:
-    - id: frozen
-      match: {access_keys: [AKIAREVOKED]}
-      limit: {rate: 0}
+limits:
+  - name: frozen
+    access_key: AKIAREVOKED
+    blocked: true
 `)
 	id := getObject("AKIAREVOKED", "b", "k")
 	for i := 0; i < 100; i++ {
@@ -185,14 +199,18 @@ rate_limits:
 // check-then-consume, no rollback), and the test asserts the charge.
 func TestDenialChargesEarlierRule(t *testing.T) {
 	l, _ := lim(t, `
-rate_limits:
-  rules:
-    - id: wide
-      match: {ops: [READ]}
-      limit: {rate: 1, burst: 10}
-    - id: narrow
-      match: {ops: [READ], buckets: [hot]}
-      limit: {rate: 1, burst: 1}
+limits:
+  - name: wide
+    operation: [GetObject, HeadObject]
+    limit_per_second: 1
+    burst: 10
+    per: total
+  - name: narrow
+    operation: [GetObject, HeadObject]
+    bucket: hot
+    limit_per_second: 1
+    burst: 1
+    per: total
 `)
 	hot := getObject("AK", "hot", "k")
 	cold := getObject("AK", "cold", "k")
@@ -240,7 +258,7 @@ func TestReloadKeepsState(t *testing.T) {
 	l, _ := lim(t, oneRule)
 	id := getObject("AKIA1", "b", "k")
 	admitted(l, id, 0, 50)
-	if err := l.Apply(cfg(t, strings.Replace(oneRule, "rate: 100, burst: 50", "rate: 1000, burst: 50", 1))); err != nil {
+	if err := l.Apply(cfg(t, strings.Replace(oneRule, "limit_per_second: 100", "limit_per_second: 1000", 1))); err != nil {
 		t.Fatal(err)
 	}
 	if d := l.Decide(id, 0, true); d.Allowed {
@@ -256,7 +274,7 @@ func TestReloadKeepsState(t *testing.T) {
 	if st := l.Status(); len(st) != 1 || st[0].LiveKeys != 1 || st[0].Denied != 2 {
 		t.Fatalf("counters did not survive the reload: %+v", st)
 	}
-	if err := l.Apply(cfg(t, "rate_limits:\n  rules: []\n")); err != nil {
+	if err := l.Apply(cfg(t, "limits: []\n")); err != nil {
 		t.Fatal(err)
 	}
 	if n := l.sweep(0); n != 1 || l.Keys() != 0 {
@@ -325,13 +343,13 @@ func TestDecideAllocatesZero(t *testing.T) {
 // from AKIA1, otherwise each pins a different bucket so one request matches one rule.
 func hundredRules(matchAll bool) string {
 	var b strings.Builder
-	b.WriteString("rate_limits:\n  rules:\n")
+	b.WriteString("limits:\n")
 	for i := 0; i < 100; i++ {
 		bucket := fmt.Sprintf("b%d", i)
 		if matchAll {
 			bucket = "b7"
 		}
-		fmt.Fprintf(&b, "    - id: rule-%03d\n      match: {ops: [READ, WRITE], buckets: [%s], prefixes: [ckpt/, logs/], access_keys: [AKIA1, AKIA2], source_cidrs: [10.0.0.0/8]}\n      group_by: [access_key, bucket, prefix, source_ip]\n      limit: {rate: 100000, burst: 100000}\n", i, bucket)
+		fmt.Fprintf(&b, "  - name: rule-%03d\n    operation: [GetObject, HeadObject, PutObject, UploadPart]\n    bucket: %s\n    prefix: [ckpt/, logs/]\n    access_key: [AKIA1, AKIA2]\n    source_ip: 10.0.0.0/8\n    limit_per_second: 100000\n    burst: 100000\n    per: [access_key, bucket, prefix, source_ip]\n", i, bucket)
 	}
 	return b.String()
 }
@@ -365,7 +383,7 @@ func TestKeyCapFailsOpen(t *testing.T) {
 // A panic inside the limiter fails open and counts; a rule whose stats pointer is missing stands
 // in for an internal fault.
 func TestLimiterPanicFailsOpen(t *testing.T) {
-	l, m := lim(t, "rate_limits:\n  rules:\n    - id: r\n      limit: {rate: 0}\n")
+	l, m := lim(t, "limits:\n  - name: r\n    blocked: true\n")
 	l.rules.Load().rules[0].stats = nil
 	d := l.Decide(getObject("AK", "b", "k"), 0, true)
 	if !d.Allowed {
@@ -395,17 +413,17 @@ func TestNodeCountDividesRateAndBurst(t *testing.T) {
 		t.Fatalf("after 40 ms admitted %d, want 1", got)
 	}
 	st := l.Status()
-	if st[0].EffectiveRate != 25 || st[0].EffectiveBurst != 13 || st[0].Rate != 100 || st[0].Burst != 50 {
+	if st[0].EffectiveRate != 25 || st[0].EffectiveBurst != 13 || st[0].RatePerSecond != 100 || st[0].Burst != 50 || st[0].Limit != "100 per second" {
 		t.Fatalf("%+v", st[0])
 	}
-	l2, _ := lim(t, "rate_limits:\n  rules:\n    - id: r\n      limit: {rate: 1, burst: 1}\ncluster: {node_count: 8}\n")
+	l2, _ := lim(t, "limits:\n  - name: r\n    limit_per_second: 1\n    burst: 1\n    per: total\ncluster: {node_count: 8}\n")
 	if got := admitted(l2, id, 0, 5); got != 1 {
 		t.Fatalf("burst never rounds below 1: admitted %d", got)
 	}
 }
 
 func TestFractionalRate(t *testing.T) {
-	l, _ := lim(t, "rate_limits:\n  rules:\n    - id: slow\n      limit: {rate: 0.5}\n")
+	l, _ := lim(t, "limits:\n  - name: slow\n    limit_per_second: 0.5\n    per: total\n")
 	id := getObject("AK", "b", "k")
 	if got := admitted(l, id, 0, 5); got != 1 {
 		t.Fatalf("burst defaults to max(1, ceil(0.5)) = 1; admitted %d", got)
@@ -424,22 +442,20 @@ func TestFractionalRate(t *testing.T) {
 
 func TestModes(t *testing.T) {
 	l, _ := lim(t, `
-rate_limits:
-  default_on_limit: too_many_requests
-  rules:
-    - id: a
-      match: {buckets: [a]}
-      limit: {rate: 0}
-    - id: b
-      match: {buckets: [b]}
-      limit: {rate: 0}
-      on_limit: slowdown
+limits:
+  - name: a
+    bucket: a
+    blocked: true
+    respond: 429
+  - name: b
+    bucket: b
+    blocked: true
 `)
 	if d := l.Decide(getObject("AK", "a", "k"), 0, true); d.Mode != ModeTooManyRequests || d.Mode.String() != "too_many_requests" {
-		t.Fatalf("default mode: %+v", d)
+		t.Fatalf("respond: 429: %+v", d)
 	}
 	if d := l.Decide(getObject("AK", "b", "k"), 0, true); d.Mode != ModeSlowDown || d.Mode.String() != "slowdown" {
-		t.Fatalf("rule mode: %+v", d)
+		t.Fatalf("respond omitted is 503 SlowDown: %+v", d)
 	}
 }
 
@@ -447,24 +463,26 @@ rate_limits:
 // longest-match prefix and the CIDR table.
 func TestMatchers(t *testing.T) {
 	l, _ := lim(t, `
-rate_limits:
-  rules:
-    - id: keys
-      match: {access_keys: [AKIA1, ""]}
-      limit: {rate: 0}
-    - id: buckets
-      match: {buckets: [data, ""]}
-      limit: {rate: 0}
-    - id: prefixes
-      match: {buckets: [p], prefixes: [ckpt/, ckpt/deep/, logs/]}
-      group_by: [prefix]
-      limit: {rate: 0}
-    - id: cidrs
-      match: {buckets: [c], source_cidrs: [10.20.0.0/16, 192.0.2.7]}
-      limit: {rate: 0}
-    - id: ops
-      match: {buckets: [o], ops: [LIST, DeleteObject]}
-      limit: {rate: 0}
+limits:
+  - name: keys
+    access_key: [AKIA1, ""]
+    blocked: true
+  - name: buckets
+    bucket: [data, ""]
+    blocked: true
+  - name: prefixes
+    bucket: p
+    prefix: [ckpt/, ckpt/deep/, logs/]
+    blocked: true
+    per: prefix
+  - name: cidrs
+    bucket: c
+    source_ip: [10.20.0.0/16, 192.0.2.7]
+    blocked: true
+  - name: ops
+    operation: [List*, deleteobject]
+    bucket: o
+    blocked: true
 `)
 	cases := []struct {
 		name string
@@ -487,8 +505,9 @@ rate_limits:
 		{"cidr single host", ident("AKIA9", "c", "k", s3id.OpGetObject, "192.0.2.7"), "cidrs"},
 		{"cidr outside", ident("AKIA9", "c", "k", s3id.OpGetObject, "10.21.0.1"), ""},
 		{"cidr no address", ident("AKIA9", "c", "k", s3id.OpGetObject, ""), ""},
-		{"ops class", ident("AKIA9", "o", "", s3id.OpListObjectsV2, ""), "ops"},
-		{"ops name", ident("AKIA9", "o", "k", s3id.OpDeleteObject, ""), "ops"},
+		{"operation family", ident("AKIA9", "o", "", s3id.OpListObjectsV2, ""), "ops"},
+		{"operation family covers every member", ident("AKIA9", "o", "", s3id.OpListMultipartUploads, ""), "ops"},
+		{"operation name in any letter case", ident("AKIA9", "o", "k", s3id.OpDeleteObject, ""), "ops"},
 		{"ops other", ident("AKIA9", "o", "k", s3id.OpGetObject, ""), ""},
 	}
 	for _, c := range cases {
@@ -511,12 +530,12 @@ func withListPrefix(id *s3id.RequestIdentity, p string) *s3id.RequestIdentity {
 // The longest configured prefix wins and becomes the key's prefix dimension.
 func TestLongestPrefixWinsAndKeysTheBucket(t *testing.T) {
 	l, _ := lim(t, `
-rate_limits:
-  rules:
-    - id: p
-      match: {prefixes: [ckpt/, ckpt/deep/]}
-      group_by: [prefix]
-      limit: {rate: 1, burst: 1}
+limits:
+  - name: p
+    prefix: [ckpt/, ckpt/deep/]
+    limit_per_second: 1
+    burst: 1
+    per: prefix
 `)
 	if d := l.Decide(getObject("AK", "b", "ckpt/deep/x"), 0, true); !d.Allowed {
 		t.Fatalf("%+v", d)
@@ -534,22 +553,25 @@ rate_limits:
 	}
 }
 
-// group_by dimensions each create independent buckets; the empty group_by is one shared bucket.
+// The `per` dimensions each create independent buckets; per: total is one shared bucket.
 func TestGroupBy(t *testing.T) {
 	l, _ := lim(t, `
-rate_limits:
-  rules:
-    - id: shared
-      match: {buckets: [s]}
-      limit: {rate: 1, burst: 2}
-    - id: per-ip
-      match: {buckets: [i]}
-      group_by: [source_ip]
-      limit: {rate: 1, burst: 1}
-    - id: per-key-bucket
-      match: {buckets: [kb1, kb2]}
-      group_by: [access_key, bucket]
-      limit: {rate: 1, burst: 1}
+limits:
+  - name: shared
+    bucket: s
+    limit_per_second: 1
+    burst: 2
+    per: total
+  - name: per-ip
+    bucket: i
+    limit_per_second: 1
+    burst: 1
+    per: source_ip
+  - name: per-key-bucket
+    bucket: [kb1, kb2]
+    limit_per_second: 1
+    burst: 1
+    per: [access_key, bucket]
 `)
 	if admitted(l, getObject("A", "s", "k"), 0, 1)+admitted(l, getObject("B", "s", "k"), 0, 1)+admitted(l, getObject("C", "s", "k"), 0, 1) != 2 {
 		t.Fatal("shared bucket must admit 2 across three keys")
@@ -577,11 +599,11 @@ rate_limits:
 // buffer, and two tenants whose concatenation would collide stay distinct.
 func TestKeysAreClonedAndNeverCollide(t *testing.T) {
 	l, _ := lim(t, `
-rate_limits:
-  rules:
-    - id: r
-      group_by: [access_key, bucket]
-      limit: {rate: 1, burst: 1}
+limits:
+  - name: r
+    limit_per_second: 1
+    burst: 1
+    per: [access_key, bucket]
 `)
 	buf := []byte("AKIAXbucket")
 	ak := string(buf[:5])
@@ -598,13 +620,13 @@ rate_limits:
 	}
 }
 
+// A blocked rule keeps no budget; its `per` only tells the refusals apart in the top list.
 func TestTopWindowAndOrder(t *testing.T) {
 	l, _ := lim(t, `
-rate_limits:
-  rules:
-    - id: r
-      group_by: [access_key]
-      limit: {rate: 0}
+limits:
+  - name: r
+    blocked: true
+    per: access_key
 `)
 	for i := 0; i < 5; i++ {
 		l.Decide(getObject("A", "b", "k"), 0, true)
@@ -636,22 +658,30 @@ rate_limits:
 
 func TestStatusAndExplain(t *testing.T) {
 	l, _ := lim(t, `
-rate_limits:
-  rules:
-    - id: tenant-a-writes
-      match: {access_keys: [AKIAEXAMPLE1], buckets: [training-data], prefixes: [ckpt/], source_cidrs: [10.20.0.0/16], ops: [WRITE]}
-      group_by: [access_key, bucket]
-      limit: {rate: 2000, burst: 4000}
-    - id: lists
-      match: {ops: [LIST]}
-      group_by: [source_ip]
-      limit: {rate: 50, burst: 200}
-      on_limit: too_many_requests
+limits:
+  - name: tenant-a-writes
+    operation: [PutObject, UploadPart, CopyObject]
+    access_key: AKIAEXAMPLE1
+    bucket: training-data
+    prefix: ckpt/
+    source_ip: 10.20.0.0/16
+    limit_per_second: 2000
+    burst: 4000
+    per: [access_key, bucket]
+  - name: lists
+    operation: [ListObjectsV2, ListObjects]
+    limit_per_second: 50
+    burst: 200
+    per: source_ip
+    respond: 429
 `)
 	st := l.Status()
-	if len(st) != 2 || st[0].ID != "tenant-a-writes" || st[0].Rate != 2000 || st[0].EffectiveBurst != 4000 || st[0].OnLimit != "slowdown" ||
-		len(st[0].Prefixes) != 1 || st[1].OnLimit != "too_many_requests" || len(st[1].GroupBy) != 1 || st[1].Ops[0] != "LIST" {
+	if len(st) != 2 || st[0].Name != "tenant-a-writes" || st[0].RatePerSecond != 2000 || st[0].EffectiveBurst != 4000 || st[0].Respond != 503 ||
+		len(st[0].Prefix) != 1 || st[1].Respond != 429 || len(st[1].Per) != 1 || st[1].Operation[0] != "ListObjectsV2" || st[1].Limit != "50 per second" {
 		t.Fatalf("%+v", st)
+	}
+	if want := "At most 50 ListObjectsV2 and ListObjects calls per second from each source IP, up to 200 at once. Over the limit, the client gets 429 TooManyRequests."; st[1].Sentence != want {
+		t.Fatalf("sentence:\n got %s\nwant %s", st[1].Sentence, want)
 	}
 	id := ident("AKIAEXAMPLE1", "training-data", "ckpt/1", s3id.OpPutObject, "10.20.1.1")
 	ex := l.Explain(id, 0)
@@ -672,24 +702,74 @@ rate_limits:
 	}
 }
 
+// Every rule a real request is charged against counts it as matched, allowed or denied; a rule the
+// traffic never reaches stays at zero, which is how an operator sees a rule that names the wrong
+// key; a dry run counts nothing; the counts survive a reload and leave with a removed rule.
+func TestMatchedCounter(t *testing.T) {
+	const two = `
+limits:
+  - name: wide
+    operation: [GetObject, HeadObject]
+    limit_per_second: 1
+    burst: 10
+    per: total
+  - name: narrow
+    operation: GetObject
+    bucket: hot
+    limit_per_second: 1
+    burst: 1
+    per: total
+  - name: wrong-key
+    access_key: DEMO-TENANT-A
+    limit_per_second: 1
+    per: total
+`
+	l, m := lim(t, two)
+	hot, cold := getObject("AK", "hot", "k"), getObject("AK", "cold", "k")
+	l.Decide(hot, 0, true)  // charged against wide and narrow, allowed
+	l.Decide(hot, 0, true)  // charged against both, denied by narrow
+	l.Decide(cold, 0, true) // charged against wide only
+	l.Explain(hot, 0)       // a dry run
+	l.Decide(hot, 0, false) // and a decision that does not consume
+	st := l.Status()
+	if st[0].Matched != 3 || st[1].Matched != 2 || st[2].Matched != 0 || st[1].Denied != 1 || st[0].Denied != 0 {
+		t.Fatalf("matched wide %d narrow %d wrong-key %d; denied narrow %d wide %d", st[0].Matched, st[1].Matched, st[2].Matched, st[1].Denied, st[0].Denied)
+	}
+	if a, b, c := value(m.Matched.WithLabelValues("wide")), value(m.Matched.WithLabelValues("narrow")), value(m.Matched.WithLabelValues("wrong-key")); a != 3 || b != 2 || c != 0 {
+		t.Fatalf("tollbooth_limiter_matched_total: wide %v narrow %v wrong-key %v", a, b, c)
+	}
+	// A reload keeps the counts of the rules that stay and drops the series of the one removed.
+	if err := l.Apply(cfg(t, strings.Replace(two, "  - name: wrong-key\n    access_key: DEMO-TENANT-A\n    limit_per_second: 1\n    per: total\n", "", 1))); err != nil {
+		t.Fatal(err)
+	}
+	if st := l.Status(); len(st) != 2 || st[0].Matched != 3 || st[1].Matched != 2 {
+		t.Fatalf("after reload: %+v", st)
+	}
+	if n := seriesCount(m.Matched); n != 2 {
+		t.Fatalf("tollbooth_limiter_matched_total has %d series after the rule was removed, want 2", n)
+	}
+}
+
 // Compile rejects what validation would have, so a reload can never publish a half-built set.
 func TestCompileErrors(t *testing.T) {
 	bad := func(r config.Rule) error {
 		c := cfg(t, "")
-		c.RateLimits.Rules = []config.Rule{r}
+		c.Limits = []config.Rule{r}
 		_, err := compile(c)
 		return err
 	}
+	one, tiny, small := config.Number(1), config.Number(1e-9), config.Number(0.001)
 	cases := map[string]config.Rule{
-		"bad cidr":    {ID: "a", Match: config.Match{SourceCIDRs: []string{"nope"}}, Limit: config.Limit{Rate: 1, Burst: 1}, OnLimit: "slowdown"},
-		"bad op":      {ID: "a", Match: config.Match{Ops: []string{"Nope"}}, Limit: config.Limit{Rate: 1, Burst: 1}, OnLimit: "slowdown"},
-		"bad mode":    {ID: "a", Limit: config.Limit{Rate: 1, Burst: 1}, OnLimit: "hold"},
-		"bad groupby": {ID: "a", GroupBy: []string{"key"}, Limit: config.Limit{Rate: 1, Burst: 1}, OnLimit: "slowdown"},
-		"prefix dim":  {ID: "a", GroupBy: []string{"prefix"}, Limit: config.Limit{Rate: 1, Burst: 1}, OnLimit: "slowdown"},
-		"empty pfx":   {ID: "a", Match: config.Match{Prefixes: []string{""}}, Limit: config.Limit{Rate: 1, Burst: 1}, OnLimit: "slowdown"},
-		"neg rate":    {ID: "a", Limit: config.Limit{Rate: -1, Burst: 1}, OnLimit: "slowdown"},
-		"tiny rate":   {ID: "a", Limit: config.Limit{Rate: 1e-9, Burst: 1}, OnLimit: "slowdown"},
-		"huge burst":  {ID: "a", Limit: config.Limit{Rate: 0.001, Burst: 2_000_000_000}, OnLimit: "slowdown"},
+		"bad source": {Name: "a", SourceIP: config.StringList{"nope"}, LimitPerSecond: &one, Per: config.StringList{"total"}},
+		"bad op":     {Name: "a", Operation: config.StringList{"Nope"}, LimitPerSecond: &one, Per: config.StringList{"total"}},
+		"class word": {Name: "a", Operation: config.StringList{"WRITE"}, LimitPerSecond: &one, Per: config.StringList{"total"}},
+		"bad per":    {Name: "a", LimitPerSecond: &one, Per: config.StringList{"key"}},
+		"prefix dim": {Name: "a", LimitPerSecond: &one, Per: config.StringList{"prefix"}},
+		"empty pfx":  {Name: "a", Prefix: config.StringList{""}, LimitPerSecond: &one, Per: config.StringList{"total"}},
+		"no limit":   {Name: "a", Per: config.StringList{"total"}},
+		"two limits": {Name: "a", LimitPerSecond: &one, LimitPerHour: &one, Per: config.StringList{"total"}},
+		"tiny rate":  {Name: "a", LimitPerSecond: &tiny, Per: config.StringList{"total"}},
+		"huge burst": {Name: "a", LimitPerSecond: &small, Burst: 2_000_000_000, Per: config.StringList{"total"}},
 	}
 	for name, r := range cases {
 		if err := bad(r); err == nil {
@@ -697,34 +777,31 @@ func TestCompileErrors(t *testing.T) {
 		}
 	}
 	c := cfg(t, "")
-	c.RateLimits.Rules = []config.Rule{{ID: "a", Limit: config.Limit{Rate: 1, Burst: 1}, OnLimit: "slowdown"}, {ID: "a", Limit: config.Limit{Rate: 1, Burst: 1}, OnLimit: "slowdown"}}
+	c.Limits = []config.Rule{{Name: "a", LimitPerSecond: &one, Per: config.StringList{"total"}}, {Name: "a", LimitPerSecond: &one, Per: config.StringList{"total"}}}
 	if _, err := compile(c); err == nil {
-		t.Error("duplicate id compiled")
-	}
-	c.RateLimits.DefaultOnLimit = "hold"
-	c.RateLimits.Rules = nil
-	if _, err := compile(c); err == nil {
-		t.Error("bad default mode compiled")
+		t.Error("duplicate name compiled")
 	}
 	if err := New(nil).Apply(c); err == nil {
 		t.Error("Apply accepted a bad set")
 	}
 }
 
-// Every rule in the examples of docs/SPEC.md compiles and classifies as documented; a rule
-// without ops covers every class and one with a class covers only it.
+// The per-class candidate lists: a rule without `operation` is a candidate for every class and
+// one that names operations only for the classes those operations belong to.
 func TestClassLists(t *testing.T) {
 	l, _ := lim(t, `
-rate_limits:
-  rules:
-    - id: any
-      limit: {rate: 1}
-    - id: writes
-      match: {ops: [WRITE]}
-      limit: {rate: 1}
-    - id: one-op
-      match: {ops: [HeadBucket]}
-      limit: {rate: 1}
+limits:
+  - name: any
+    limit_per_second: 1
+    per: total
+  - name: writes
+    operation: [PutObject, UploadPart, CopyObject]
+    limit_per_second: 1
+    per: total
+  - name: one-op
+    operation: HeadBucket
+    limit_per_second: 1
+    per: total
 `)
 	rs := l.rules.Load()
 	if len(rs.rules) != 3 {
@@ -751,7 +828,7 @@ rate_limits:
 
 // Unknown operations and out-of-range classes are clamped, never indexed past the arrays.
 func TestOutOfRangeEnums(t *testing.T) {
-	l, _ := lim(t, "rate_limits:\n  rules:\n    - id: any\n      limit: {rate: 0}\n")
+	l, _ := lim(t, "limits:\n  - name: any\n    blocked: true\n")
 	id := &s3id.RequestIdentity{Op: s3id.Op(250), Class: s3id.Class(99)}
 	if d := l.Decide(id, 0, true); d.Allowed {
 		t.Fatalf("an any-op rule denies Unknown too: %+v", d)

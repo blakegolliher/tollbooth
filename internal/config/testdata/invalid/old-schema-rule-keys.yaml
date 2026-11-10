@@ -1,0 +1,9 @@
+node_id: a
+backend: {scheme: http, endpoints: [h:1]}
+showback: {dir: /d}
+limits:
+  - id: x
+    match: {ops: [LIST]}
+    group_by: [source_ip]
+    limit: {rate: 20}
+    on_limit: too_many_requests

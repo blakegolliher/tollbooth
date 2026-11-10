@@ -37,6 +37,41 @@
       "max_keys": 2000000,
       "sweep_interval": "10s"
     },
+    "limits": [
+      {
+        "access_key": [
+          "AKIAEXAMPLE1",
+          "AKIAEXAMPLE2"
+        ],
+        "bucket": "training-data",
+        "burst": 4000,
+        "limit_per_second": 2000,
+        "name": "tenant-a-writes",
+        "operation": [
+          "PutObject",
+          "UploadPart",
+          "CopyObject"
+        ],
+        "per": [
+          "access_key",
+          "bucket"
+        ],
+        "prefix": "ckpt/"
+      },
+      {
+        "burst": 200,
+        "limit_per_second": 50,
+        "name": "list-storm",
+        "operation": "List*",
+        "per": "source_ip",
+        "respond": 429
+      },
+      {
+        "access_key": "AKIAREVOKED",
+        "blocked": true,
+        "name": "frozen"
+      }
+    ],
     "listen": {
       "address": ":8443",
       "idle_timeout": "2m0s",
@@ -60,77 +95,6 @@
     "proxy": {
       "copy_buffer_bytes": 131072,
       "drain_timeout": "30s"
-    },
-    "rate_limits": {
-      "default_on_limit": "slowdown",
-      "rules": [
-        {
-          "group_by": [
-            "access_key",
-            "bucket"
-          ],
-          "id": "tenant-a-writes",
-          "limit": {
-            "burst": 4000,
-            "rate": 2000
-          },
-          "match": {
-            "access_keys": [
-              "AKIAEXAMPLE1",
-              "AKIAEXAMPLE2"
-            ],
-            "buckets": [
-              "training-data"
-            ],
-            "ops": [
-              "WRITE"
-            ],
-            "prefixes": [
-              "ckpt/"
-            ],
-            "source_cidrs": []
-          },
-          "on_limit": "slowdown"
-        },
-        {
-          "group_by": [
-            "source_ip"
-          ],
-          "id": "list-storm",
-          "limit": {
-            "burst": 200,
-            "rate": 50
-          },
-          "match": {
-            "access_keys": [],
-            "buckets": [],
-            "ops": [
-              "LIST"
-            ],
-            "prefixes": [],
-            "source_cidrs": []
-          },
-          "on_limit": "too_many_requests"
-        },
-        {
-          "group_by": [],
-          "id": "frozen",
-          "limit": {
-            "burst": 0,
-            "rate": 0
-          },
-          "match": {
-            "access_keys": [
-              "AKIAREVOKED"
-            ],
-            "buckets": [],
-            "ops": [],
-            "prefixes": [],
-            "source_cidrs": []
-          },
-          "on_limit": "slowdown"
-        }
-      ]
     },
     "showback": {
       "dimensions": [

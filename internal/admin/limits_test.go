@@ -33,16 +33,19 @@ const limitsConfig = `node_id: t
 backend: {scheme: http, endpoints: [127.0.0.1:1]}
 showback: {dir: /tmp/x}
 admin: {token: secret-token}
-rate_limits:
-  rules:
-    - id: tenant-a-writes
-      match: {access_keys: [AKIAEXAMPLE1], buckets: [training-data], prefixes: [ckpt/], ops: [WRITE]}
-      group_by: [access_key, bucket]
-      limit: {rate: 2000, burst: 4000}
-    - id: frozen
-      match: {access_keys: [AKIAREVOKED]}
-      limit: {rate: 0}
-      on_limit: too_many_requests
+limits:
+  - name: tenant-a-writes
+    operation: [PutObject, UploadPart, CopyObject]
+    access_key: AKIAEXAMPLE1
+    bucket: training-data
+    prefix: ckpt/
+    limit_per_second: 2000
+    burst: 4000
+    per: [access_key, bucket]
+  - name: frozen
+    access_key: AKIAREVOKED
+    blocked: true
+    respond: 429
 `
 
 func limitsServer(t *testing.T) (*Server, *limiter.Limiter, *config.Config) {
@@ -89,8 +92,9 @@ func TestLimitsRoutes(t *testing.T) {
 	if code != 200 || json.Unmarshal(body, &lim1) != nil {
 		t.Fatalf("%d %s", code, body)
 	}
-	if len(lim1.Rules) != 2 || lim1.Rules[0].ID != "tenant-a-writes" || lim1.Rules[0].Rate != 2000 || lim1.Rules[0].EffectiveBurst != 4000 ||
-		lim1.Rules[1].Denied != 3 || lim1.Rules[1].OnLimit != "too_many_requests" || lim1.LiveKeys != 0 {
+	if len(lim1.Rules) != 2 || lim1.Rules[0].Name != "tenant-a-writes" || lim1.Rules[0].RatePerSecond != 2000 || lim1.Rules[0].EffectiveBurst != 4000 ||
+		lim1.Rules[1].Denied != 3 || lim1.Rules[1].Respond != 429 || !lim1.Rules[1].Blocked || lim1.LiveKeys != 0 ||
+		lim1.Rules[1].Sentence != "Refuses every request by access key AKIAREVOKED. The client gets 429 TooManyRequests." {
 		t.Fatalf("%s", body)
 	}
 

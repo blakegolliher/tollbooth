@@ -37,4 +37,4 @@
 
 
 
-reload REJECTED: rate_limits.rules[0].limit.rate: must be >= 0
+reload REJECTED: limits[0].limit_per_second: must be a number above 0, got -1

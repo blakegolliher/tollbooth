@@ -1,0 +1,24 @@
+ 1 Overview  2 Limits  3 Usage  4 Backends  5 Config  6 Graphs  tui-node · v0.0.
+  LIMIT           MEANS                                    MATCHED/S THROTTLED/S
+▸ tenant-a-writes PutObject +2: 2,000 per second for ea…      none ⚠           0
+  list-storm      ListObjectsV2, ListObjects: 50 per se…         312         170
+  frozen          all requests: blocked; key AKIAREVOKED           0           0
+
+  tenant-a-writes: At most 2,000 PutObject, UploadPart, and CopyObject calls
+  per second for each access key on each bucket, up to 4,000 at once. Only for
+  requests by access key AKIAEXAMPLE1 on bucket training-data under prefix ck…
+  ⚠ no request has matched this rule in the 1 h since it was loaded
+    check the names it uses; t tests a request against the rules
+
+  BUSIEST OPERATIONS RIGHT NOW            REQ/S  THROTTLED/S  LIMITED BY
+  GetObject                               1,204            0  no limit
+  ListObjectsV2                             312          170  list-storm
+  PutObject                                  96            0  tenant-a-writes (p
+  HeadObject                                4.2            0  no limit
+
+
+
+
+
+
+↑↓ select · enter change · n new · d delete · t test · / filter · ? help

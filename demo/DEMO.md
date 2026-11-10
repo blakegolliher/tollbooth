@@ -2,8 +2,9 @@
 
 Twelve minutes, one machine, two terminals. Every command below was run as written against the demo
 stack (`demo/run.sh start`) and the outputs are what it printed, trimmed. The audience sees one
-thing per step: the proxy is invisible until a rule fires, a rule is one line of intent, a reload
-is instant, the hour's usage is a file they can open.
+thing per step: the proxy is invisible until a rule fires, a rule is a few plain lines in S3's own
+words that the tool reads back as a sentence, a reload is instant, the hour's usage is a file they
+can open.
 
 Setup once, in every shell you will type in:
 
@@ -47,14 +48,34 @@ showback           hour 2026-11-09T19:00:00Z; 0 tuples
 backends           1 of 1 up
 
 $ tb rules list
-ID                     MATCH                       GROUP_BY           RATE       BURST  MODE               KEYS  DENIED
-tenant-a-reads         key=DEMO-TENANT-A ops=READ  access_key,bucket  2          2      slowdown           0     0
-list-storm-per-client  ops=LIST                    source_ip          1          1      too_many_requests  0     0
-writes-per-bucket      ops=WRITE                   bucket             500        1000   slowdown           0     0
-frozen-bucket          bucket=frozen                                  0 (block)  -      slowdown           0     0
+NAME                LIMIT           PER         OPERATION                                     ONLY_FOR                  RESPOND  KEYS  MATCHED  DENIED
+tenant-a-reads      2 per second    bucket      GetObject,HeadObject                          access_key=DEMO-TENANT-A  503      0     0        0
+list-storm          1 per second    source_ip   ListObjectsV2                                 any                       429      0     0        0
+uploads-per-bucket  500 per second  bucket      PutObject,UploadPart,CompleteMultipartUpload  any                       503      0     0        0
+frozen-bucket       blocked         access_key  any                                           bucket=frozen             503      0     0        0
+
+tenant-a-reads      At most 2 GetObject and HeadObject calls per second on each bucket. Only for requests by access key DEMO-TENANT-A. Over the limit, the client gets 503 SlowDown.
+list-storm          At most 1 ListObjectsV2 call per second from each source IP. Over the limit, the client gets 429 TooManyRequests.
+uploads-per-bucket  At most 500 PutObject, UploadPart, and CompleteMultipartUpload calls per second on each bucket, up to 1,000 at once. Over the limit, the client gets 503 SlowDown.
+frozen-bucket       Refuses every request on bucket frozen. The client gets 503 SlowDown.
+
+4 rules, 0 live keys
 ```
 
-Say: four rules, each one line of intent in a YAML file; nothing in tollbooth writes that file.
+The first of them, as it is written in the file:
+
+```yaml
+limits:
+  - name: tenant-a-reads
+    operation: [GetObject, HeadObject]
+    access_key: DEMO-TENANT-A
+    limit_per_second: 2
+    per: bucket
+```
+
+Say: four rules, each a few plain lines in a YAML file, written in the operation names S3 itself
+uses; the tool reads every rule back as a sentence, so nobody has to trust their reading of the
+file. `MATCHED` beside `DENIED` says whether a rule is seeing the traffic it was written for.
 
 ## 2. Transparent: the client cannot tell it is there
 
@@ -79,7 +100,8 @@ pointed at the proxy behaves exactly as it did pointed at the cluster.
 
 ## 3. A rule fires: SlowDown with Retry-After, the SDK backs off
 
-Tenant A is allowed 2 reads per second per bucket. Eight requests at once, one attempt each:
+Tenant A is allowed 2 GetObject or HeadObject calls per second on each bucket. Eight requests at
+once, one attempt each:
 
 ```
 $ for i in 1 2 3 4 5 6 7 8; do s3api head-object --bucket training-data --key ckpt/step-0001.bin & done; wait
@@ -123,18 +145,23 @@ Who is being throttled, right now:
 
 ```
 $ tb rules top
-RULE            ACCESS_KEY     BUCKET         PREFIX  SOURCE_IP  DENIED  LAST
-tenant-a-reads  DEMO-TENANT-A  training-data                     5       6s ago
+RULE            ACCESS_KEY  BUCKET         PREFIX  SOURCE_IP  DENIED  LAST
+tenant-a-reads              training-data                     5       1s ago
 ```
+
+(The rule counts `per: bucket`, so the bucket is what it names; the access key is the rule's own
+filter.)
 
 What would happen to a request, without sending it:
 
 ```
 $ tb rules test -access-key DEMO-TENANT-A -bucket training-data -key ckpt/step-0001.bin -op GetObject
-GetObject READ (key level): denied by tenant-a-reads (slowdown, Retry-After 1s); 1 rules match
-RULE            KEY                                     LIVE_KEYS  VERDICT  RETRY_AFTER  MODE
-tenant-a-reads  key=DEMO-TENANT-A bucket=training-data  1          deny     1s           slowdown
+GetObject (key level): denied by tenant-a-reads (503 SlowDown, Retry-After 1s); 1 rule matches
+RULE            KEY                   LIVE_KEYS  VERDICT  RETRY_AFTER  RESPOND
+tenant-a-reads  bucket=training-data  1          deny     1s           503
 ```
+
+(Right after the burst. A second later the same command says `allowed`: the bucket has refilled.)
 
 ## 4. A different answer for a different problem: 429 for list storms
 
@@ -145,8 +172,9 @@ An error occurred (TooManyRequests) when calling the ListObjectsV2 operation …
 An error occurred (TooManyRequests) when calling the ListObjectsV2 operation …
 ```
 
-Say: per source address, one listing per second, `429 TooManyRequests` because that is what this
-customer's client stack handles better; each rule picks its mode.
+Say: the rule names the operation, `ListObjectsV2`, which is what `aws s3 ls` sends; each source
+address may list once a second, and the rule says `respond: 429` because that is what this
+customer's client stack handles better.
 
 ## 5. The stop button: a frozen bucket
 
@@ -154,10 +182,13 @@ customer's client stack handles better; each rule picks its mode.
 $ s3 cp /tmp/demo-64k.bin s3://frozen/x.bin
 upload failed: … An error occurred (SlowDown) when calling the PutObject operation (reached max retries: 0): Please reduce your request rate.
 $ tb rules test -access-key DEMO-TENANT-B -bucket frozen -key x -op PutObject
-PutObject WRITE (key level): denied by frozen-bucket (slowdown, Retry-After 1s); 2 rules match
+PutObject (key level): denied by frozen-bucket (503 SlowDown, Retry-After 1s); 2 rules match
+RULE                KEY                LIVE_KEYS  VERDICT  RETRY_AFTER  RESPOND
+uploads-per-bucket  bucket=frozen      1          allow    -            503
+frozen-bucket       key=DEMO-TENANT-B  0          deny     1s           503
 ```
 
-Say: `rate: 0` is incident response: a runaway job or a compromised key stops in one reload,
+Say: `blocked: true` is incident response: a runaway job or a compromised key stops in one reload,
 with no change to the cluster and no client reconfiguration.
 
 ## 6. Change a rule live
@@ -165,14 +196,19 @@ with no change to the cluster and no client reconfiguration.
 Edit the file (tenant A from 2/s to 50/s), see the difference, apply it:
 
 ```
-$ sed -i 's/limit: {rate: 2, burst: 2}/limit: {rate: 50, burst: 100}/' $TOLLBOOTH_DEMO_CONFIG
-$ tb config diff --config $TOLLBOOTH_DEMO_CONFIG | tail -1
+$ sed -i 's/limit_per_second: 2$/limit_per_second: 50/' $TOLLBOOTH_DEMO_CONFIG
+$ tb check-config $TOLLBOOTH_DEMO_CONFIG | grep tenant-a-reads
+  tenant-a-reads: At most 50 GetObject and HeadObject calls per second on each bucket. Only for requests by access key DEMO-TENANT-A. Over the limit, the client gets 503 SlowDown.
+$ tb config diff --config $TOLLBOOTH_DEMO_CONFIG
+KEY                                      RUNNING  FILE
+limits[tenant-a-reads].limit_per_second  2        50
+
 1 keys differ; run `tollbooth config reload` to apply …/demo/state/tollbooth.yaml
 $ tb config reload --config $TOLLBOOTH_DEMO_CONFIG
 ok           true
 generation   2
 rules        4
-duration_ms  0.47
+duration_ms  0.42
 ```
 
 Repeat the burst from step 3: all eight succeed. The TUI's status screen shows generation 2.
@@ -190,22 +226,108 @@ $ sed -i '/^bogus: 1$/d' $TOLLBOOTH_DEMO_CONFIG     # and put the rate back if y
 Say: unknown keys are errors, a rejected reload keeps the running config, the swap is one pointer
 (0.5 ms here, 0.6 ms measured under load), in-flight requests never notice.
 
-## 6b. The console: graphs, and the rule change without leaving the TUI (PR #27)
+## 6b. The console: add a limit without opening the file
 
-In the TUI terminal, `6` is the Graphs screen: braille line charts of requests and throttles per
-second, backend time to first byte, denials per second by rule, requests in flight, heap and RSS,
-goroutines, over the last ten minutes of polls; `space` pauses, `r` resets. Run
-`demo/run.sh load 60` first so the lines move, then repeat the burst from step 3 and watch the
-throttle line and the `tenant-a-reads` denial line rise together.
+The request the form is built for: *"we have too many GetObject calls coming in; limit them to 20 a
+second for each access key."* Run `demo/run.sh load 100` first so there is traffic to look at.
 
-Then `5`, `e`: the config file opens in the TUI's editor. `i` to insert, change `rate: 2` under
-`tenant-a-reads` to `rate: 50`, `esc`; the line under the text says `valid: 4 rules` on every
-keystroke (type a stray word and it says `INVALID:` with the key and line instead). `ctrl+r` saves
-the file (a `tollbooth.yaml.<time>.bak` appears beside it) and reloads the proxy in one step; the
-bottom line reports the new generation. `esc` closes the editor.
+In the TUI terminal, `2` is the Limits screen: the rules in words with what each matches and
+throttles per second, and under them the busiest S3 operations right now (frames below are from the
+running demo, 112 columns):
 
-Say: the operator never leaves the console; the save is explicit, validated, atomic, backed up,
-and refused if someone else changed the file meanwhile. The CLI still never writes the file.
+```
+  LIMIT              MEANS                                                                 MATCHED/S THROTTLED/S
+▸ tenant-a-reads     GetObject, HeadObject: 2 per second on each bucket; key DEMO-TENAN…           0           0
+  list-storm         ListObjectsV2: 1 per second from each source IP                               0           0
+  uploads-per-bucket PutObject +2: 500 per second on each bucket                                  22           0
+  frozen-bucket      all requests: blocked; bucket frozen                                          0           0
+
+  BUSIEST OPERATIONS RIGHT NOW            REQ/S  THROTTLED/S  LIMITED BY
+  GetObject                                  71            0  tenant-a-reads (part)
+  PutObject                                  23            0  uploads-per-bucket
+  HeadObject                                7.0            0  tenant-a-reads (part)
+```
+
+`n` opens the form. Type `get`: the list under the field shows the S3 operations that match, the
+ones in traffic first with their rates. `enter` takes `GetObject`. `tab`, `20`. `tab` three times to
+**Counted** (past the unit and "at once"), `→` until `each access key`:
+
+```
+│ New limit                                                                                                    │
+│   Limit what     GetObject                                                                                   │
+│   To at most     20  per second   at once: same as the limit                                                 │
+│ ▸ Counted         ‹ each access key ›                                                                        │
+│   Only for       access key any                                                                              │
+│                  bucket     any                                                                              │
+│                  prefix     any                                                                              │
+│                  source IP  any                                                                              │
+│   Over the limit 503 SlowDown (what S3 itself answers)                                                       │
+│   Name           getobject-per-access-key                                                                    │
+│   Note           why this limit exists (optional)                                                            │
+│ ── who gets a budget of their own: ←/→ to choose ─────────────────────────────────────────────────────────── │
+│   ( ) everyone together               all matching requests share one budget                                 │
+│   ( ) each source IP                  a budget of its own for every client                                   │
+│   (•) each access key                 a budget of its own for every key                                      │
+│   ( ) each bucket                     a budget of its own for every bucket                                   │
+│   ( ) each access key on each bucket  a budget of its own for every pair                                     │
+│                                                                                                              │
+│ Means   At most 20 GetObject calls per second for each access key. Over the limit, the client gets 503       │
+│         SlowDown.                                                                                            │
+│ Now     GetObject: 73/s right now                                                                            │
+```
+
+One more `tab` shows what the **Only for** fields offer: the access keys the proxy has seen in the
+last two hours, busiest first (`AKIALOAD002  6,579 requests lately` …), so nobody types a key.
+Then `ctrl+r` (from any field): the bottom line says `reloaded: generation 2, 5 rules, 0.6 ms`
+(generation 3 if you did step 6), a `tollbooth.yaml.<time>.bak` is beside the file, and the file
+has gained exactly this, with every other byte and comment as it was:
+
+```yaml
+  - name: getobject-per-access-key
+    operation: GetObject
+    limit_per_second: 20
+    per: access_key
+```
+
+Within one poll the Limits screen shows the rule at work (three load keys at about 25 GetObject a
+second each, against 20):
+
+```
+  getobject-per-access-key GetObject: 20 per second for each access key                           76         1.5
+```
+
+`enter` on the rule opens the same form with the cursor on the number: replace `20` with `5`,
+`ctrl+r`. The detail under the rule now names who is being held, and `6` (Graphs) shows the
+throttle line rising:
+
+```
+▸ getobject-per-access-key GetObject: 5 per second for each access key                            17         3.0
+
+  getobject-per-access-key: At most 5 GetObject calls per second for each access key. Over the limit, the
+  client gets 503 SlowDown.
+  held in the last minute: key=AKIALOAD000 (95) · key=AKIALOAD002 (82) · key=AKIALOAD001 (40)
+```
+
+(The request rate falls with it, from 100/s to about 25/s here: the generator's four workers spend
+their time in the SDK's retry backoff. A client held this far under its demand slows itself down.)
+`d` on the rule, `y`: it is deleted and the change applied. After the add, the change, and the
+delete the config file was byte-identical to the one the demo started with.
+
+A rule that has matched no request since it was loaded, while traffic flows, is marked `none ⚠`
+after a minute. If you came here without steps 3 to 5, `tenant-a-reads`, `list-storm`, and
+`frozen-bucket` show it, correctly: the background load uses other keys, never lists, and never
+touches the frozen bucket. It is the mark that catches a rule written for the wrong access key.
+
+Say: the question was asked in S3's words and answered in them; the operator picked the operation
+and the key from what the proxy is seeing, read the rule back as a sentence before saving, and
+watched it bite. The save is explicit, validated, atomic, backed up, and refused if someone else
+changed the file meanwhile. The file is still the source of truth, and `5`, `e` opens it in the
+console's editor (validated on every keystroke, `ctrl+r` saves and reloads) for anyone who would
+rather write the four lines. The CLI still never writes the file.
+
+`6` is the Graphs screen: braille line charts of requests and throttles per second, backend time
+to first byte, denials per second by rule, requests in flight, heap and RSS, goroutines, over the
+last ten minutes of polls; `space` pauses, `r` resets.
 
 ## 7. Showback: who used what, by the hour, as a file
 
@@ -271,14 +393,17 @@ request byte has been sent, so nothing is ever duplicated.
 
 ```
 $ curl -s http://$TOLLBOOTH_ADMIN/metrics | grep -E '^tollbooth_' | grep -v ' 0$' | head
-tollbooth_limiter_denied_total{rule="list-storm-per-client"} 4
+tollbooth_limiter_denied_total{rule="list-storm"} 3
 tollbooth_limiter_denied_total{rule="tenant-a-reads"} 5
-tollbooth_requests_total{op_class="READ",operation="HeadObject",result="forwarded",status_class="2xx"} 15
+tollbooth_limiter_matched_total{rule="list-storm"} 4
+tollbooth_limiter_matched_total{rule="tenant-a-reads"} 8
+tollbooth_requests_total{op_class="LIST",operation="ListObjectsV2",result="throttled",status_class="throttled"} 3
+tollbooth_requests_total{op_class="READ",operation="HeadObject",result="forwarded",status_class="2xx"} 3
 tollbooth_requests_total{op_class="READ",operation="HeadObject",result="throttled",status_class="throttled"} 5
 …
 ```
 
-Say: 21 metrics, every one in `docs/telemetry-catalog.md`, labels bounded by configuration, never
+Say: 22 metrics, every one in `docs/telemetry-catalog.md`, labels bounded by configuration, never
 by object key or access key.
 
 ## Running it against a real S3 endpoint (the POC)
@@ -295,30 +420,35 @@ tb doctor --config $TOLLBOOTH_DEMO_CONFIG           # backend <host>: ok, tcp an
 s3 ls s3://$LOAD_BUCKET/                            # real listing, through the proxy
 ```
 
-1. **Put your key on a rule.** `tb tui --config $TOLLBOOTH_DEMO_CONFIG`, `5`, `e`, `i`: on the
-   `tenant-a-reads` rule change the match to `match: {access_keys: [<your key>]}` and
-   `rate: 2, burst: 2` to something above the load you are about to run, say `rate: 200, burst: 200`;
-   `esc`, `ctrl+r`. The bottom line says `reloaded: generation 2`. Dropping `ops: [READ]` from the
-   match makes the rule cover every operation of the key; with it the rule sees only GET and HEAD,
-   80 of the load's 100 requests per second, and the PUTs pass under `writes-per-bucket`.
-2. **Start traffic.** In another shell, `demo/run.sh load 100`: 100 requests per second of GET,
+1. **Start traffic.** In another shell, `demo/run.sh load 100`: 100 requests per second of GET,
    PUT, and HEAD against `$LOAD_BUCKET` as your key, after seeding 200 small objects so the reads
-   find something. `6` in the TUI: the request line climbs to 100/s, the backend TTFB line shows
-   the cluster's answer time, throttles stay at zero. Give it a minute of history.
-3. **Lower the limit.** `5`, `e`, `i`, change `rate: 200, burst: 200` to `rate: 30, burst: 30`,
-   `esc`, `ctrl+r`. Back on `6`, within two polls the `throttled` line rises. The `req` line counts
-   every request the proxy answers, throttled ones included, so it stays near the offered rate, or
-   above it because the client retries; the gap between the two lines, about 30/s, is what reaches
-   the cluster. `denied per second, by rule` shows `tenant-a-reads`. `2` shows the rule with live
-   keys and the denied count; `enter` on it shows your key as the one being held.
-   Two things to say out loud. The generator's SDK retries a SlowDown with its own backoff (it
-   does not read `Retry-After` by default, D-043), and with the offered rate this far above the
-   limit some operations use up their retries and fail with SlowDown: that is what a tenant over
-   its limit should see, and `demo/state/loadgen.log` counts them as errors at the end of the run.
-   And lower the burst with the rate: the burst is the bucket, so `rate: 30, burst: 250` would pass
-   about four seconds of traffic before the limit bites.
-4. **Raise it again** the same way and watch the lines cross back. `demo/run.sh load 300` restarts
-   the generator at another rate; `demo/run.sh stop` ends the load and the proxy.
+   find something. `tb tui --config $TOLLBOOTH_DEMO_CONFIG`, `6`: the request line climbs to
+   100/s, the backend TTFB line shows the cluster's answer time, throttles stay at zero (the demo
+   rules name `DEMO-TENANT-A`, not your key). Give it a minute of history.
+2. **See what is arriving.** `2` (Limits): under the rules, "Busiest operations right now" lists
+   GetObject at about 70/s, PutObject at 20/s, HeadObject at 10/s, each with the limit that covers
+   it or `no limit`.
+3. **Limit it.** `n`; type `get`, `enter` takes GetObject; `tab`, `30`; `tab` three times to
+   Counted, `→` to `each access key`; one more `tab` and `↓`, `enter` picks your key from the keys
+   the proxy has seen (optional: without it the rule gives every key its own 30 a second). The
+   Means line reads the rule back; `ctrl+r` saves and applies. Within two polls the rule's row
+   shows matched about 70/s and a throttled rate; `6` shows the `throttled` line rising and
+   `denied per second, by rule` naming the rule.
+   Two things to say out loud. The `req` line counts every request the proxy answers, throttled
+   ones included; requests minus throttled is what reaches the cluster. And the generator's SDK
+   retries a SlowDown with its own backoff (it does not read `Retry-After` by default, D-043):
+   held far below its demand, its workers spend their time backing off, the offered rate itself
+   falls (100/s to about 25/s with the null backend and a limit of 5), and some operations use up
+   their retries and fail with SlowDown. That is what a tenant over its limit should see, and
+   `demo/state/loadgen.log` counts them as errors at the end of the run.
+4. **Change it, then remove it.** `2`, select the rule, `enter`: the cursor is on the number. Type
+   a higher one, `ctrl+r`, and watch the lines cross back. "At once" is the burst: it defaults to
+   the limit's own number, and `↓`, `enter` on the field chooses "evenly spaced" (strict, one at a
+   time); a burst far above the limit passes that many requests before the limit
+   bites (`limit_per_second: 30` with `burst: 250` is about six seconds of GetObject at 70/s). `d`, `y`
+   deletes the rule. `demo/run.sh load 300` restarts the generator at another rate;
+   `demo/run.sh stop` ends the load and the proxy. The same changes by hand: `5`, `e` opens the
+   file in the editor.
 5. **Showback** (`3`, or `tb usage query --config $TOLLBOOTH_DEMO_CONFIG --group-by access_key,bucket`)
    shows your key and bucket with the requests and bytes of the run, by hour, in files under
    `demo/state/showback/`.

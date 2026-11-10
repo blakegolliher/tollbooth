@@ -1,0 +1,40 @@
+ 1 Overview  2 Limits  3 Usage  4 Backends  5 Config  6 Graphs  tui-node · v0.0.0-tui
+╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ New limit                                                                                                            │
+│   Limit what     ListObjectsV2                                                                                       │
+│   To at most     20  per second   at once: same as the limit                                                         │
+│   Counted        each source IP                                                                                      │
+│ ▸ Only for       access key akia                                                                                     │
+│                  bucket     any                                                                                      │
+│                  prefix     any                                                                                      │
+│                  source IP  any                                                                                      │
+│   Over the limit 503 SlowDown (what S3 itself answers)                                                               │
+│   Name           listobjectsv2-key-akia-per-source-ip                                                                │
+│   Note           why this limit exists (optional)                                                                    │
+│ ── seen by the proxy lately, busiest first: ↓ pick · enter accept ────────────────────────────────────────────────── │
+│   ▸ AKIAEXAMPLE1                         250 requests lately                                                         │
+│     AKIAREVOKED                          3 requests lately                                                           │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│ Means   At most 20 ListObjectsV2 calls per second from each source IP. Only for requests by access key akia. Over    │
+│         the limit, the client gets 503 SlowDown.                                                                     │
+│ Now     ⚠ no request from access key akia seen in the last two hours                                                 │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+
+
+
+
+
+
+
+
+
+
+
+tab next · arrows pick · enter accept · ctrl+r apply · ctrl+s save · esc cancel

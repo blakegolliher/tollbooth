@@ -1,7 +1,37 @@
 # ADR-0007: Rules an operator can read: S3 vocabulary, plain keys, a sentence read back, and a guided form
 
-Status: **proposed** (2026-11-10). Blake decides; Fable grades. This ADR challenges the rule schema
-in the specification's Rate limiting section and extends ADR-0006 (the TUI may write the config).
+Status: **accepted** (Blake, 2026-11-10: "yes I like this. let's implement it", with two directions:
+the unit goes in the key, `limit_per_hour: 20`, "to make quoting and parsing easier", and "the guided
+tui is a good idea. let's hone it on that as it might be heavily used for most admin interaction").
+Built on `p5/readable-rules`, all three steps of the phasing. This ADR challenged the rule schema in
+the specification's Rate limiting section and extends ADR-0006 (the TUI may write the config); the
+specification's schema block and Operator surface row are to be amended as in Consequences
+(Fable's edit).
+
+## As built: where the implementation differs from the text below
+
+The sections after this one are the proposal as it was accepted and are kept as written. What was
+built differs in these places (D-058 to D-061 give the reasons):
+
+| The proposal said | What was built |
+| --- | --- |
+| `limit: 20/s`, `limit: 20/min`, `limit: blocked` | `limit_per_second: 20`, `limit_per_minute: 20`, `limit_per_hour: 20`, `blocked: true`; exactly one per rule (Blake's direction) |
+| `burst` defaults to one second's worth | `burst` defaults to the limit's own number, so `limit_per_hour: 20` passes 20 at once and then refills one every 180 s (measured: the twenty-first request is told `Retry-After: 180`). Blake, 2026-11-10: keep the burst as the default, with strict as an option; strict is `burst: 1`, offered in the form as "evenly spaced" and read back as "evenly spaced (one every 3 minutes)" (measured: of five requests at once, one passes) |
+| `per` is required | required for a limit; optional on a blocked rule, where it only groups `rules top` |
+| The sentence: "Each source IP may make at most 20 ListObjectsV2 calls per second. Over that, the client gets 503 SlowDown." | "At most 20 ListObjectsV2 calls per second from each source IP. Over the limit, the client gets 503 SlowDown." One word order for every combination of filters and `per` |
+| The editor shows the sentence for the rule under the cursor | not built; the editor's verdict line is unchanged. The sentence is in `check-config`, `rules list`, `rules show`, `GET /admin/limits`, the Limits screen, and the form |
+| A rule that matches nothing for five minutes is flagged on the Limits screen and in `rules list` | flagged on the Limits screen after one minute; `rules list` and `rules show` print the matched count. The mark also appears on a rule for an idle tenant; Blake, 2026-11-10: keep the mark |
+| `l` limits the selected operation | not built; `n` opens the form with the operations in traffic listed first |
+| The form's fields: Limit what, To at most, Counted, Only for, When over, Name, Note | the same, plus the unit and "at once" (the burst) beside the number; "When over" is labelled "Over the limit" |
+| Pickers offer the values recorded in the current showback hour | the last two hours of `GET /admin/usage`, so the list is not empty just after the hour turns |
+| Live per-key rates are a later ADR | unchanged: the form's "Now" line gives the live rate of the operations the rule names, not of one key |
+| (not in the proposal) | `config show` and `config diff` list rules as `limits[<name>].<key>`; `rules test` and the TUI's test form print the operation and `503 SlowDown` instead of the class and the mode; the busiest-operations table marks a rule that covers only part of an operation's traffic |
+
+Measured on the dev box (2 vCPUs, noisy): the matched counter is one atomic add and one counter
+increment per rule a request is charged against; `BenchmarkDecide100Rules` moved by +3.5%, the
+all-match case by +1.3%, both at 0 allocations. The form was driven end to end against a running
+proxy under 100 req/s: add, change, and delete of a rule each wrote the file, left a backup,
+reloaded in under 1 ms, and after the three the file was byte-identical to the original.
 
 ## Context
 

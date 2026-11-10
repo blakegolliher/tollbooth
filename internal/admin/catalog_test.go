@@ -75,6 +75,7 @@ func touchAll(m *Metrics) {
 	m.Limiter.Decision.Observe(1e-6)
 	m.Limiter.Keys.Set(1)
 	m.Limiter.Overflow.Inc()
+	m.Limiter.Matched.WithLabelValues("rule-a").Inc()
 	m.Limiter.Denied.WithLabelValues("rule-a").Inc()
 	m.Limiter.Errors.Inc()
 	m.Showback.Tuples.Set(1)
@@ -113,8 +114,8 @@ func TestEveryMetricIsInTheCatalog(t *testing.T) {
 	// Phases 1 to 3 register exactly the eleven request-path, backend, and reload metrics, the five
 	// limiter metrics, and the five showback metrics. Nothing is registered ahead of the code that
 	// observes it (D-045).
-	if len(registered) != 21 {
-		t.Errorf("Phases 1 to 3 register exactly twenty-one tollbooth_ metrics, got %d: %v", len(registered), registered)
+	if len(registered) != 22 {
+		t.Errorf("Phases 1 to 5 register exactly twenty-two tollbooth_ metrics, got %d: %v", len(registered), registered)
 	}
 }
 

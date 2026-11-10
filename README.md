@@ -5,6 +5,24 @@ keyed by access key, bucket, prefix, and source address, and hourly showback (AP
 counts) for SLA reporting and chargeback. Every request and response passes through
 byte-for-byte; the proxy holds no credentials, re-signs nothing, and fails open.
 
+A limit is written in S3's own words, and the tool reads it back:
+
+```yaml
+limits:
+  - name: list-storm
+    operation: ListObjectsV2
+    limit_per_second: 20
+    per: source_ip
+```
+
+```
+$ tollbooth check-config tollbooth.yaml
+  list-storm: At most 20 ListObjectsV2 calls per second from each source IP. Over the limit, the client gets 503 SlowDown.
+```
+
+Or without opening the file: `tollbooth tui --config tollbooth.yaml`, screen `2`, `n` is a guided
+form that lists the operations and access keys in live traffic and writes the same four lines.
+
 Status: **Phase 5 (hardening, v0.1.0)**: every feature of the specification is built and gated;
 the reference-node performance run and the tag are what remain (`docs/STATUS.md`,
 `docs/adr/0005-performance-targets-at-v0.1.0.md`).
@@ -14,7 +32,7 @@ Quick start:
 ```
 make build                      # bin/tollbooth (Go 1.27.3; GOTOOLCHAIN=auto fetches it)
 make demo && source demo/env.sh # a local stack on :28000 with four rules; demo/DEMO.md is the walkthrough
-bin/tollbooth tui               # the operator screens against it
+bin/tollbooth tui --config $TOLLBOOTH_DEMO_CONFIG   # the operator console: 2 is Limits, n adds one
 make release                    # dist/: static linux amd64 and arm64 tarballs, unit file, SHA256SUMS
 ```
 

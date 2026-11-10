@@ -37,7 +37,7 @@ import (
 )
 
 // rigWithRules starts one null backend behind a proxy whose config carries the given YAML tail
-// (rate_limits, kill_switches, logging).
+// (limits, kill_switches, logging).
 func rigWithRules(t *testing.T, tail string) *rig {
 	t.Helper()
 	nb := nullbackend.New(4096)
@@ -54,11 +54,10 @@ func rigWithRules(t *testing.T, tail string) *rig {
 }
 
 const frozenRule = `
-rate_limits:
-  rules:
-    - id: rule-secret-name
-      match: {buckets: [frozen]}
-      limit: {rate: 0}
+limits:
+  - name: rule-secret-name
+    bucket: frozen
+    blocked: true
 `
 
 // metricValue reads one gathered series by family and label string (Gather sorts labels by name).
@@ -157,7 +156,7 @@ func TestThrottleSlowDown(t *testing.T) {
 }
 
 func TestThrottleTooManyRequests(t *testing.T) {
-	r := rigWithRules(t, strings.Replace(frozenRule, "limit: {rate: 0}", "limit: {rate: 0}\n      on_limit: too_many_requests", 1))
+	r := rigWithRules(t, strings.Replace(frozenRule, "blocked: true", "blocked: true\n    respond: 429", 1))
 	resp, err := fresh().Get(r.front.URL + "/frozen/k") //nolint:noctx // test
 	if err != nil {
 		t.Fatal(err)
@@ -173,7 +172,7 @@ func TestThrottleTooManyRequests(t *testing.T) {
 
 // Retry-After is the GCRA wait rounded up, so a client that honors it is admitted.
 func TestThrottleRetryAfterIsHonest(t *testing.T) {
-	r := rigWithRules(t, "rate_limits:\n  rules:\n    - id: slow\n      match: {buckets: [slow]}\n      limit: {rate: 0.5, burst: 1}\n")
+	r := rigWithRules(t, "limits:\n  - name: slow\n    bucket: slow\n    limit_per_second: 0.5\n    burst: 1\n    per: total\n")
 	c := fresh()
 	get := func() *http.Response {
 		resp, err := c.Get(r.front.URL + "/slow/k") //nolint:noctx // test
@@ -327,9 +326,9 @@ func TestThrottleLogSampled(t *testing.T) {
 // path, with 100 matching rules (docs/DESIGN.md §9: seven in total, zero in the limiter).
 func TestHandlerAllocationsWithRules(t *testing.T) {
 	var rules strings.Builder
-	rules.WriteString("rate_limits:\n  rules:\n")
+	rules.WriteString("limits:\n")
 	for i := 0; i < 100; i++ {
-		fmt.Fprintf(&rules, "    - id: r%d\n      match: {buckets: [b], ops: [READ], access_keys: [AKIAX]}\n      group_by: [access_key, bucket]\n      limit: {rate: 1000000000, burst: 1000000000}\n", i)
+		fmt.Fprintf(&rules, "  - name: r%d\n    operation: [GetObject, HeadObject]\n    bucket: b\n    access_key: AKIAX\n    limit_per_second: 1000000000\n    burst: 1000000000\n    per: [access_key, bucket]\n", i)
 	}
 	h, w, req := allocRig(t, rules.String())
 	h.ServeHTTP(w, req)
@@ -346,7 +345,7 @@ func TestHandlerAllocationsWithRules(t *testing.T) {
 // The denied path: identity, decision, and the pooled error body. Measured and pinned so the
 // throttle storm cost cannot grow unnoticed (docs/DESIGN.md §9, denied path).
 func TestThrottledAllocations(t *testing.T) {
-	h, w, req := allocRig(t, "rate_limits:\n  rules:\n    - id: r\n      match: {buckets: [b]}\n      limit: {rate: 0}\n")
+	h, w, req := allocRig(t, "limits:\n  - name: r\n    bucket: b\n    blocked: true\n")
 	h.ServeHTTP(w, req)
 	allocs := testing.AllocsPerRun(2000, func() {
 		clear(w.h)

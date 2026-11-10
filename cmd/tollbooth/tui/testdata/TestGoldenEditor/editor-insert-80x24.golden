@@ -1,22 +1,22 @@
  1 Overview  2 Limits  3 Usage  4 Backends  5 Config  6 Graphs  tui-node · v0.0.
 ╭──────────────────────────────────────────────────────────────────────────────╮
-│ tollbooth.yaml   NORMAL  ● modified  line 1 col 4 · 19 lines                 │
+│ tollbooth.yaml   NORMAL  ● modified  line 1 col 4 · 23 lines                 │
 │                                                                              │
 │  1 # xnode_id: tui-node                                                      │
 │  2 backend: {scheme: http, endpoints: [10.0.0.1:9000, 10.0.0.2:9000]}        │
 │  3 showback: {dir: /tmp/x}                                                   │
 │  4 admin: {token: tok}                                                       │
-│  5 rate_limits:                                                              │
-│  6   rules:                                                                  │
-│  7     - id: tenant-a-writes                                                 │
-│  8       match: {access_keys: [AKIAEXAMPLE1], buckets: [training-data],      │
-│    prefixes: [ckpt/], ops: [WRITE]}                                          │
-│  9       group_by: [access_key, bucket]                                      │
-│  10       limit: {rate: 2000, burst: 8000}                                   │
-│  11     - id: list-storm                                                     │
-│  12       match: {ops: [LIST]}                                               │
-│  13       group_by: [source_ip]                                              │
-│  14       limit: {rate: 50, burst: 200}                                      │
+│  5 limits:                                                                   │
+│  6   - name: tenant-a-writes                                                 │
+│  7     operation: [PutObject, UploadPart, CopyObject]                        │
+│  8     access_key: AKIAEXAMPLE1                                              │
+│  9     bucket: training-data                                                 │
+│  10     prefix: ckpt/                                                        │
+│  11     limit_per_second: 2000                                               │
+│  12     burst: 8000                                                          │
+│  13     per: [access_key, bucket]                                            │
+│  14   - name: list-storm                                                     │
+│  15     operation: [ListObjectsV2, ListObjects]                              │
 │                                                                              │
 │  INVALID  node_id: required; must be stable across restarts (a pod name is   │
 ╰──────────────────────────────────────────────────────────────────────────────╯

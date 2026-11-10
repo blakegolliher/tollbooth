@@ -1,30 +1,30 @@
  1 Overview  2 Limits  3 Usage  4 Backends  5 Config  6 Graphs  tui-node · v0.0.0-tui
 ╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-│ tollbooth.yaml   NORMAL   line 3 col 1 · 19 lines                                                                    │
+│ tollbooth.yaml   NORMAL   line 3 col 1 · 23 lines                                                                    │
 │                                                                                                                      │
 │  1 node_id: tui-node                                                                                                 │
 │  2 backend: {scheme: http, endpoints: [10.0.0.1:9000, 10.0.0.2:9000]}                                                │
 │  3 showback: {dir: /tmp/x}                                                                                           │
 │  4 admin: {token: tok}                                                                                               │
-│  5 rate_limits:                                                                                                      │
-│  6   rules:                                                                                                          │
-│  7     - id: tenant-a-writes                                                                                         │
-│  8       match: {access_keys: [AKIAEXAMPLE1], buckets: [training-data], prefixes: [ckpt/], ops: [WRITE]}             │
-│  9       group_by: [access_key, bucket]                                                                              │
-│  10       limit: {rate: 2000, burst: 8000}                                                                           │
-│  11     - id: list-storm                                                                                             │
-│  12       match: {ops: [LIST]}                                                                                       │
-│  13       group_by: [source_ip]                                                                                      │
-│  14       limit: {rate: 50, burst: 200}                                                                              │
-│  15       on_limit: too_many_requests                                                                                │
-│  16     - id: frozen                                                                                                 │
-│  17       match: {access_keys: [AKIAREVOKED]}                                                                        │
-│  18       limit: {rate: 0}                                                                                           │
-│  19                                                                                                                  │
-│                                                                                                                      │
-│                                                                                                                      │
-│                                                                                                                      │
-│                                                                                                                      │
+│  5 limits:                                                                                                           │
+│  6   - name: tenant-a-writes                                                                                         │
+│  7     operation: [PutObject, UploadPart, CopyObject]                                                                │
+│  8     access_key: AKIAEXAMPLE1                                                                                      │
+│  9     bucket: training-data                                                                                         │
+│  10     prefix: ckpt/                                                                                                │
+│  11     limit_per_second: 2000                                                                                       │
+│  12     burst: 8000                                                                                                  │
+│  13     per: [access_key, bucket]                                                                                    │
+│  14   - name: list-storm                                                                                             │
+│  15     operation: [ListObjectsV2, ListObjects]                                                                      │
+│  16     limit_per_second: 50                                                                                         │
+│  17     burst: 200                                                                                                   │
+│  18     per: source_ip                                                                                               │
+│  19     respond: 429                                                                                                 │
+│  20   - name: frozen                                                                                                 │
+│  21     access_key: AKIAREVOKED                                                                                      │
+│  22     blocked: true                                                                                                │
+│  23                                                                                                                  │
 │                                                                                                                      │
 │                                                                                                                      │
 │                                                                                                                      │

@@ -128,10 +128,36 @@ func keyedDecodeError(data []byte, err error) error {
 		msg := e.Message
 		if strings.HasPrefix(msg, "field ") && strings.Contains(msg, " not found in type ") {
 			msg = "unknown key"
+			if hint, ok := renamedKeys[lastSegment(key)]; ok && (key == "rate_limits" || strings.HasPrefix(key, "limits[")) {
+				msg += "; " + hint
+			}
 		}
 		out = append(out, &Error{Key: key, Msg: msg})
 	}
 	return errors.Join(out...)
+}
+
+// renamedKeys says what to write instead of a key from the rule schema tollbooth had before
+// ADR-0007, so a file in the old shape is told the new words rather than just "unknown key".
+var renamedKeys = map[string]string{
+	"rate_limits": "rules are written under `limits:` (docs/CONFIG.md)",
+	"id":          "a rule's name is written `name:`",
+	"match":       "write the filters at the rule's own level: operation, access_key, bucket, prefix, source_ip",
+	"ops":         "write `operation:` with S3 operation names",
+	"group_by":    "write `per:` (total, access_key, bucket, prefix, or source_ip)",
+	"limit":       "write limit_per_second, limit_per_minute, or limit_per_hour with a number, or blocked: true",
+	"on_limit":    "write `respond: 503` or `respond: 429`",
+}
+
+// lastSegment is the final key of a dotted path, without a list index.
+func lastSegment(path string) string {
+	if i := strings.LastIndexByte(path, '.'); i >= 0 {
+		path = path[i+1:]
+	}
+	if i := strings.IndexByte(path, '['); i >= 0 {
+		path = path[:i]
+	}
+	return path
 }
 
 // keyPath returns the dotted path of the deepest mapping key at or before (line, col).
