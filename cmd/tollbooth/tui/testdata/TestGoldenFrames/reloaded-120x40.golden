@@ -1,4 +1,4 @@
- 1 Overview  2 Limits  3 Usage  4 Backends  5 Config  tui-node · v0.0.0-tui
+ 1 Overview  2 Limits  3 Usage  4 Backends  5 Config  6 Graphs  tui-node · v0.0.0-tui
   state          ready
   uptime         X
   in flight      4
@@ -37,4 +37,4 @@
 
 
 
-reload REJECTED: rate_limits.rules[0].limit.rate: must be >= 0
+reload REJECTED: limits[0].limit_per_second: must be a number above 0, got -1

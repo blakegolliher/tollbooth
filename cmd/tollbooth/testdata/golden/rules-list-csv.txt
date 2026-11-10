@@ -1,4 +1,4 @@
-ID,MATCH,GROUP_BY,RATE,BURST,MODE,KEYS,DENIED
-tenant-a-writes,key(2) bucket=training-data prefix=ckpt/ ops=WRITE,"access_key,bucket",2000 (1000/node),4000 (2000/node),slowdown,0,0
-list-storm,ops=LIST,source_ip,50 (25/node),200 (100/node),too_many_requests,0,0
-frozen,key=AKIAREVOKED,,0 (block),-,slowdown,0,3
+NAME,LIMIT,PER,OPERATION,ONLY_FOR,RESPOND,KEYS,MATCHED,DENIED
+tenant-a-writes,"2,000 per second (1000/s on this node)","access_key,bucket","PutObject,UploadPart,CopyObject",access_key(2) bucket=training-data prefix=ckpt/,503,0,0,0
+list-storm,50 per second (25/s on this node),source_ip,List*,any,429,0,0,0
+frozen,blocked,-,any,access_key=AKIAREVOKED,503,0,3,3

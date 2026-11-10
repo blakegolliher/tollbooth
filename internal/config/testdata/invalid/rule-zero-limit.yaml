@@ -1,0 +1,7 @@
+node_id: a
+backend: {scheme: http, endpoints: [h:1]}
+showback: {dir: /d}
+limits:
+  - name: x
+    limit_per_second: 0
+    per: total

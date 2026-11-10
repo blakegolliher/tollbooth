@@ -151,6 +151,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	h := w.Header()
 	h.Set("x-amz-request-id", "NULLBACKEND000001")
 	h.Set("x-amz-id-2", "null/backend")
+	h.Set("Last-Modified", "Sun, 09 Nov 2026 00:00:00 GMT") // aws cli's `s3 cp` download requires it on HEAD
 	if st := int(s.Fail.Load()); st != 0 {
 		h.Set("Content-Type", "application/xml")
 		w.WriteHeader(st)

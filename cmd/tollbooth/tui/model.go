@@ -12,10 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package tui is `tollbooth tui`: five read-only screens over the admin API, polled every
-// interval, keyboard only, 80×24 minimum, honoring NO_COLOR and TERM=dumb, showing the last state
-// under a staleness banner when the admin API is unreachable (docs/SPEC.md, Operator surface;
-// ADR-0003). It is the only package that imports charmbracelet (depguard).
+// Package tui is `tollbooth tui`: six screens over the admin API, polled every interval, keyboard
+// only, 80×24 minimum, honoring NO_COLOR and TERM=dumb, showing the last state under a staleness
+// banner when the admin API is unreachable (docs/SPEC.md, Operator surface; ADR-0003). Five are
+// read-only; the Config screen's editor (ADR-0006) writes the config file only on an explicit save.
+// It is the only package that imports charmbracelet (depguard).
 package tui
 
 import (
@@ -37,7 +38,7 @@ import (
 	"github.com/blakegolliher/tollbooth/internal/showback"
 )
 
-// Screen is one of the five.
+// Screen is one of the six.
 type Screen int
 
 // The screens, in key order.
@@ -47,9 +48,10 @@ const (
 	ScreenUsage
 	ScreenBackends
 	ScreenConfig
+	ScreenGraphs
 )
 
-var screenNames = map[Screen]string{ScreenOverview: "Overview", ScreenLimits: "Limits", ScreenUsage: "Usage", ScreenBackends: "Backends", ScreenConfig: "Config"}
+var screenNames = map[Screen]string{ScreenOverview: "Overview", ScreenLimits: "Limits", ScreenUsage: "Usage", ScreenBackends: "Backends", ScreenConfig: "Config", ScreenGraphs: "Graphs"}
 
 // Options configure a Model.
 type Options struct {
@@ -60,6 +62,10 @@ type Options struct {
 	Now func() time.Time
 	// Hours of usage the Usage screen shows by default.
 	UsageHours int
+	// History is how many polls the Graphs screen keeps (default 300: ten minutes at 2 s).
+	History int
+	// Editor is the external editor for `E` on the Config screen; empty means $EDITOR, then vi.
+	Editor string
 }
 
 // usageGroupBys are the group-by choices `g` cycles through.
@@ -75,7 +81,11 @@ type snapshot struct {
 	view     configView
 	usage    *showback.Result
 	usageErr string
-	at       time.Time
+	metrics  map[string]float64 // the few process gauges the Graphs screen plots
+	// requests_total by operation, summed over its other labels, and the throttled part of it: what
+	// the Limits screen's "busiest operations" and the form's operation picker turn into rates.
+	opRequests, opThrottled map[string]float64
+	at                      time.Time
 }
 
 type configView struct {
@@ -111,10 +121,15 @@ type (
 	clearNotice struct{}
 )
 
-// sample is one poll's rates, for the sparklines.
+// sample is one poll's numbers, for the Overview sparklines and the Graphs screen.
 type sample struct {
 	at                  time.Time
 	requests, throttled float64
+	inflight            float64
+	ttfb                map[string]float64 // endpoint → last TTFB ms
+	denied              map[string]int64   // rule → denied since start (cumulative)
+	heapMiB, rssMiB     float64
+	goroutines          float64
 }
 
 // Model is the Bubble Tea model.
@@ -128,9 +143,19 @@ type Model struct {
 	snap    *snapshot // last successful poll; nil before the first
 	stale   bool      // the last poll failed; snap is old
 	lastErr string
-	history []sample // last five minutes of polls
+	history []sample // the last Options.History polls
+	paused  bool     // Graphs: history frozen
 
 	notice string // one-line message at the bottom
+
+	// Config editor (ADR-0006)
+	ed editorState
+
+	// Limits: rates from the last two polls, the guided form, and the delete prompt (ADR-0007).
+	opRate, opThrottle map[string]float64    // requests and throttled requests per second, by operation
+	ruleRate           map[string][2]float64 // matched and denied per second, by rule
+	form               formState
+	confirmDelete      string // the rule a delete is waiting on y/n for
 
 	// Limits
 	filter     textinput.Model
@@ -171,6 +196,9 @@ func New(opts Options) Model {
 	}
 	if opts.UsageHours <= 0 {
 		opts.UsageHours = 24
+	}
+	if opts.History <= 0 {
+		opts.History = 300
 	}
 	m := Model{opts: opts, screen: ScreenOverview, width: 80, height: 24}
 	m.filter = newInput("filter rules by id, bucket, key…", 40)
@@ -240,6 +268,10 @@ func (m Model) poll() tea.Cmd {
 			return pollMsg{err: err}
 		}
 		s.config, s.view = cv.Config, cv.configView
+		if raw, err := c.Do(ctx, http.MethodGet, "/metrics", nil, nil); err == nil {
+			s.metrics = parseGauges(raw, "go_memstats_heap_alloc_bytes", "go_goroutines", "process_resident_memory_bytes")
+			s.opRequests, s.opThrottled = parseOpCounters(raw)
+		}
 		q := url.Values{"group_by": {groupBy}}
 		if from != "" {
 			q.Set("from", from)
@@ -259,9 +291,18 @@ func (m Model) poll() tea.Cmd {
 
 // Update handles messages.
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	if m2, cmd, ok := m.updateEditor(msg); ok {
+		return m2, cmd
+	}
+	if m2, cmd, ok := m.updateForm(msg); ok {
+		return m2, cmd
+	}
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width, m.height = msg.Width, msg.Height
+		if m.ed.open {
+			m.sizeEditor()
+		}
 		return m, nil
 	case tickMsg:
 		return m, tea.Batch(m.poll(), m.tick())
@@ -271,11 +312,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		m.stale, m.lastErr = false, ""
+		m.observe(m.snap, msg.snap)
 		m.snap = msg.snap
-		m.history = append(m.history, sample{at: msg.snap.at, requests: msg.snap.status.Rates.Requests1s, throttled: msg.snap.status.Rates.Throttled1s})
-		cutoff := msg.snap.at.Add(-5 * time.Minute)
-		for len(m.history) > 0 && m.history[0].at.Before(cutoff) {
-			m.history = m.history[1:]
+		if !m.paused {
+			m.history = append(m.history, sampleOf(msg.snap))
+			for len(m.history) > m.opts.History {
+				m.history = m.history[1:]
+			}
 		}
 		if m.selected >= len(m.visibleRules()) {
 			m.selected = max(0, len(m.visibleRules())-1)
@@ -332,6 +375,15 @@ func clearAfter(d time.Duration) tea.Cmd {
 // key handles a key press: text inputs first when one is active, then the global keys, then the
 // screen's own.
 func (m Model) key(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if m.ed.open {
+		return m.keyEditor(msg)
+	}
+	if m.form.open {
+		return m.keyForm(msg)
+	}
+	if m.confirmDelete != "" {
+		return m.keyConfirmDelete(msg)
+	}
 	if m.testing {
 		return m.keyTestForm(msg)
 	}
@@ -400,14 +452,32 @@ func (m Model) key(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "?":
 		m.help = !m.help
 		return m, nil
-	case "1", "2", "3", "4", "5":
+	case "1", "2", "3", "4", "5", "6":
 		m.screen = Screen(msg.String()[0] - '0')
 		m.help = false
 		m.detail = false
 		return m, nil
+	case "tab", "right":
+		m.screen = m.screen%ScreenGraphs + 1 // 1 → 2 … 6 → 1
+		m.help, m.detail = false, false
+		return m, nil
+	case "shift+tab", "left":
+		m.screen = (m.screen+ScreenGraphs-2)%ScreenGraphs + 1 // 1 → 6, 2 → 1 …
+		m.help, m.detail = false, false
+		return m, nil
 	case "r":
-		if m.screen == ScreenOverview || m.screen == ScreenConfig {
+		switch m.screen {
+		case ScreenOverview, ScreenConfig:
 			return m, m.reload()
+		case ScreenGraphs:
+			m.history = nil
+			return m, nil
+		default:
+		}
+	case " ":
+		if m.screen == ScreenGraphs {
+			m.paused = !m.paused
+			return m, nil
 		}
 	case "esc":
 		m.detail = false
@@ -421,12 +491,54 @@ func (m Model) key(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case ScreenUsage:
 		return m.keyUsage(msg)
 	case ScreenConfig:
-		if msg.String() == "v" {
+		switch msg.String() {
+		case "v":
 			return m, m.validate()
+		case "e":
+			return m.openEditor()
 		}
 	default:
 	}
 	return m, nil
+}
+
+// sampleOf reduces a poll to the numbers the graphs keep.
+func sampleOf(s *snapshot) sample {
+	out := sample{at: s.at, requests: s.status.Rates.Requests1s, throttled: s.status.Rates.Throttled1s, inflight: float64(s.status.Inflight),
+		ttfb: make(map[string]float64, len(s.status.Backends)), denied: make(map[string]int64, len(s.limits.Rules))}
+	for i := range s.status.Backends {
+		out.ttfb[s.status.Backends[i].Endpoint] = s.status.Backends[i].TTFBLastMS
+	}
+	for i := range s.limits.Rules {
+		out.denied[s.limits.Rules[i].Name] = s.limits.Rules[i].Denied
+	}
+	out.heapMiB = s.metrics["go_memstats_heap_alloc_bytes"] / (1 << 20)
+	out.rssMiB = s.metrics["process_resident_memory_bytes"] / (1 << 20)
+	out.goroutines = s.metrics["go_goroutines"]
+	return out
+}
+
+// parseGauges picks named series out of a Prometheus text exposition; absent names are absent.
+func parseGauges(raw []byte, names ...string) map[string]float64 {
+	want := make(map[string]bool, len(names))
+	for _, n := range names {
+		want[n] = true
+	}
+	out := map[string]float64{}
+	for _, line := range strings.Split(string(raw), "\n") {
+		if line == "" || line[0] == '#' {
+			continue
+		}
+		name, val, ok := strings.Cut(line, " ")
+		if !ok || !want[name] {
+			continue
+		}
+		var f float64
+		if _, err := fmt.Sscanf(val, "%g", &f); err == nil {
+			out[name] = f
+		}
+	}
+	return out
 }
 
 func (m Model) keyLimits(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
@@ -443,8 +555,21 @@ func (m Model) keyLimits(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.testFields[i].Blur()
 		}
 		return m, m.testFields[0].Focus()
+	case "n":
+		return m.openForm("")
 	case "enter":
-		m.detail = !m.detail
+		if m.selected < len(rules) {
+			return m.openForm(rules[m.selected].Name)
+		}
+		return m.openForm("")
+	case "d":
+		if m.selected < len(rules) {
+			if m.opts.ConfigPath == "" {
+				m.notice = "no --config given; nothing to delete from"
+				return m, clearAfter(8 * time.Second)
+			}
+			m.confirmDelete = rules[m.selected].Name
+		}
 		return m, nil
 	case "up", "k":
 		if m.selected > 0 {
@@ -456,6 +581,92 @@ func (m Model) keyLimits(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 	}
 	return m, nil
+}
+
+// observe turns two consecutive polls into per-second rates: requests and throttles by operation,
+// matched and denied by rule. The first poll, and two polls at the same instant, leave them unset.
+func (m *Model) observe(prev, cur *snapshot) {
+	if prev == nil || cur == nil {
+		return
+	}
+	dt := cur.at.Sub(prev.at).Seconds()
+	if dt <= 0 {
+		return
+	}
+	m.opRate, m.opThrottle = map[string]float64{}, map[string]float64{}
+	for op, v := range cur.opRequests {
+		if d := v - prev.opRequests[op]; d > 0 {
+			m.opRate[op] = d / dt
+		}
+	}
+	for op, v := range cur.opThrottled {
+		if d := v - prev.opThrottled[op]; d > 0 {
+			m.opThrottle[op] = d / dt
+		}
+	}
+	was := make(map[string][2]int64, len(prev.limits.Rules))
+	for i := range prev.limits.Rules {
+		r := &prev.limits.Rules[i]
+		was[r.Name] = [2]int64{r.Matched, r.Denied}
+	}
+	m.ruleRate = map[string][2]float64{}
+	for i := range cur.limits.Rules {
+		r := &cur.limits.Rules[i]
+		if p, ok := was[r.Name]; ok {
+			m.ruleRate[r.Name] = [2]float64{max(0, float64(r.Matched-p[0])/dt), max(0, float64(r.Denied-p[1])/dt)}
+		}
+	}
+}
+
+// parseOpCounters sums tollbooth_requests_total by its operation label, and the part of it whose
+// result is "throttled", from a Prometheus text exposition.
+func parseOpCounters(raw []byte) (requests, throttled map[string]float64) {
+	requests, throttled = map[string]float64{}, map[string]float64{}
+	const name = "tollbooth_requests_total{"
+	for _, line := range strings.Split(string(raw), "\n") {
+		if !strings.HasPrefix(line, name) {
+			continue
+		}
+		end := strings.LastIndexByte(line, '}')
+		if end < 0 {
+			continue
+		}
+		var v float64
+		if _, err := fmt.Sscanf(strings.TrimSpace(line[end+1:]), "%g", &v); err != nil || v == 0 {
+			continue
+		}
+		labels := line[len(name):end]
+		op := labelValue(labels, "operation")
+		if op == "" {
+			continue
+		}
+		requests[op] += v
+		if labelValue(labels, "result") == "throttled" {
+			throttled[op] += v
+		}
+	}
+	return requests, throttled
+}
+
+// labelValue reads one label out of a `k="v",k2="v2"` list (tollbooth's label values carry no quotes).
+func labelValue(labels, key string) string {
+	needle := key + `="`
+	for off := 0; off < len(labels); {
+		i := strings.Index(labels[off:], needle)
+		if i < 0 {
+			return ""
+		}
+		i += off
+		if i == 0 || labels[i-1] == ',' {
+			rest := labels[i+len(needle):]
+			if j := strings.IndexByte(rest, '"'); j >= 0 {
+				return rest[:j]
+			}
+			return ""
+		}
+		off = i + 1
+	}
+	return ""
 }
 
 func (m Model) keyTestForm(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
@@ -523,7 +734,7 @@ func (m Model) visibleRules() []limiterRule {
 	var out []limiterRule
 	for i := range m.snap.limits.Rules {
 		r := &m.snap.limits.Rules[i]
-		if f != "" && !strings.Contains(strings.ToLower(r.ID+" "+strings.Join(r.Buckets, " ")+" "+strings.Join(r.AccessKeys, " ")+" "+strings.Join(r.Prefixes, " ")), f) {
+		if f != "" && !strings.Contains(strings.ToLower(r.Name+" "+r.Sentence+" "+r.Note), f) {
 			continue
 		}
 		out = append(out, limiterRule{r})
@@ -651,7 +862,7 @@ func (m Model) validate() tea.Cmd {
 			return noticeMsg(fmt.Sprintf("%s: INVALID: %s", path, firstLine(err.Error())))
 		}
 		w := c.Warnings(0)
-		return noticeMsg(fmt.Sprintf("%s: ok (%d rules, %d warnings)", path, len(c.RateLimits.Rules), len(w)))
+		return noticeMsg(fmt.Sprintf("%s: ok (%d rules, %d warnings)", path, len(c.Limits), len(w)))
 	}
 }
 

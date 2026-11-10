@@ -1,4 +1,4 @@
- 1 Overview  2 Limits  3 Usage  4 Backends  5 Config 
+ 1 Overview  2 Limits  3 Usage  4 Backends  5 Config  6 Graphs 
  STALE: admin API unreachable (admin API at http://127.0.0.1:9: Get "http://127.
 
   No data yet: the admin API has not answered.
@@ -21,4 +21,4 @@
 
 
 
-r reload · 1-5 screens · ? help · q quit
+r reload · tab or 1-6 screens · ? help · q quit

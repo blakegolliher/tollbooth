@@ -45,9 +45,10 @@ go build -o bin/loadgen ./bench/loadgen
 } > "$OUT/env.txt"
 cat "$OUT/env.txt"
 
-# Config: RULES rules on the READ class list that never match the load (distinct buckets), one
-# wide READ rule keyed by access key, bucket, and prefix with a rate the load cannot reach, and
-# one throttle rule on bucket load-throttle for the throttle scenario.
+# Config: RULES rules that name the load's operations but never match it (distinct buckets), so
+# every request walks them; one wide GetObject and HeadObject rule counted per access key and
+# bucket with a limit the load cannot reach; and one throttle rule on bucket load-throttle for the
+# throttle scenario.
 CFG=$OUT/tollbooth.yaml
 {
   cat <<YAML
@@ -59,26 +60,28 @@ backend:
   endpoints: [$NULL_ADDR]
 showback: {dir: $OUT/showback}
 logging: {level: warn}
-rate_limits:
-  rules:
+limits:
 YAML
   for i in $(seq 1 "$RULES"); do
     cat <<YAML
-    - id: rule-$(printf '%03d' "$i")
-      match: {ops: [READ, WRITE], buckets: [other-$i], prefixes: [ckpt/, logs/]}
-      group_by: [access_key, bucket, prefix]
-      limit: {rate: 1000, burst: 2000}
+  - name: rule-$(printf '%03d' "$i")
+    operation: [GetObject, HeadObject, PutObject, UploadPart]
+    bucket: other-$i
+    prefix: [ckpt/, logs/]
+    limit_per_second: 1000
+    burst: 2000
+    per: [access_key, bucket, prefix]
 YAML
   done
   cat <<YAML
-    - id: wide-read
-      match: {ops: [READ]}
-      group_by: [access_key, bucket]
-      limit: {rate: 1000000000, burst: 1000000000}
-    - id: throttle
-      match: {buckets: [load-throttle-0]}
-      group_by: [access_key]
-      limit: {rate: 500, burst: 500}
+  - name: wide-read
+    operation: [GetObject, HeadObject]
+    limit_per_second: 1000000000
+    per: [access_key, bucket]
+  - name: throttle
+    bucket: load-throttle-0
+    limit_per_second: 500
+    per: access_key
 YAML
 } > "$CFG"
 bin/tollbooth check-config "$CFG"

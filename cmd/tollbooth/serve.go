@@ -134,7 +134,7 @@ func serve(ctx context.Context, path string, cfg *config.Config, log *slog.Logge
 	log.Info("tollbooth starting", "version", version, "commit", commit, "config", path, "node_id", cfg.NodeID,
 		"listen", ln.Addr().String(), "scheme", scheme, "proxy_protocol", cfg.Listen.ProxyProtocol,
 		"admin", admLn.Addr().String(), "backend_scheme", cfg.Backend.Scheme, "backends", cfg.Backend.Endpoints,
-		"rules", len(cfg.RateLimits.Rules), "base_domains", cfg.BaseDomains)
+		"rules", len(cfg.Limits), "base_domains", cfg.BaseDomains)
 
 	errc := make(chan error, 2)
 	go func() { errc <- data.Serve(ln) }()
@@ -210,7 +210,7 @@ func (r *reloader) reload() admin.ReloadResult {
 	r.published.Store(next)
 	r.generation++
 	r.loadedAt = start
-	res.OK, res.Generation, res.Rules = true, r.generation, len(next.RateLimits.Rules)
+	res.OK, res.Generation, res.Rules = true, r.generation, len(next.Limits)
 	res.DurationMS = float64(time.Since(start)) / 1e6
 	r.last = &res
 	r.metrics.ConfigReload.WithLabelValues("ok").Inc()

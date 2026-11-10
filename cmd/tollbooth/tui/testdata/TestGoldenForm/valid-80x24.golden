@@ -1,0 +1,24 @@
+ 1 Overview  2 Limits  3 Usage  4 Backends  5 Config  6 Graphs  tui-node · v0.0.
+╭──────────────────────────────────────────────────────────────────────────────╮
+│ New limit                                                                    │
+│   Limit what     ListObjectsV2                                               │
+│   To at most     20  per second   at once: same as the limit                 │
+│ ▸ Counted         ‹ each source IP ›                                         │
+│   Only for       access key any                                              │
+│                  bucket     any                                              │
+│                  prefix     any                                              │
+│                  source IP  any                                              │
+│   Over the limit 503 SlowDown (what S3 itself answers)                       │
+│   Name           listobjectsv2-per-source-ip                                 │
+│   Note           why this limit exists (optional)                            │
+│ ── who gets a budget of their own: ←/→ to choose ─────────────────────────── │
+│   ( ) everyone together               all matching requests share one budget │
+│   (•) each source IP                  a budget of its own for every client   │
+│   ( ) each access key                 a budget of its own for every key      │
+│   ( ) each bucket                     a budget of its own for every bucket   │
+│   ( ) each access key on each bucket  a budget of its own for every pair     │
+│ Means   At most 20 ListObjectsV2 calls per second from each source IP. Over  │
+│         the limit, the client gets 503 SlowDown.                             │
+│ Now     ListObjectsV2: 312/s right now                                       │
+╰──────────────────────────────────────────────────────────────────────────────╯
+tab next · arrows pick · enter accept · ctrl+r apply · ctrl+s save · esc cancel

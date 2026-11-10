@@ -154,6 +154,19 @@ type target struct {
 	endpoint string
 	ak, sk   string
 	region   string
+	// clock is the signing time for the raw requests; runMatrix fixes it per case so the direct
+	// and the proxied send sign with the same second. Streaming-signed bodies embed the timestamp
+	// in every chunk signature, so two sends that straddled a second differed byte for byte
+	// (CI run 42693610351, one case in 293). Nil means time.Now.
+	clock func() time.Time
+}
+
+// now is the signing time for a raw request.
+func (t *target) now() time.Time {
+	if t.clock != nil {
+		return t.clock()
+	}
+	return time.Now().UTC()
 }
 
 // newTarget builds the clients. When addr is set, every *.domain / domain host dials addr.
@@ -385,6 +398,9 @@ func runMatrix(direct, via *target, o matrixOptions) (results []result, failed, 
 	ctx, bkt, prefix := o.ctx, o.bucket, o.prefix
 	run := func(name, op string, body bool, f func(*target) error) {
 		r := result{name: o.style + "/" + name, op: op}
+		caseNow := time.Now().UTC()
+		direct.clock = func() time.Time { return caseNow }
+		via.clock = direct.clock
 		ed := f(direct)
 		r.direct = direct.rec.take()
 		ev := f(via)

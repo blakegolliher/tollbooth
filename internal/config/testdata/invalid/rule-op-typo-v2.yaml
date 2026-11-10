@@ -1,0 +1,8 @@
+node_id: a
+backend: {scheme: http, endpoints: [h:1]}
+showback: {dir: /d}
+limits:
+  - name: x
+    operation: ListObjectV2
+    limit_per_second: 20
+    per: source_ip

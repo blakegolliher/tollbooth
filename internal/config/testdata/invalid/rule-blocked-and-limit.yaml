@@ -1,6 +1,7 @@
 node_id: a
 backend: {scheme: http, endpoints: [h:1]}
 showback: {dir: /d}
-rate_limits:
-  rules:
-    - {id: x, limit: {rate: 1}, on_limit: shape}
+limits:
+  - name: x
+    blocked: true
+    limit_per_second: 1

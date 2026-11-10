@@ -27,14 +27,16 @@ import (
 	"time"
 
 	"github.com/blakegolliher/tollbooth/internal/admin"
+	"github.com/blakegolliher/tollbooth/internal/config"
 	"github.com/blakegolliher/tollbooth/internal/limiter"
 )
 
 const rulesUsage = `usage: tollbooth rules <verb> [flags]
 
 verbs:
-  list                         rules in force with live key counts and denials (GET /admin/limits)
-  show <id>                    one rule in full
+  list                         rules in force, each read back as a sentence, with live key counts,
+                               the requests each has matched, and the ones it denied (GET /admin/limits)
+  show <name>                  one rule in full
   test --op OP [--access-key K] [--bucket B] [--key P] [--prefix Q] [--ip A]
                                dry run: which rules match, the key each resolves to, the decision now;
                                no token is consumed (POST /admin/limits/test)
@@ -106,10 +108,10 @@ func rulesList(args []string, stdout, stderr *os.File) error {
 	if err != nil {
 		return err
 	}
-	g := &grid{header: []string{"ID", "MATCH", "GROUP_BY", "RATE", "BURST", "MODE", "KEYS", "DENIED"}}
+	g := &grid{header: []string{"NAME", "LIMIT", "PER", "OPERATION", "ONLY_FOR", "RESPOND", "KEYS", "MATCHED", "DENIED"}}
 	for i := range lim.Rules {
 		r := &lim.Rules[i]
-		g.add(r.ID, matchSummary(r), strings.Join(r.GroupBy, ","), rateString(r.Rate, r.EffectiveRate), burstString(r.Burst, r.EffectiveBurst), r.OnLimit, strconv.FormatInt(r.LiveKeys, 10), strconv.FormatInt(r.Denied, 10))
+		g.add(r.Name, limitString(r), perString(r), listOrAny(r.Operation), onlyFor(r), strconv.Itoa(r.Respond), strconv.FormatInt(r.LiveKeys, 10), strconv.FormatInt(r.Matched, 10), strconv.FormatInt(r.Denied, 10))
 	}
 	if af.format != "table" {
 		return render(stdout, af.format, g, raw)
@@ -117,13 +119,24 @@ func rulesList(args []string, stdout, stderr *os.File) error {
 	if rErr := render(stdout, af.format, g, raw); rErr != nil {
 		return rErr
 	}
+	// The read-back (ADR-0007): what each rule means, in a sentence.
+	if len(lim.Rules) > 0 {
+		_, _ = fmt.Fprintln(stdout)
+	}
+	width := 0
+	for i := range lim.Rules {
+		width = max(width, len(lim.Rules[i].Name))
+	}
+	for i := range lim.Rules {
+		_, _ = fmt.Fprintf(stdout, "%-*s  %s\n", width, lim.Rules[i].Name, lim.Rules[i].Sentence)
+	}
 	_, err = fmt.Fprintf(stdout, "\n%d rules, %d live keys\n", len(lim.Rules), lim.LiveKeys)
 	return err
 }
 
-// matchSummary is the one-cell description of a rule's match block: each present condition with
-// its count or, for a single value, the value.
-func matchSummary(r *limiter.RuleStatus) string {
+// onlyFor is the one-cell description of a rule's filters: each present one with its value or,
+// for several, their count; "any" when the rule has none.
+func onlyFor(r *limiter.RuleStatus) string {
 	var parts []string
 	add := func(name string, vs []string) {
 		switch len(vs) {
@@ -134,11 +147,10 @@ func matchSummary(r *limiter.RuleStatus) string {
 			parts = append(parts, fmt.Sprintf("%s(%d)", name, len(vs)))
 		}
 	}
-	add("key", r.AccessKeys)
-	add("bucket", r.Buckets)
-	add("prefix", r.Prefixes)
-	add("cidr", r.SourceCIDRs)
-	add("ops", r.Ops)
+	add("access_key", r.AccessKey)
+	add("bucket", r.Bucket)
+	add("prefix", r.Prefix)
+	add("source_ip", r.SourceIP)
 	if len(parts) == 0 {
 		return "any"
 	}
@@ -152,27 +164,34 @@ func quoteEmpty(s string) string {
 	return s
 }
 
-// rateString shows the configured rate and, when node_count divides it, the per-node rate.
-func rateString(rate, eff float64) string {
-	s := strconv.FormatFloat(rate, 'f', -1, 64)
-	if rate == 0 {
-		return "0 (block)"
+// limitString shows the limit as written and, when node_count divides it, what this node enforces.
+func limitString(r *limiter.RuleStatus) string {
+	if r.Blocked {
+		return "blocked"
 	}
-	if eff != rate {
-		s += " (" + strconv.FormatFloat(eff, 'f', -1, 64) + "/node)"
+	s := r.Limit
+	if r.EffectiveRate != r.RatePerSecond {
+		s += " (" + strconv.FormatFloat(r.EffectiveRate, 'f', -1, 64) + "/s on this node)"
 	}
 	return s
 }
 
-func burstString(burst, eff int) string {
-	if burst == 0 {
+func burstString(r *limiter.RuleStatus) string {
+	if r.Blocked {
 		return "-"
 	}
-	s := strconv.Itoa(burst)
-	if eff != burst {
-		s += " (" + strconv.Itoa(eff) + "/node)"
+	s := strconv.Itoa(r.Burst)
+	if r.EffectiveBurst != r.Burst {
+		s += " (" + strconv.Itoa(r.EffectiveBurst) + " on this node)"
 	}
 	return s
+}
+
+func perString(r *limiter.RuleStatus) string {
+	if len(r.Per) == 0 {
+		return "-"
+	}
+	return strings.Join(r.Per, ",")
 }
 
 // parseMixed parses flags that may appear before or after positional arguments (the flag package
@@ -199,7 +218,7 @@ func rulesShow(args []string, stdout, stderr *os.File) error {
 		return err
 	}
 	if len(pos) != 1 {
-		return fmt.Errorf("usage: tollbooth rules show <id>")
+		return fmt.Errorf("usage: tollbooth rules show <name>")
 	}
 	id := pos[0]
 	c, err := af.client()
@@ -214,22 +233,27 @@ func rulesShow(args []string, stdout, stderr *os.File) error {
 	}
 	for i := range lim.Rules {
 		r := &lim.Rules[i]
-		if r.ID != id {
+		if r.Name != id {
 			continue
 		}
 		raw, _ := json.Marshal(r) //nolint:gosec // access key ids are identifiers, not secrets (G117 matches the field name)
 		g := &grid{header: []string{"FIELD", "VALUE"}}
-		g.add("id", r.ID)
-		g.add("access_keys", listOrAny(r.AccessKeys))
-		g.add("buckets", listOrAny(r.Buckets))
-		g.add("prefixes", listOrAny(r.Prefixes))
-		g.add("source_cidrs", listOrAny(r.SourceCIDRs))
-		g.add("ops", listOrAny(r.Ops))
-		g.add("group_by", listOrAny(r.GroupBy))
-		g.add("rate", rateString(r.Rate, r.EffectiveRate))
-		g.add("burst", burstString(r.Burst, r.EffectiveBurst))
-		g.add("on_limit", r.OnLimit)
+		g.add("name", r.Name)
+		g.add("means", r.Sentence)
+		g.add("operation", listOrAny(r.Operation))
+		g.add("access_key", listOrAny(r.AccessKey))
+		g.add("bucket", listOrAny(r.Bucket))
+		g.add("prefix", listOrAny(r.Prefix))
+		g.add("source_ip", listOrAny(r.SourceIP))
+		g.add("limit", limitString(r))
+		g.add("per", perString(r))
+		g.add("burst", burstString(r))
+		g.add("respond", strconv.Itoa(r.Respond))
+		if r.Note != "" {
+			g.add("note", r.Note)
+		}
 		g.add("live_keys", strconv.FormatInt(r.LiveKeys, 10))
+		g.add("matched", strconv.FormatInt(r.Matched, 10))
 		g.add("denied", strconv.FormatInt(r.Denied, 10))
 		return render(stdout, af.format, g, raw)
 	}
@@ -273,29 +297,40 @@ func rulesTest(args []string, stdout, stderr *os.File) error {
 	if err != nil {
 		return err
 	}
-	g := &grid{header: []string{"RULE", "KEY", "LIVE_KEYS", "VERDICT", "RETRY_AFTER", "MODE"}}
+	g := &grid{header: []string{"RULE", "KEY", "LIVE_KEYS", "VERDICT", "RETRY_AFTER", "RESPOND"}}
 	for _, m := range res.Result.Matches {
 		verdict, ra := "allow", "-"
 		if !m.Allowed {
 			verdict, ra = "deny", strconv.Itoa(m.RetryAfter)+"s"
 		}
-		g.add(m.Rule, keyDims(m.AccessKey, m.Bucket, m.Prefix, m.SourceIP), strconv.FormatInt(m.LiveKeys, 10), verdict, ra, m.Mode)
+		g.add(m.Rule, keyDims(m.AccessKey, m.Bucket, m.Prefix, m.SourceIP), strconv.FormatInt(m.LiveKeys, 10), verdict, ra, strconv.Itoa(config.ModeStatus(m.Mode)))
 	}
 	if af.format != "table" {
 		return render(stdout, af.format, g, raw)
 	}
 	decision := "allowed"
 	if !res.Result.Allowed {
-		decision = fmt.Sprintf("denied by %s (%s, Retry-After %ds)", res.Result.DeniedBy, res.Result.Mode, res.Result.RetryAfter)
+		decision = fmt.Sprintf("denied by %s (%s, Retry-After %ds)", res.Result.DeniedBy, config.ModeText(res.Result.Mode), res.Result.RetryAfter)
 	}
-	_, _ = fmt.Fprintf(stdout, "%s %s (%s level): %s; %d rules match\n", res.Operation, res.Class, res.Level, decision, len(res.Result.Matches))
+	_, _ = fmt.Fprintf(stdout, "%s (%s level): %s; %s\n", res.Operation, res.Level, decision, rulesMatch(len(res.Result.Matches)))
 	if len(res.Result.Matches) == 0 {
 		return nil
 	}
 	return render(stdout, af.format, g, raw)
 }
 
-// keyDims renders the group_by dimensions a rule resolved; "(shared)" for an empty group_by.
+// rulesMatch says how many rules a dry run matched: "no rule matches", "1 rule matches", "3 rules match".
+func rulesMatch(n int) string {
+	switch n {
+	case 0:
+		return "no rule matches"
+	case 1:
+		return "1 rule matches"
+	}
+	return strconv.Itoa(n) + " rules match"
+}
+
+// keyDims renders the `per` dimensions a rule resolved; "(shared)" for per: total.
 func keyDims(ak, bucket, prefix, ip string) string {
 	var parts []string
 	if ak != "" {

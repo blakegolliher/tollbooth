@@ -1,0 +1,8 @@
+node_id: a
+backend: {scheme: http, endpoints: [h:1]}
+showback: {dir: /d}
+limits:
+  - name: x
+    operation: [[GetObject]]
+    limit_per_second: 1
+    per: total

@@ -1,16 +1,21 @@
 {
-  "id": "list-storm",
-  "ops": [
-    "LIST"
+  "name": "list-storm",
+  "sentence": "At most 50 List* calls (11 operations) per second from each source IP, up to 200 at once. Over the limit, the client gets 429 TooManyRequests.",
+  "summary": "List*: 50 per second from each source IP",
+  "operation": [
+    "List*"
   ],
-  "group_by": [
+  "limit": "50 per second",
+  "blocked": false,
+  "rate_per_second": 50,
+  "burst": 200,
+  "per": [
     "source_ip"
   ],
-  "rate": 50,
-  "burst": 200,
-  "effective_rate": 25,
+  "effective_rate_per_second": 25,
   "effective_burst": 100,
-  "on_limit": "too_many_requests",
+  "respond": 429,
   "live_keys": 0,
+  "matched": 0,
   "denied": 0
 }

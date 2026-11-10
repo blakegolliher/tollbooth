@@ -1,6 +1,0 @@
-node_id: a
-backend: {scheme: http, endpoints: [h:1]}
-showback: {dir: /d}
-rate_limits:
-  rules:
-    - {id: x, match: {source_cidrs: [10.0.0.0/33]}, limit: {rate: 1}}

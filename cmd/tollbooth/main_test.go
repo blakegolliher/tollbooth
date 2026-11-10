@@ -173,12 +173,21 @@ func TestServeLifecycle(t *testing.T) {
 	if n := nb.Served(); n < 1 {
 		t.Fatalf("backend served %d", n)
 	}
-	// Metrics are open; /admin/* needs the token.
-	resp, _ = http.Get("http://" + adminAddr + "/metrics") //nolint:noctx // test
-	m, _ := io.ReadAll(resp.Body)
-	resp.Body.Close() //nolint:errcheck // test
-	if !strings.Contains(string(m), `tollbooth_requests_total{op_class="READ",operation="GetObject",result="forwarded",status_class="2xx"} 1`) {
-		t.Fatalf("metrics missing the request:\n%s", firstLines(string(m), "tollbooth_requests_total{op_class=\"READ\",operation=\"GetObject\""))
+	// Metrics are open; /admin/* needs the token. A request is counted when it completes, which
+	// is after its last byte has reached the client (D-047), so the counter is awaited, not read
+	// once: under a loaded machine the scrape can arrive first (seen once in a full parallel run).
+	var m []byte
+	const counted = `tollbooth_requests_total{op_class="READ",operation="GetObject",result="forwarded",status_class="2xx"} 1`
+	for deadline := time.Now().Add(5 * time.Second); ; time.Sleep(10 * time.Millisecond) {
+		resp, _ = http.Get("http://" + adminAddr + "/metrics") //nolint:noctx // test
+		m, _ = io.ReadAll(resp.Body)
+		resp.Body.Close() //nolint:errcheck // test
+		if strings.Contains(string(m), counted) {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("metrics missing the request after 5 s:\n%s", firstLines(string(m), "tollbooth_requests_total{op_class=\"READ\",operation=\"GetObject\""))
+		}
 	}
 	resp, _ = http.Get("http://" + adminAddr + "/admin/limits") //nolint:noctx // test
 	resp.Body.Close()                                           //nolint:errcheck // test

@@ -292,14 +292,23 @@ type Rule struct {
     ops        [2]uint64          // bitset over Op (≤ 128 operations); all ones = any
     groupBy    uint8              // bits: access_key, bucket, prefix, source_ip
     T, tau     int64              // emission interval and tolerance in nanoseconds, after node_count
-    blockAll   bool               // rate == 0
+    blockAll   bool               // blocked: true
     mode       Mode               // slowdown | too_many_requests
-    stats      *ruleStats         // live keys, denials since start, deny ring; owned by the id, survives reloads
+    stats      *ruleStats         // live keys, matched and denied since start, deny ring; owned by the name, survives reloads
+    matched    prometheus.Counter // pre-resolved limiter_matched_total{rule}; one Inc per rule a request is charged against
     denied     prometheus.Counter // pre-resolved limiter_denied_total{rule}
 }
 ```
 
-Bounds (D-037): a non-zero `rate` lies in [1e-6, 1e9], `burst / rate ≤ 1e9` s, and
+The file's vocabulary ends at `compile` (ADR-0007). A rule in the file is written in S3 operation
+names with `limit_per_second`, `limit_per_minute`, `limit_per_hour`, or `blocked: true`, and `per`;
+`config.Rule` turns those into what this section works in: `Operations()` (the operations each
+name or `Family*` resolves to, set as bits in `ops`), `Rate()` in requests per second, `BurstSize()`,
+`GroupBy()` (the `per` dimensions; `per: total` is none), and `RespondStatus()`. `ID` is the rule's
+`name`. Operation classes remain the index (`byClass`) and the `op_class` metric label; they are
+not a word an operator writes or reads.
+
+Bounds (D-037): a limit, in requests per second, lies in [1e-6, 1e9], `burst / rate ≤ 1e9` s, and
 `cluster.node_count ≤ 1024`, so `T ≤ ~1e15` ns and `tau ≤ 1e18` ns and no GCRA sum can overflow
 `int64` in a 30-year process lifetime. Validation enforces them; `compile` re-checks and a reload
 never publishes a half-built set.
@@ -315,11 +324,11 @@ operations and `identity.ListPrefix` for the four bucket-level list operations (
 
 ```go
 type key struct {
-    rule   string      // rule.id; a reload that keeps the id keeps the state
-    ak     string      // "" unless access_key in group_by
-    bucket string      // "" unless bucket in group_by
-    prefix string      // the matched configured prefix, "" unless prefix in group_by
-    ip     netip.Addr  // zero unless source_ip in group_by
+    rule   string      // the rule's name; a reload that keeps the name keeps the state
+    ak     string      // "" unless access_key in per
+    bucket string      // "" unless bucket in per
+    prefix string      // the matched configured prefix, "" unless prefix in per
+    ip     netip.Addr  // zero unless source_ip in per
 }
 ```
 
@@ -355,9 +364,10 @@ else:                 deny;  wait = (tat - tau) - now; Retry-After = max(1, ceil
 ```
 
 Exactly `burst_eff` requests pass from a full bucket and the next is denied; with `burst × T` it
-would be `burst + 1`, and `TestExactlyBurst` checks this. `rate == 0` is a separate branch:
+would be `burst + 1`, and `TestExactlyBurst` checks this. A blocked rule is a separate branch:
 always deny, `Retry-After: 1`, no state, no infinite `T`. Fractional rates work because `T` is an
-integer number of nanoseconds (`rate: 0.5` → `T = 2e9`).
+integer number of nanoseconds (`limit_per_second: 0.5` → `T = 2e9`; `limit_per_hour: 20` →
+`T = 180e9`).
 
 Evaluation is one pass over the matching rules in config order, consuming from each. The first
 denial ends the pass, decides the mode from that rule, and the tokens already taken from earlier
@@ -379,9 +389,10 @@ held for the walk of that shard only; with 1,000,000 keys that is ~4,000 keys pe
 0.65 ms, 256 times per sweep.
 
 Reload swaps the config pointer, then `Limiter.Apply` compiles and stores the new `RuleSet`; the
-store is untouched. A changed `rate` or `burst` applies from the next decision because a TAT is a
-timestamp. Per-rule counters and the deny ring belong to the rule id (`ruleStats`) and move to the
-new compiled rule; the stats and the `limiter_denied_total{rule}` child of a removed id are deleted.
+store is untouched. A changed limit or `burst` applies from the next decision because a TAT is a
+timestamp. Per-rule counters and the deny ring belong to the rule's name (`ruleStats`) and move to
+the new compiled rule; the stats and the `limiter_matched_total{rule}` and
+`limiter_denied_total{rule}` children of a removed name are deleted.
 Requests in flight finish with the `RuleSet` they loaded at entry. `TestReloadKeepsState` and the
 Phase 2 reload-under-load test (≤ 100 ms, zero failed requests) pin this.
 
@@ -389,7 +400,7 @@ Phase 2 reload-under-load test (≤ 100 ms, zero failed requests) pin this.
 
 Per rule, a fixed ring of 1,024 `{key, at int64}` entries written under a per-rule mutex on each
 denial; the array is allocated on the rule's first denial. `GET /admin/limits/top?n=20&window=60s`
-reads the rings, counts entries within the window by key, and returns the top n with the rule id
+reads the rings, counts entries within the window by key, and returns the top n with the rule name
 and the key's dimensions. The ring holds cloned strings only; a slot that already holds the same
 key is reused without cloning, so a storm on few keys allocates nothing after the first lap
 (`TestDecideAllocatesZero`). Allowed requests never touch it.
@@ -531,10 +542,14 @@ summary from the parts the process already holds and a one-second sampler of two
 (D-050); `/admin/backends` renders per-endpoint atomics kept on the pool; `doctor` is a fixed
 list of checks (D-051); the TUI polls everything in one command per interval and shows the last
 state under a STALE banner when a poll fails (D-053). Design points that matter here: one admin client; every
-verb supports `--format table|json|csv` where `json` is the admin response unwrapped; neither the
-CLI nor the TUI writes the config file; the TUI is read-only, polls, and shows the last state under
-a staleness banner when the admin API is unreachable; Bubble Tea imports are fenced to
-`cmd/tollbooth/tui` (ADR-0003).
+verb supports `--format table|json|csv` where `json` is the admin response unwrapped; the CLI never
+writes the config file and the TUI writes it only on an explicit save from its editor (ADR-0006:
+validated with `config.Parse`, atomic temp-and-rename, a timestamped backup beside the file, refused
+when the file changed on disk since it was loaded); the TUI polls and shows the last state under a
+staleness banner when the admin API is unreachable; its Graphs screen draws braille line charts
+(about 150 lines of its own, no charting dependency) over the last `--history` polls of the rates,
+in-flight, backend TTFB, denials per rule, and the process gauges it reads from `/metrics`; Bubble
+Tea imports are fenced to `cmd/tollbooth/tui` (ADR-0003).
 
 ## 9. Hot-path walkthrough with allocation budget
 
@@ -681,7 +696,7 @@ Coverage floor 85% of statements; every `Op` exercised; `-race` everywhere.
 | Parquet export | 6, by ADR | NDJSON is enough for DuckDB and billing systems; a store seam is introduced then |
 | OpenTelemetry tracing | 6 | metrics and showback cover v1 needs |
 | Per-source connection caps | 6 | `ReadHeaderTimeout` and the in-flight cap bound slowloris in v1 |
-| Rule editing from CLI/TUI | 6 | nothing in tollbooth writes the config file |
+| Rule editing from CLI/TUI | TUI editor delivered in Phase 5 (ADR-0006, pulled forward by Blake); the CLI stays read-only | the file remains the source of truth; the TUI's save is explicit, validated, atomic, backed up |
 | Backend drain | 6 | passive marking and retry-before-bytes suffice for v1 |
 | Web UI | 6, only if the TUI proves insufficient | |
 | Go versus Rust | ADR-0005 (Gate 5): stay on Go; the dev-box profile is kernel-bound (44% socket syscalls, under 2% in the proxy's own code); reopened only by a reference-node profile that says otherwise | |
