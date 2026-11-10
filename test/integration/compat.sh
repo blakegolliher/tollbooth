@@ -8,6 +8,17 @@
 #   compat.sh                 run everything, full logs under run/compat/
 #   BACKENDS="garage"         restrict to one backend
 #   STAGES="s3diff"           restrict to one stage (s3diff, clients, throttle)
+#
+# Against a cluster that already exists (test plan category 6: "and against a VAST cluster in the
+# lab, manual, results committed"):
+#
+#   BACKENDS=vast VAST_ENDPOINT=host:port AWS_ACCESS_KEY_ID=… AWS_SECRET_ACCESS_KEY=… compat.sh
+#
+# runs the s3diff and client stages through tollbooth in front of that endpoint and writes
+# docs/COMPAT-vast.md (docs/COMPAT.md stays CI's). It CREATES AND DELETES BUCKETS on the cluster:
+# s3diff-vast, and compat-<tool>-vast-direct / -via for each client tool, so the credential must
+# be allowed to, and the names must be free. Plaintext HTTP only (VAST_REGION, default us-east-1).
+# The throttle stage is not run there: it measures the tools, and Garage is enough for that.
 set -euo pipefail
 
 HERE=$(cd "$(dirname "$0")" && pwd)
@@ -22,16 +33,30 @@ export GOTOOLCHAIN=${GOTOOLCHAIN:-auto}
 
 # A client tool that cannot be fetched becomes FAIL cells, not an aborted run: stage 1 still runs.
 case " $STAGES " in *" clients "*|*" throttle "*) "$HERE/clients.sh" fetch || echo "compat: some client tools are missing; their cells will fail" >&2 ;; esac
-"$HERE/backends.sh" up
-trap '"$HERE/backends.sh" down; pkill -f "tollbooth serve --config $RUN/" 2>/dev/null || true' EXIT
-# shellcheck disable=SC1091
-eval "$("$HERE/backends.sh" env)"
+# The pinned local backends are started only when one of them is asked for; an existing cluster
+# (vast) is used as it is.
+local_backends=0
+for b in $BACKENDS; do case $b in garage|versitygw) local_backends=1 ;; esac; done
+if [ "$local_backends" = 1 ]; then
+  "$HERE/backends.sh" up
+  trap '"$HERE/backends.sh" down; pkill -f "tollbooth serve --config $RUN/" 2>/dev/null || true' EXIT
+  # shellcheck disable=SC1091
+  eval "$("$HERE/backends.sh" env)"
+else
+  trap 'pkill -f "tollbooth serve --config $RUN/" 2>/dev/null || true' EXIT
+fi
 
 rc=0
 for b in $BACKENDS; do
   case $b in
     garage)    ep=127.0.0.1:3900; region=garage;    ak=$GARAGE_ACCESS_KEY; sk=$GARAGE_SECRET ;;
     versitygw) ep=127.0.0.1:7070; region=us-east-1; ak=$VGW_ACCESS_KEY;    sk=$VGW_SECRET ;;
+    vast)
+      ep=${VAST_ENDPOINT:?set VAST_ENDPOINT=host:port, the S3 endpoint of the cluster, plaintext HTTP}
+      region=${VAST_REGION:-us-east-1}
+      ak=${AWS_ACCESS_KEY_ID:?set AWS_ACCESS_KEY_ID to a key that may create and delete buckets on the cluster}
+      sk=${AWS_SECRET_ACCESS_KEY:?set AWS_SECRET_ACCESS_KEY}
+      echo "compat: vast: this run creates and deletes the buckets s3diff-vast and compat-<tool>-vast-{direct,via} on $ep" ;;
     *) echo "compat: unknown backend $b" >&2; exit 2 ;;
   esac
   listen=127.0.0.1:18${RANDOM:0:3}
@@ -74,7 +99,7 @@ YAML
     [ "$fails" -eq 0 ] || rc=1 ;;
   esac
   case " $STAGES " in *" throttle "*)
-    if [ "$b" = "$THROTTLE_BACKEND" ]; then
+    if [ "$b" = "$THROTTLE_BACKEND" ] && [ "$b" != vast ]; then
       if "$HERE/throttle.sh" run "$b" "http://$ep" "http://$listen" "$admin" "$region" "$ak" "$sk" "$cfg" "$RUN/results-throttle-$b.tsv" > "$RUN/throttle-$b.log" 2>&1; then :; else
         echo "compat: $b: throttle stage exited non-zero; see $RUN/throttle-$b.log" >&2; rc=1
       fi
@@ -85,8 +110,11 @@ YAML
   wait "$pid" 2>/dev/null || true
 done
 
-# docs/COMPAT.md: tool × operation, one column per backend, from every results file.
-python3 - "$RUN" "$ROOT/docs/COMPAT.md" $BACKENDS <<'PY'
+# docs/COMPAT.md: tool × operation, one column per backend, from every results file. A run against
+# an existing cluster alone writes docs/COMPAT-vast.md and leaves CI's file as it is.
+compat_out=$ROOT/docs/COMPAT.md
+[ "$local_backends" = 1 ] || compat_out=$ROOT/docs/COMPAT-vast.md
+python3 - "$RUN" "$compat_out" $BACKENDS <<'PY'
 import glob, os, sys
 run, out, backends = sys.argv[1], sys.argv[2], sys.argv[3:]
 cells = {}  # (tool, op) -> {backend: (status, detail)}
@@ -109,7 +137,8 @@ lines = ["# Client compatibility matrix", "",
          "(test plan category 6). PASS: the operation succeeded through the proxy. FAIL: it succeeded direct and failed through "
          "the proxy, a transparency defect, with the last error line. GAP: it failed both ways identically, a backend limitation "
          "the proxy relayed faithfully, with the backend's words. Backends run as pinned static binaries "
-         "(test/integration/backends.sh); tools are pinned in clients.sh.", "",
+         "(test/integration/backends.sh); tools are pinned in clients.sh. A `vast` column is a run by hand against an "
+         "existing VAST cluster (`BACKENDS=vast`, see compat.sh).", "",
          "| Tool | Operation | " + " | ".join(backends) + " |",
          "| --- | --- | " + " | ".join("---" for _ in backends) + " |"]
 total = fails = gaps = 0
@@ -130,8 +159,9 @@ open(out, "w").write("\n".join(lines))
 print(f"compat: wrote {out} ({total} cells, {fails} failures)")
 PY
 
-# docs/THROTTLE.md: one row per tool and retry mode from the throttle stage.
-if compgen -G "$RUN/results-throttle-*.tsv" > /dev/null; then
+# docs/THROTTLE.md: one row per tool and retry mode from the throttle stage (never from a run
+# against an existing cluster alone, which has no throttle stage).
+if [ "$local_backends" = 1 ] && compgen -G "$RUN/results-throttle-*.tsv" > /dev/null; then
 python3 - "$RUN" "$ROOT/docs/THROTTLE.md" $BACKENDS <<'PY'
 import glob, os, sys
 run, out = sys.argv[1], sys.argv[2]
