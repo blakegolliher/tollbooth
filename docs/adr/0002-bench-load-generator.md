@@ -1,6 +1,6 @@
 # ADR-0002: Load generator for the bench harness
 
-Status: **accepted** (Gate 0 review, 2026-11-08): option (c). Open decision 2 in docs/SPEC.md. See the note on warp's availability under Consequences.
+Status: **accepted** (Gate 0 review, 2026-11-08): option (c). Open decision 2 in docs/SPEC.md. See the note on warp's availability under Consequences. **The cross-check half is superseded by ADR-0005 (accepted 2026-11-10): elbencho replaces warp.**
 
 ## Context
 

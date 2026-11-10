@@ -1,6 +1,10 @@
 # ADR-0005: Performance targets at v0.1.0, the Go-versus-Rust call, and the bench cross-check
 
-Status: **proposed** (Phase 5, 2026-11-09). Blake decides; Fable grades at Gate 5.
+Status: **accepted** (Blake, 2026-11-10, answering Gate 5 questions 1 to 3): (1) option (b), tag
+v0.1.0 with the four end-to-end rows published as unverified on the reference node and that run
+made the gate for v0.1.1; (2) stay on Go, reopened only by a reference-node profile that puts the
+runtime rather than the kernel at the top; (3) elbencho replaces warp as the external cross-check.
+Proposed in Phase 5 on 2026-11-09.
 
 ## Context
 
