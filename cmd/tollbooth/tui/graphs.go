@@ -17,11 +17,11 @@ package tui
 import (
 	"fmt"
 	"sort"
-	"strings"
 )
 
 // The Graphs screen (ADR-0006): braille line charts over the kept history, newest at the right.
-// Charts in priority order; as many as the terminal height holds are drawn.
+// Charts in priority order; as many as the terminal height holds are drawn. A chart whose legend
+// wraps is taller, so the count is decided by the lines each one actually takes.
 
 // graphsLines renders the screen for the current size.
 func (m Model) graphsLines() []string {
@@ -33,15 +33,6 @@ func (m Model) graphsLines() []string {
 	if room >= 30 {
 		rows = 5
 	}
-	per := rows + 1
-	n := room / per
-	if n < 1 {
-		n = 1
-	}
-	charts := m.chartSet()
-	if n > len(charts) {
-		n = len(charts)
-	}
 	var lines []string
 	span := ""
 	if len(m.history) > 1 {
@@ -52,9 +43,12 @@ func (m Model) graphsLines() []string {
 	if m.paused {
 		span += " · PAUSED"
 	}
-	for i := 0; i < n; i++ {
-		c := charts[i]
-		lines = append(lines, chart(c.title, c.series, m.width-1, rows, c.ymax)...)
+	for i, c := range m.chartSet() {
+		cl := chart(c.title, c.series, m.width-1, rows, c.ymax)
+		if i > 0 && len(lines)+len(cl)+1 > room { // +1: the history line under the charts
+			break
+		}
+		lines = append(lines, cl...)
 	}
 	lines = append(lines, styleDim.Render("  "+span))
 	return lines
@@ -91,7 +85,7 @@ func (m Model) chartSet() []chartSpec {
 		sort.Strings(eps)
 		ss := make([]series, 0, len(eps))
 		for _, ep := range eps {
-			ss = append(ss, series{name: shortEndpoint(ep), values: pick(func(s sample) float64 { return s.ttfb[ep] }), unit: " ms"})
+			ss = append(ss, series{name: ep, values: pick(func(s sample) float64 { return s.ttfb[ep] }), unit: " ms"}) // the full host:port, never shortened
 		}
 		if len(ss) > 0 {
 			specs = append(specs, chartSpec{title: "backend time to first byte", series: ss})
@@ -137,15 +131,4 @@ func (m Model) chartSet() []chartSpec {
 		chartSpec{title: "goroutines", series: []series{{name: "goroutines", values: pick(func(s sample) float64 { return s.goroutines })}}},
 	)
 	return specs
-}
-
-// shortEndpoint trims a host:port to fit a chart title.
-func shortEndpoint(ep string) string {
-	if len(ep) <= 21 {
-		return ep
-	}
-	if i := strings.LastIndexByte(ep, ':'); i > 0 {
-		return trunc(ep[:i], 15) + ep[i:]
-	}
-	return trunc(ep, 21)
 }

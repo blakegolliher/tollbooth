@@ -1,6 +1,6 @@
  1 Overview  2 Limits  3 Usage  4 Backends  5 Config  6 Graphs  tui-node · v0.0.
 Keys
-  1 … 6       Overview, Limits, Usage, Backends, Config, Graphs
+  1 … 6       Overview, Limits, Usage, Backends, Config, Graphs; tab / → next, s
   r           reload the config file on the proxy (Overview, Config); reset the 
   v           validate the file on disk with check-config (Config)
   e           edit the file on disk: i insert, esc normal, ctrl+s save, ctrl+r s

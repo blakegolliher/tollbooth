@@ -30,13 +30,28 @@ import (
 // limiterRule wraps a status row for the Limits table.
 type limiterRule struct{ *limiter.RuleStatus }
 
+// The palette (the same one as vast-bucket-policy-manager, so the two tools look related): blue
+// for titles and focus, green for good, orange for warnings and INSERT, red for errors, grey for
+// hints. lipgloss drops the colors under NO_COLOR and TERM=dumb; the goldens render without them.
 var (
-	styleTitle  = lipgloss.NewStyle().Bold(true)
-	styleTab    = lipgloss.NewStyle().Reverse(true).Bold(true)
-	styleHeader = lipgloss.NewStyle().Underline(true)
-	styleStale  = lipgloss.NewStyle().Reverse(true)
-	styleSel    = lipgloss.NewStyle().Reverse(true)
-	styleDim    = lipgloss.NewStyle().Faint(true)
+	colorBlue   = lipgloss.Color("39")
+	colorGreen  = lipgloss.Color("82")
+	colorOrange = lipgloss.Color("214")
+	colorRed    = lipgloss.Color("196")
+	colorGrey   = lipgloss.Color("240")
+
+	styleTitle  = lipgloss.NewStyle().Bold(true).Foreground(colorBlue)
+	styleTab    = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("0")).Background(colorBlue)
+	styleHeader = lipgloss.NewStyle().Bold(true).Underline(true).Foreground(colorBlue)
+	styleStale  = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("0")).Background(colorRed)
+	styleSel    = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("0")).Background(colorBlue)
+	styleDim    = lipgloss.NewStyle().Faint(true).Foreground(colorGrey)
+	styleOK     = lipgloss.NewStyle().Foreground(colorGreen)
+	styleWarn   = lipgloss.NewStyle().Foreground(colorOrange)
+	styleErr    = lipgloss.NewStyle().Foreground(colorRed)
+	badgeNormal = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("0")).Background(colorBlue).Padding(0, 1)
+	badgeInsert = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("0")).Background(colorOrange).Padding(0, 1)
+	badgeAlert  = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("0")).Background(colorRed).Padding(0, 1)
 )
 
 // View renders the current screen into exactly height lines of at most width cells.
@@ -92,7 +107,10 @@ func (m Model) tabs() string {
 
 func (m Model) footer() string {
 	if m.notice != "" {
-		return styleTitle.Render(m.notice)
+		if strings.Contains(m.notice, "REJECTED") || strings.Contains(m.notice, "INVALID") || strings.Contains(m.notice, "not saved") || strings.Contains(m.notice, "changed on disk") || strings.HasPrefix(m.notice, "save: ") || strings.HasPrefix(m.notice, "reload: ") {
+			return styleErr.Render(m.notice)
+		}
+		return styleOK.Render(m.notice)
 	}
 	if m.help {
 		return "? close help · q quit"
@@ -113,17 +131,17 @@ func (m Model) footer() string {
 	}
 	switch m.screen {
 	case ScreenOverview:
-		return "r reload · 1-5 screens · ? help · q quit"
+		return "r reload · tab or 1-6 screens · ? help · q quit"
 	case ScreenLimits:
 		return "↑↓ select · enter detail · t test request · / filter · ? help · q quit"
 	case ScreenUsage:
 		return "g group-by · s sort · f range · / filter · enter hourly bars · x export CSV · ? help"
 	case ScreenBackends:
-		return "read-only · 1-5 screens · ? help · q quit"
+		return "read-only · tab or 1-6 screens · ? help · q quit"
 	case ScreenConfig:
 		return "e edit the file · r reload · v validate the file on disk · ? help · q quit"
 	case ScreenGraphs:
-		return "space pause · r reset history · 1-6 screens · ? help · q quit"
+		return "space pause · r reset history · tab or 1-6 screens · ? help · q quit"
 	}
 	return ""
 }
@@ -159,7 +177,7 @@ func (m Model) body() []string {
 func (m Model) helpLines() []string {
 	return []string{
 		styleTitle.Render("Keys"),
-		"  1 … 6       Overview, Limits, Usage, Backends, Config, Graphs",
+		"  1 … 6       Overview, Limits, Usage, Backends, Config, Graphs; tab / → next, shift+tab / ← previous",
 		"  r           reload the config file on the proxy (Overview, Config); reset the history (Graphs)",
 		"  v           validate the file on disk with check-config (Config)",
 		"  e           edit the file on disk: i insert, esc normal, ctrl+s save, ctrl+r save and reload, E $EDITOR (Config)",
@@ -179,16 +197,16 @@ func (m Model) helpLines() []string {
 
 func (m Model) overviewLines() []string {
 	s := m.snap.status
-	state := "ready"
+	state := styleOK.Render("ready")
 	if !s.Ready {
-		state = "NOT READY"
+		state = styleErr.Render("NOT READY")
 	}
-	last := "none"
+	last := styleDim.Render("none")
 	if s.LastReload != nil {
 		if s.LastReload.OK {
-			last = fmt.Sprintf("ok at %s (%d rules)", s.LastReload.At.UTC().Format("15:04:05"), s.LastReload.Rules)
+			last = styleOK.Render(fmt.Sprintf("ok at %s (%d rules)", s.LastReload.At.UTC().Format("15:04:05"), s.LastReload.Rules))
 		} else {
-			last = "FAILED: " + s.LastReload.Error
+			last = styleErr.Render("FAILED: " + s.LastReload.Error)
 		}
 	}
 	w := m.width - 24
@@ -208,9 +226,9 @@ func (m Model) overviewLines() []string {
 	)
 	for i := range s.Backends {
 		b := &s.Backends[i]
-		st := "up"
+		st := styleOK.Render("up")
 		if !b.Up {
-			st = "DOWN"
+			st = styleErr.Render("DOWN")
 		}
 		lines = append(lines, fmt.Sprintf("  %-14s %s %s, %d in flight, ttfb %.1f ms", "", b.Endpoint, st, b.Inflight, b.TTFBMeanMS))
 	}
@@ -466,11 +484,11 @@ func (m Model) backendsLines() []string {
 	lines := []string{styleHeader.Render(hdr)}
 	for i := range m.snap.backends {
 		b := &m.snap.backends[i]
-		st := "up"
+		st := styleOK.Render("up   ")
 		if !b.Up {
-			st = "DOWN"
+			st = styleErr.Render("DOWN ")
 		}
-		lines = append(lines, fmt.Sprintf("  %-22s %-5s %9d %9d %7d %6d %6d %8d %6d %6d %8.1fms %8.1fms", trunc(b.Endpoint, 22), st, b.Inflight, b.Requests, b.Errors, b.ErrorsDial, b.ErrorsTLS, b.ErrorsTime, b.ErrorsRst, b.ErrorsOth, b.TTFBMeanMS, b.TTFBLastMS))
+		lines = append(lines, fmt.Sprintf("  %-22s %s %9d %9d %7d %6d %6d %8d %6d %6d %8.1fms %8.1fms", trunc(b.Endpoint, 22), st, b.Inflight, b.Requests, b.Errors, b.ErrorsDial, b.ErrorsTLS, b.ErrorsTime, b.ErrorsRst, b.ErrorsOth, b.TTFBMeanMS, b.TTFBLastMS))
 		if b.LastError != "" {
 			lines = append(lines, styleDim.Render(fmt.Sprintf("    last error %s: %s", b.LastErrAt, trunc(b.LastError, m.width-40))))
 		}

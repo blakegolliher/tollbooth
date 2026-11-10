@@ -38,7 +38,9 @@ Decisions behind entries are in `docs/DECISIONS.md` (D-nnn) and `docs/adr/`.
   over the last `--history` polls; a Config editor (`e` on screen `5`) with NORMAL and INSERT modes,
   validation on every keystroke, `$EDITOR` hand-off, and an explicit, atomic, backed-up save
   (`ctrl+s`, `ctrl+r` saves and reloads). The TUI's save is the only write tollbooth makes to the
-  config file; the CLI never writes it (Phase 5).
+  config file; the CLI never writes it. A shared color palette across the screens, a bordered
+  editor pane with a mode badge and an always-visible block cursor, and `tab`, `shift+tab`, and the
+  arrow keys to move between screens (Phase 5).
 
 ### Known limitations
 
