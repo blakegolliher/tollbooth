@@ -1,0 +1,18 @@
+node_id: soak
+listen: {address: 127.0.0.1:18000}
+admin: {address: 127.0.0.1:19900, pprof: true}
+backend:
+  scheme: http
+  endpoints: [127.0.0.1:19000]
+  health_check: {interval: 1s, timeout: 500ms}
+showback: {dir: bench/results/soak-2026-11-09T183931Z/showback, flush_interval: 60s}
+logging: {level: warn}
+rate_limits:
+  rules:
+    - id: wide-read
+      match: {ops: [READ]}
+      group_by: [access_key, bucket]
+      limit: {rate: 500018608, burst: 500018608}
+    - id: frozen
+      match: {buckets: [load-frozen-0]}
+      limit: {rate: 0}

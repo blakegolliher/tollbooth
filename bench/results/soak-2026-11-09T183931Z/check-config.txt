@@ -1,0 +1,1 @@
+bench/results/soak-2026-11-09T183931Z/tollbooth.yaml: ok (2 rules, 1 backend endpoints, 1 warnings)
