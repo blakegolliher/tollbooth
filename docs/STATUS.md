@@ -1,9 +1,9 @@
 # STATUS
 
-Current phase: **5 (Hardening and v0.1.0), at its gate** on `phase-5` (started 2026-11-09 on
+Current phase: **5 (Hardening and v0.1.0), closing its gate** on `phase-5` (started 2026-11-09 on
 Blake's go after Gate 4 passed; `phase-4` tagged and in `main`). PRs #24 and #26 to #35 are merged;
-`p5/soak` (PR #25) carries the 24 h soak's results and the final `docs/reports/gate-5.md`. Stopped
-at Gate 5: the tag and Phase 6 wait for Blake.
+the final `docs/reports/gate-5.md` is in. Blake answered its questions on 2026-11-10; three items
+remain before the v0.1.0 tag (below), then the tag, then Phase 6 on his word.
 
 ## Phases
 
@@ -59,9 +59,21 @@ of PR #24; the final build passes the six-minute soak smoke (246,314 requests, 1
 unexplained errors). G2 on the final build: all ten steps exit 0, race coverage 89.8%, fuzz 6 × 60
 s clean, s3diff 293 cases 0 diffs.
 
-Pending Blake: the eight questions of `docs/reports/gate-5.md` §6: ADR-0005 (what v0.1.0 claims;
-stay on Go; elbencho as cross-check), who tags, the dev-box soak and whether to rerun it on the
-final build, the specification amendments, and the resolver finding.
+Blake's answers (2026-11-10, `docs/reports/gate-5.md` §8): tag v0.1.0 with the four end-to-end
+rows marked unverified (ADR-0005 accepted: option (b), stay on Go, elbencho for warp); the builder
+tags on Blake's word after he merges `phase-5` into `main`; the dev-box soak is accepted without a
+rerun, with a second one on the reference node at v0.1.1; the specification is amended by Blake or
+Fable from `docs/reports/gate-5-spec-amendments.md`; and two things are to be done **before the
+tag**: the health check must not report a serving proxy as not ready when the resolver fails (an
+ADR and the fix), and the client matrix must be run against a VAST cluster.
+
+The nightly on the final build (42885875806) failed its benchmark comparison on 15 rows with no
+regression in the proxy: another CPU model, a comparison command that pooled same-named benchmarks
+of different packages, and a test backend that gained a response header (D-063). Corrected on
+`p5/gate5-closeout`, which also carries the resolver fix (ADR-0008): the backend pool remembers the
+addresses each endpoint's name last resolved to and connects and probes there when a lookup fails,
+so a resolver outage no longer marks a serving proxy not ready or fails new connections.
+
 Cut: nothing; the reference-node measurements are deferred, not cut (ADR-0005).
 
 Findings: the first soak smoke was voided by a stale null backend from an interrupted `bench/run.sh`
@@ -74,7 +86,9 @@ cases 0 diffs; bench raw 4 KiB GET direct 7,065 versus proxied 2,243 req/s at co
 (contention, ADR-0005); soak smoke 223,770 requests, 11 chaos steps, 0 unexplained errors, RSS 23
 to 34 MiB.
 
-Gate result: pending (final report written 2026-11-10; Blake decides).
+Gate result: **pass on three conditions** (Blake, 2026-11-10), all before the tag: the
+health-check fix with its ADR, the VAST client matrix, the benchmark-gate correction. Phase 6
+starts after them and the tag, on Blake's word, one ADR per item.
 
 ## Phase 4 record
 

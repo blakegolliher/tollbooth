@@ -432,6 +432,16 @@ func (m Model) backendsLines() []string {
 			st = styleErr.Render("DOWN ")
 		}
 		lines = append(lines, fmt.Sprintf("  %-22s %s %9d %9d %7d %6d %6d %8d %6d %6d %8.1fms %8.1fms", trunc(b.Endpoint, 22), st, b.Inflight, b.Requests, b.Errors, b.ErrorsDial, b.ErrorsTLS, b.ErrorsTime, b.ErrorsRst, b.ErrorsOth, b.TTFBMeanMS, b.TTFBLastMS))
+		if b.ResolverFailingSince != "" {
+			// ADR-0008: the name does not resolve; the endpoint is reached at what it last resolved to.
+			how := "no address is known for it"
+			if len(b.Addresses) > 0 {
+				how = "reached at its last known address " + strings.Join(b.Addresses, ", ")
+			}
+			lines = append(lines,
+				styleWarn.Render(fit(fmt.Sprintf("    ⚠ name not resolving since %s (%d failed lookups)", b.ResolverFailingSince, b.ErrorsResolve), m.width)),
+				styleWarn.Render(fit("      "+how, m.width)))
+		}
 		if b.LastError != "" {
 			lines = append(lines, styleDim.Render(fmt.Sprintf("    last error %s: %s", b.LastErrAt, trunc(b.LastError, m.width-40))))
 		}

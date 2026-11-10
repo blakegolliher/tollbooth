@@ -199,6 +199,16 @@ TLS handshake error and `inBody.count() == 0`, i.e. before any request byte went
 `backend_retries_total` counts retries. With every endpoint down the request gets
 `503 ServiceUnavailable` with the S3 body and `x-amz-request-id`, counted `proxy_error`.
 
+Connections to a named endpoint are opened by one function, `Pool.dialer`, used by the data path's
+transport and the probe's (ADR-0008). It looks the name up within half of the dial timeout,
+remembers the answer on the endpoint, and dials the addresses in order with the remaining time
+divided among them; when the lookup fails it dials the remembered answer instead, starting at a
+rotating position, counts `backend_errors_total{kind="resolve"}`, and leaves the endpoint's health
+to what the dial finds. Only a name that has never resolved fails the dial for want of an address,
+as a connect error of kind `resolve`. An endpoint written as an address goes straight to
+`net.Dialer`. The `Host` header, the TLS server name, and certificate verification use the
+configured name in every case; only the dial target is an address.
+
 TTFB is measured as `time.Since(t0)` around `RoundTrip` (headers received); the `httptrace`
 struct shunt allocates per request is not used.
 
@@ -657,6 +667,7 @@ mechanism here and the test (category 9) that asserts it.
 | Invalid reload | 7.1 | `TestInvalidReloadKeepsConfig` under load |
 | All backends unreachable | 4.5 | `TestAllBackendsDown` |
 | One backend down | 4.5 passive marking and retry-before-bytes | `TestOneBackendDown` |
+| The resolver does not answer (endpoints by name) | 4.5: one dial function for the data path and the probe looks the name up within half the dial timeout, remembers the answer, and dials the last answer when the lookup fails; a failed lookup alone never marks an endpoint down (ADR-0008) | `TestResolverOutageKeepsServing`, `TestStartDuringResolverOutage`, `TestRememberedAddressThatNoLongerAnswers`, `TestNewAnswerReplacesTheRememberedOne` |
 | Backend TTFB 30 s | `response_header_timeout` 300 s default; request waits | `TestSlowBackendHeaders` |
 | Backend resets mid-download | 4.6 abort | `TestBackendDiesMidGet*` |
 | Client disconnects mid-upload | context cancel propagates to the backend request; `bytes_in` as read | `TestClientAbortsUpload` |
@@ -680,7 +691,7 @@ Every category in docs/SPEC.md (Test plan) maps to a package and a phase:
 | 7 | Throttling behavior | `test/e2e` (aws-sdk-go-v2 in-process, every PR: body parsing, 1 req/s completion by retry mode, the 200-object sync at half concurrency in standard and adaptive modes, the Expect reconnect cost) and `test/integration/throttle.sh` (aws cli, boto3, s5cmd, rclone, s3cmd against Garage in the CI `integration` job, `docs/THROTTLE.md`) | 2 |
 | 8 | Showback correctness | `internal/showback` (injected clock: completion hour, rollover and seal, restart with no double count, kill between snapshots, recovered hour, overflow fold, clock step back, concurrent records across the seal, verify detects a removed hour, `FuzzRead`) + `TestShowbackReconciliation` and the on/off cost A/B in `test/e2e` | 3 |
 | 9 | Chaos and resilience | `test/e2e` + null backend fault injection | 1–5 |
-| 10 | Performance regression | `make bench-compare` against `test/bench/baseline.txt` (committed at Gate 2 from the fixed CI runner) in the nightly job; `make bench-e2e` (`bench/run.sh`, `bench/loadgen`) for the end-to-end rows | 2–5 |
+| 10 | Performance regression | `make bench-compare` against `test/bench/baseline.txt` in the nightly job (the baseline is a nightly's own output, re-recorded at Gate 5; benchmarks are matched by package and name; timings are enforced when the run's CPU model is the baseline's, allocation counts always, D-063); `make bench-e2e` (`bench/run.sh`, `bench/loadgen`) for the end-to-end rows | 2–5 |
 | 11 | Static analysis | CI (`.golangci.yml`, `govulncheck`, `gosec`, Semgrep, CodeQL, `go-licenses`) | 0 skeleton, 1 on |
 | 12 | Operator surface | `internal/admin` `TestOperatorSurfaceParity` (route table × `docs/OPERATOR_SURFACE.md`, plus a registration probe), `cmd/tollbooth` `TestGoldens` (every verb × table, json, csv) and `TestDoctorGolden`, `cmd/tollbooth/tui` golden frames at 80×24 and 120×40 for every screen and the unreachable state plus a `teatest` smoke run (D-052); the two runbook tasks in `docs/OPERATIONS.md` | 4 |
 

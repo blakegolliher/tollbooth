@@ -31,6 +31,7 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"net/netip"
 	"os"
 	"sync"
 	"sync/atomic"
@@ -44,20 +45,29 @@ import (
 type Endpoint struct {
 	Addr string // host:port
 	up   atomic.Bool
-	// lastErr is the most recent failure, for /admin/backends.
-	mu      sync.Mutex
-	lastErr string
-	lastAt  time.Time
+	// host and port are Addr split; host is "" when Addr is an IP literal, which is dialed as it
+	// is and never looked up.
+	host, port string
+
+	// lastErr is the most recent failure, for /admin/backends. addrs is what host last resolved
+	// to, kept for when the resolver does not answer (ADR-0008); failingSince is when it stopped.
+	mu           sync.Mutex
+	lastErr      string
+	lastAt       time.Time
+	addrs        []netip.Addr
+	failingSince time.Time
+	rotate       int
 
 	inflight  atomic.Int64
 	requests  atomic.Int64    // responses received
-	errors    [5]atomic.Int64 // by errorKind: dial, tls, timeout, reset, other
+	errors    [6]atomic.Int64 // by errorKind: dial, tls, timeout, reset, other, resolve
 	ttfbSumNS atomic.Int64
 	ttfbLast  atomic.Int64
 }
 
 // errorKinds indexes Endpoint.errors; the names are the backend_errors_total kind label.
-var errorKinds = [...]string{"dial", "tls", "timeout", "reset", "other"}
+// "other" stays at index 4: countError files an unknown kind there.
+var errorKinds = [...]string{"dial", "tls", "timeout", "reset", "other", "resolve"}
 
 func (e *Endpoint) countError(kind string) {
 	for i, k := range errorKinds {
@@ -80,7 +90,16 @@ func (e *Endpoint) observe(ttfb time.Duration) {
 func (e *Endpoint) status() admin.BackendStatus {
 	st := admin.BackendStatus{Endpoint: e.Addr, Up: e.up.Load(), Inflight: e.inflight.Load(), Requests: e.requests.Load()}
 	st.ErrorsDial, st.ErrorsTLS, st.ErrorsTime, st.ErrorsRst, st.ErrorsOth = e.errors[0].Load(), e.errors[1].Load(), e.errors[2].Load(), e.errors[3].Load(), e.errors[4].Load()
-	st.Errors = st.ErrorsDial + st.ErrorsTLS + st.ErrorsTime + st.ErrorsRst + st.ErrorsOth
+	st.ErrorsResolve = e.errors[5].Load()
+	st.Errors = st.ErrorsDial + st.ErrorsTLS + st.ErrorsTime + st.ErrorsRst + st.ErrorsOth + st.ErrorsResolve
+	e.mu.Lock()
+	for _, a := range e.addrs {
+		st.Addresses = append(st.Addresses, a.String())
+	}
+	if !e.failingSince.IsZero() {
+		st.ResolverFailingSince = e.failingSince.UTC().Format(time.RFC3339)
+	}
+	e.mu.Unlock()
 	if st.Requests > 0 {
 		st.TTFBMeanMS = float64(e.ttfbSumNS.Load()) / float64(st.Requests) / 1e6
 		st.TTFBLastMS = float64(e.ttfbLast.Load()) / 1e6
@@ -116,6 +135,10 @@ type Pool struct {
 	Transport http.RoundTripper
 	tr        *http.Transport
 
+	// lookup resolves a backend's name; tests replace it. byAddr finds the endpoint a dial is for.
+	lookup func(ctx context.Context, host string) ([]netip.Addr, error)
+	byAddr map[string]*Endpoint
+
 	metrics *admin.Metrics
 	log     *slog.Logger
 	check   config.HealthCheck
@@ -132,9 +155,13 @@ func NewPool(c *config.Backend, m *admin.Metrics, log *slog.Logger) (*Pool, erro
 	if len(c.Endpoints) == 0 {
 		return nil, errors.New("backend: no endpoints")
 	}
+	p := &Pool{Scheme: c.Scheme, metrics: m, log: log, check: c.HealthCheck, dial: c.DialTimeout, stop: make(chan struct{}), byAddr: make(map[string]*Endpoint, len(c.Endpoints))}
+	p.lookup = func(ctx context.Context, host string) ([]netip.Addr, error) {
+		return net.DefaultResolver.LookupNetIP(ctx, "ip", host)
+	}
 	tr := &http.Transport{
 		Proxy:                 nil, // never the environment's HTTP proxy
-		DialContext:           (&net.Dialer{Timeout: c.DialTimeout, KeepAlive: 30 * time.Second}).DialContext,
+		DialContext:           p.dialer(c.DialTimeout),
 		ForceAttemptHTTP2:     false, // HTTP/1.1 only, on both sides
 		TLSNextProto:          map[string]func(string, *tls.Conn) http.RoundTripper{},
 		MaxIdleConns:          c.MaxIdleConnsPerHost * len(c.Endpoints),
@@ -160,11 +187,17 @@ func NewPool(c *config.Backend, m *admin.Metrics, log *slog.Logger) (*Pool, erro
 		}
 		tr.TLSClientConfig = tc
 	}
-	p := &Pool{Scheme: c.Scheme, Transport: tr, tr: tr, metrics: m, log: log, check: c.HealthCheck, dial: c.DialTimeout, tlsConf: tc, stop: make(chan struct{})}
+	p.Transport, p.tr, p.tlsConf = tr, tr, tc
 	for _, a := range c.Endpoints {
 		e := &Endpoint{Addr: a}
+		if host, port, err := net.SplitHostPort(a); err == nil {
+			if _, perr := netip.ParseAddr(host); perr != nil {
+				e.host, e.port = host, port // a name: looked up on every dial, remembered for when that fails
+			}
+		}
 		e.up.Store(true) // optimistic until the first check; a dial error marks it down at once
 		p.Endpoints = append(p.Endpoints, e)
+		p.byAddr[a] = e
 		if m != nil {
 			m.BackendUp.WithLabelValues(a).Set(1)
 		}
@@ -217,7 +250,7 @@ func (p *Pool) MarkDown(e *Endpoint, err error, kind string) {
 			p.log.Warn("backend endpoint marked down", "endpoint", e.Addr, "kind", kind, "err", err.Error())
 		}
 	}
-	if p.metrics != nil {
+	if p.metrics != nil && kind != "resolve" { // a failed lookup was counted where it failed (unresolved)
 		p.metrics.BackendErrors.WithLabelValues(e.Addr, kind).Inc()
 	}
 }
@@ -254,7 +287,7 @@ func (p *Pool) checkLoop(e *Endpoint) {
 	// A dedicated transport so a check never competes with the data path for a pooled connection
 	// and never leaves one open.
 	tr := &http.Transport{
-		DialContext:       (&net.Dialer{Timeout: p.check.Timeout}).DialContext,
+		DialContext:       p.dialer(p.check.Timeout),
 		TLSClientConfig:   p.tlsConf,
 		DisableKeepAlives: true,
 		ForceAttemptHTTP2: false,
@@ -290,6 +323,99 @@ func (p *Pool) checkOnce(e *Endpoint, client *http.Client) {
 	p.markUp(e)
 }
 
+// dialer returns the DialContext both transports use (ADR-0008). An endpoint written as an
+// address is dialed as it is. A named one is looked up here, within half of timeout so that a
+// resolver that hangs leaves time to connect; the answer is remembered and dialed, and when the
+// lookup fails the last answer is dialed instead. Only with no answer ever does the dial fail for
+// want of a name, as a connect error of kind "resolve".
+func (p *Pool) dialer(timeout time.Duration) func(ctx context.Context, network, addr string) (net.Conn, error) {
+	d := &net.Dialer{Timeout: timeout, KeepAlive: 30 * time.Second}
+	return func(ctx context.Context, network, addr string) (net.Conn, error) {
+		e := p.byAddr[addr]
+		if e == nil || e.host == "" {
+			return d.DialContext(ctx, network, addr)
+		}
+		ctx, cancel := context.WithTimeout(ctx, timeout)
+		defer cancel()
+		lctx, lcancel := context.WithTimeout(ctx, timeout/2)
+		ips, err := p.lookup(lctx, e.host)
+		lcancel()
+		if err != nil && ctx.Err() != nil {
+			return nil, ctx.Err() // the caller gave up; that says nothing about the resolver
+		}
+		if err == nil && len(ips) == 0 {
+			err = &net.DNSError{Err: "no addresses", Name: e.host, IsNotFound: true}
+		}
+		if err == nil {
+			p.resolved(e, ips)
+		} else if ips = p.unresolved(e, err); len(ips) == 0 {
+			return nil, &net.OpError{Op: "dial", Net: network, Err: err}
+		}
+		var last error
+		for i, ip := range ips {
+			actx, acancel := ctx, context.CancelFunc(func() {})
+			if dl, ok := ctx.Deadline(); ok && i < len(ips)-1 {
+				// Divide what is left among the addresses still to try, as net.Dialer does.
+				actx, acancel = context.WithTimeout(ctx, time.Until(dl)/time.Duration(len(ips)-i))
+			}
+			c, derr := d.DialContext(actx, network, net.JoinHostPort(ip.String(), e.port))
+			acancel()
+			if derr == nil {
+				return c, nil
+			}
+			last = derr
+		}
+		return nil, last
+	}
+}
+
+// resolved remembers what the endpoint's name resolved to and ends a resolver failure.
+func (p *Pool) resolved(e *Endpoint, ips []netip.Addr) {
+	e.mu.Lock()
+	recovered := !e.failingSince.IsZero()
+	e.addrs, e.failingSince = append(e.addrs[:0], ips...), time.Time{}
+	e.mu.Unlock()
+	if recovered && p.log != nil {
+		p.log.Info("resolver answering again for backend endpoint", "endpoint", e.Addr)
+	}
+}
+
+// unresolved records a failed lookup and returns the addresses to dial instead: the last answer,
+// starting at a rotating position, or none when the name has never resolved. The failure is
+// counted and shown and does not change the endpoint's health; the dial that follows decides that.
+// This is the one place a failed lookup is counted, for the endpoint's row and for
+// backend_errors_total{kind="resolve"}, whichever path dialed and whether or not an address was
+// known; the callers that count other kinds skip this one.
+func (p *Pool) unresolved(e *Endpoint, err error) []netip.Addr {
+	e.mu.Lock()
+	first := e.failingSince.IsZero()
+	if first {
+		e.failingSince = time.Now()
+	}
+	n := len(e.addrs)
+	out := make([]netip.Addr, 0, n)
+	for i := 0; i < n; i++ {
+		out = append(out, e.addrs[(e.rotate+i)%n])
+	}
+	if n > 0 {
+		e.rotate = (e.rotate + 1) % n
+		e.lastErr, e.lastAt = fmt.Sprintf("resolver: %v; using the last known address %s", err, out[0]), time.Now()
+	}
+	e.mu.Unlock()
+	e.countError("resolve")
+	if p.metrics != nil {
+		p.metrics.BackendErrors.WithLabelValues(e.Addr, "resolve").Inc()
+	}
+	if first && p.log != nil {
+		if n > 0 {
+			p.log.Warn("resolver failing for backend endpoint; using its last known addresses", "endpoint", e.Addr, "addresses", fmt.Sprint(out), "err", err.Error())
+		} else {
+			p.log.Warn("resolver failing for backend endpoint and no address is known", "endpoint", e.Addr, "err", err.Error())
+		}
+	}
+	return out
+}
+
 // IsConnectError reports whether err is a failure to connect to an endpoint (dial or TLS
 // handshake): no request byte was sent, so the request may be retried on another endpoint.
 func IsConnectError(err error) bool {
@@ -305,6 +431,10 @@ func IsConnectError(err error) bool {
 
 // errorKind labels a backend failure for tollbooth_backend_errors_total{kind}.
 func errorKind(err error) string {
+	var dns *net.DNSError
+	if errors.As(err, &dns) {
+		return "resolve" // the name did not resolve and no address was known (ADR-0008)
+	}
 	var op *net.OpError
 	if errors.As(err, &op) && op.Op == "dial" {
 		return "dial"

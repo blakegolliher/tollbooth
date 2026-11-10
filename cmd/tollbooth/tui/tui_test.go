@@ -405,3 +405,27 @@ func TestProgramSmoke(t *testing.T) {
 		t.Fatalf("final screen %d, snapshot nil=%v", final.screen, final.snap == nil)
 	}
 }
+
+// ADR-0008: when a backend's name does not resolve, the Backends screen says so under the
+// endpoint, with the address it is being reached at, while the endpoint stays up.
+func TestBackendsScreenShowsAFailingResolver(t *testing.T) {
+	m := Model{width: 80, snap: &snapshot{backends: []admin.BackendStatus{
+		{Endpoint: "s3.cluster.example:443", Up: true, Requests: 9, Errors: 4, ErrorsResolve: 4, Addresses: []string{"10.0.0.7", "10.0.0.8"}, ResolverFailingSince: "2026-11-10T18:29:49Z"},
+		{Endpoint: "10.0.0.9:443", Up: true},
+		{Endpoint: "new.cluster.example:443", ErrorsResolve: 2, ResolverFailingSince: "2026-11-10T18:30:00Z"},
+	}}}
+	out := strings.Join(m.backendsLines(), "\n")
+	for _, want := range []string{
+		"name not resolving since 2026-11-10T18:29:49Z (4 failed lookups)",
+		"reached at its last known address 10.0.0.7, 10.0.0.8",
+		"name not resolving since 2026-11-10T18:30:00Z (2 failed lookups)",
+		"no address is known for it",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("the Backends screen lacks %q:\n%s", want, out)
+		}
+	}
+	if strings.Count(out, "name not resolving") != 2 {
+		t.Errorf("an endpoint written as an address, or one that resolves, must carry no resolver line:\n%s", out)
+	}
+}
