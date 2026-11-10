@@ -94,7 +94,7 @@ func doctor(cfgPath string, timeout time.Duration) []check {
 		return out
 	}
 	warnings := cfg.Warnings(goMemLimit())
-	add("config", "ok", "%s loads: %d rules, %d backend endpoints, %d warnings", cfgPath, len(cfg.RateLimits.Rules), len(cfg.Backend.Endpoints), len(warnings))
+	add("config", "ok", "%s loads: %d rules, %d backend endpoints, %d warnings", cfgPath, len(cfg.Limits), len(cfg.Backend.Endpoints), len(warnings))
 	for _, w := range warnings {
 		add("config warning", "warn", "%s", w)
 	}

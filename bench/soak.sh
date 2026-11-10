@@ -54,7 +54,7 @@ CHAOS_SECS=$(secs "$CHAOS_EVERY")
 TOTAL_SECS=$(python3 -c "print(int($SOAK_HOURS*3600))")
 
 CFG=$OUT/tollbooth.yaml
-write_cfg() { # write_cfg RATE: the rule set with a wide READ rule at RATE and a frozen bucket
+write_cfg() { # write_cfg RATE: the rule set with a wide GetObject and HeadObject rule at RATE and a frozen bucket
   cat > "$CFG" <<YAML
 node_id: soak
 listen: {address: $PROXY_ADDR}
@@ -65,15 +65,14 @@ backend:
   health_check: {interval: 1s, timeout: 500ms}
 showback: {dir: $OUT/showback, flush_interval: 60s}
 logging: {level: warn}
-rate_limits:
-  rules:
-    - id: wide-read
-      match: {ops: [READ]}
-      group_by: [access_key, bucket]
-      limit: {rate: $1, burst: $1}
-    - id: frozen
-      match: {buckets: [load-frozen-0]}
-      limit: {rate: 0}
+limits:
+  - name: wide-read
+    operation: [GetObject, HeadObject]
+    limit_per_second: $1
+    per: [access_key, bucket]
+  - name: frozen
+    bucket: load-frozen-0
+    blocked: true
 YAML
 }
 write_cfg 1000000000

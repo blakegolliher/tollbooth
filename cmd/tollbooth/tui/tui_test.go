@@ -49,20 +49,24 @@ const fixtureConfig = `node_id: tui-node
 backend: {scheme: http, endpoints: [10.0.0.1:9000, 10.0.0.2:9000]}
 showback: {dir: /tmp/x}
 admin: {token: tok}
-rate_limits:
-  rules:
-    - id: tenant-a-writes
-      match: {access_keys: [AKIAEXAMPLE1], buckets: [training-data], prefixes: [ckpt/], ops: [WRITE]}
-      group_by: [access_key, bucket]
-      limit: {rate: 2000, burst: 4000}
-    - id: list-storm
-      match: {ops: [LIST]}
-      group_by: [source_ip]
-      limit: {rate: 50, burst: 200}
-      on_limit: too_many_requests
-    - id: frozen
-      match: {access_keys: [AKIAREVOKED]}
-      limit: {rate: 0}
+limits:
+  - name: tenant-a-writes
+    operation: [PutObject, UploadPart, CopyObject]
+    access_key: AKIAEXAMPLE1
+    bucket: training-data
+    prefix: ckpt/
+    limit_per_second: 2000
+    burst: 4000
+    per: [access_key, bucket]
+  - name: list-storm
+    operation: [ListObjectsV2, ListObjects]
+    limit_per_second: 50
+    burst: 200
+    per: source_ip
+    respond: 429
+  - name: frozen
+    access_key: AKIAREVOKED
+    blocked: true
 `
 
 var fixedNow = time.Date(2026, 11, 9, 12, 30, 0, 0, time.UTC)
@@ -113,7 +117,7 @@ func fixture(t *testing.T) (*admin.Client, string) {
 			if reloads == 1 {
 				return admin.ReloadResult{OK: true, At: at, Generation: 3, Rules: 3, DurationMS: 0.4}
 			}
-			return admin.ReloadResult{Error: "rate_limits.rules[0].limit.rate: must be >= 0", At: at, Generation: 3}
+			return admin.ReloadResult{Error: "limits[0].limit_per_second: must be a number above 0, got -1", At: at, Generation: 3}
 		},
 		Backends: func() []admin.BackendStatus {
 			return []admin.BackendStatus{

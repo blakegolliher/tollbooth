@@ -89,22 +89,23 @@ run() {
   # be one request every two seconds; one per second keeps the row under a minute).
   local conc=20 rate=10 burst=20
   cat >> "$CFG" <<YAML
-rate_limits:
-  rules:
+limits:
 YAML
   local t
   for t in awscli boto3 s5cmd rclone; do
     cat >> "$CFG" <<YAML
-    - id: thr-$t
-      match: {buckets: [thr-$t]}
-      group_by: [access_key]
-      limit: {rate: $rate, burst: $burst}
+  - name: thr-$t
+    bucket: thr-$t
+    limit_per_second: $rate
+    burst: $burst
+    per: access_key
 YAML
   done
   cat >> "$CFG" <<YAML
-    - id: thr-s3cmd
-      match: {buckets: [thr-s3cmd]}
-      limit: {rate: 1, burst: 1}
+  - name: thr-s3cmd
+    bucket: thr-s3cmd
+    limit_per_second: 1
+    per: total
 YAML
   reload
 
@@ -140,7 +141,7 @@ CFG
 import sys
 p = sys.argv[1]
 s = open(p).read()
-i = s.find("rate_limits:\n")
+i = s.find("limits:\n")
 if i >= 0:
     open(p, "w").write(s[:i])
 PY

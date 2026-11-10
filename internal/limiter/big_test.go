@@ -105,12 +105,12 @@ func TestUniqueKeyFlood(t *testing.T) {
 		t.Skip("set TOLLBOOTH_BIG=1 to run the 60 s unique-key flood")
 	}
 	l, m := lim(t, `
-rate_limits:
-  rules:
-    - id: per-ip
-      match: {ops: [READ]}
-      group_by: [source_ip]
-      limit: {rate: 100, burst: 1}
+limits:
+  - name: per-ip
+    operation: [GetObject, HeadObject]
+    limit_per_second: 100
+    burst: 1
+    per: source_ip
 limiter: {max_keys: 100000, sweep_interval: 1s}
 `)
 	ctx, cancel := context.WithCancel(context.Background())

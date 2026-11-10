@@ -154,15 +154,14 @@ func (r *rig) denied(rule string) float64 {
 // classification of SlowDown as a throttling error. Same for 429 TooManyRequests.
 func TestSDKParsesThrottleResponse(t *testing.T) {
 	r := start(t, `
-rate_limits:
-  rules:
-    - id: frozen-503
-      match: {buckets: [frozen]}
-      limit: {rate: 0}
-    - id: frozen-429
-      match: {buckets: [frozen429]}
-      limit: {rate: 0}
-      on_limit: too_many_requests
+limits:
+  - name: frozen-503
+    bucket: frozen
+    blocked: true
+  - name: frozen-429
+    bucket: frozen429
+    blocked: true
+    respond: 429
 `)
 	c := r.client(1, false)
 	for bucket, code := range map[string]string{"frozen": "SlowDown", "frozen429": "TooManyRequests"} {
@@ -217,11 +216,12 @@ func TestGoSDKCompletesUnderOneRequestPerSecond(t *testing.T) {
 				t.Setenv("AWS_NEW_RETRIES_2026", "true")
 			}
 			r := start(t, `
-rate_limits:
-  rules:
-    - id: one-per-second
-      match: {buckets: [slow]}
-      limit: {rate: 1, burst: 1}
+limits:
+  - name: one-per-second
+    bucket: slow
+    limit_per_second: 1
+    burst: 1
+    per: total
 `)
 			c := r.client(0, mode.adaptive)
 			const objects = 5
@@ -268,12 +268,12 @@ func TestGoSDKSyncAgainstHalfConcurrency(t *testing.T) {
 	}{{"standard-default", false}, {"adaptive", true}} {
 		t.Run(mode.name, func(t *testing.T) {
 			r := start(t, fmt.Sprintf(`
-rate_limits:
-  rules:
-    - id: sync
-      match: {buckets: [sync]}
-      group_by: [access_key]
-      limit: {rate: %d, burst: %d}
+limits:
+  - name: sync
+    bucket: sync
+    limit_per_second: %d
+    burst: %d
+    per: access_key
 `, concurrency/2, concurrency))
 			c := r.client(0, mode.adaptive)
 			var failed, wrongErr atomic.Int64
@@ -326,11 +326,10 @@ rate_limits:
 // report; the per-tool numbers (aws cli, boto3, s5cmd) come from the integration stage.
 func TestThrottledExpectContinueReconnectCost(t *testing.T) {
 	r := start(t, `
-rate_limits:
-  rules:
-    - id: frozen
-      match: {buckets: [frozen]}
-      limit: {rate: 0}
+limits:
+  - name: frozen
+    bucket: frozen
+    blocked: true
 `)
 	body := bytes.Repeat([]byte("x"), 4<<20)
 	tr := &http.Transport{ExpectContinueTimeout: time.Second}

@@ -1,6 +1,7 @@
 # tollbooth example configuration. Every key is set to its default except the required ones,
 # which carry example values. docs/CONFIG.md documents each key. Unknown keys are errors.
-# Nothing in tollbooth ever writes this file; edit it and run `tollbooth config reload`.
+# Only an explicit save in `tollbooth tui` ever writes this file (ADR-0006); edit it by hand or
+# there, then run `tollbooth config reload`.
 
 node_id: tb-a01                     # required; stable across restarts
 base_domains: []                    # virtual-hosted-style base domains, e.g. [s3.lab.example.com]
@@ -40,27 +41,25 @@ proxy:
 cluster:
   node_count: 1                     # each node enforces rate / node_count
 
-rate_limits:
-  default_on_limit: slowdown        # slowdown (503 SlowDown) | too_many_requests (429)
-  rules: []
-  # rules:
-  #   - id: tenant-a-writes
-  #     match:
-  #       access_keys: [AKIAEXAMPLE1, AKIAEXAMPLE2]
-  #       buckets: [training-data, checkpoints]
-  #       prefixes: [ckpt/, logs/]
-  #       source_cidrs: [10.20.0.0/16]
-  #       ops: [WRITE]
-  #     group_by: [access_key, bucket]
-  #     limit: { rate: 2000, burst: 4000 }
-  #   - id: list-storm-per-client
-  #     match: { ops: [LIST] }
-  #     group_by: [source_ip]
-  #     limit: { rate: 50, burst: 200 }
-  #     on_limit: too_many_requests
-  #   - id: frozen-key
-  #     match: { access_keys: [AKIAREVOKED] }
-  #     limit: { rate: 0 }
+limits: []                          # the rules; check-config reads each one back as a sentence
+  # - name: list-storm              # "too many ListObjectsV2 calls: limit them to 20 a second"
+  #   operation: ListObjectsV2      # S3 API operation names; a list, or a family like Get*; omit for every operation
+  #   limit_per_second: 20          # or limit_per_minute, or limit_per_hour, or blocked: true
+  #   per: source_ip                # who gets their own budget: total, access_key, bucket, prefix, or source_ip
+  # - name: tenant-a-uploads
+  #   operation: [PutObject, UploadPart, CompleteMultipartUpload]
+  #   access_key: [AKIAEXAMPLE1, AKIAEXAMPLE2]
+  #   bucket: [training-data, checkpoints]
+  #   prefix: [ckpt/, logs/]
+  #   source_ip: 10.20.0.0/16
+  #   limit_per_second: 2000
+  #   burst: 4000                   # how many may arrive at once; default is the limit's own number
+  #   per: [access_key, bucket]     # each access key gets its own 2,000 a second on each bucket
+  #   respond: 429                  # 503 SlowDown (default, what S3 itself answers) or 429 TooManyRequests
+  #   note: "why this rule exists"
+  # - name: revoked-key
+  #   access_key: AKIAREVOKED
+  #   blocked: true                 # refuse every matching request
 
 limiter:
   max_keys: 2000000

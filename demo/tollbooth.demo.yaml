@@ -1,5 +1,6 @@
 # tollbooth demo configuration (demo/run.sh fills the @PLACEHOLDERS@ and writes demo/state/tollbooth.yaml).
-# Four rules that each show one behavior; docs/CONFIG.md documents every key.
+# Four rules that each show one behavior. `tollbooth check-config` reads every rule back as a
+# sentence; docs/CONFIG.md documents every key.
 
 node_id: demo-a01
 base_domains: []
@@ -13,30 +14,34 @@ backend:
   tls: {insecure_skip_verify: @BACKEND_INSECURE@}   # lab certificates; false in production
   health_check: {interval: @HEALTH_INTERVAL@, timeout: @HEALTH_TIMEOUT@}   # restart-only; a cluster can take 2 s to answer HEAD /
 
-rate_limits:
-  default_on_limit: slowdown
-  rules:
-    # Tenant A may read 2 requests per second per bucket (low so hand-typed commands trip it); the
-    # third in a second gets 503 SlowDown with Retry-After, the SDK backs off, nothing is dropped.
-    - id: tenant-a-reads
-      match: {access_keys: [DEMO-TENANT-A], ops: [READ]}
-      group_by: [access_key, bucket]
-      limit: {rate: 2, burst: 2}
-    # A listing storm from one client address: one LIST per second, answered with 429 instead.
-    - id: list-storm-per-client
-      match: {ops: [LIST]}
-      group_by: [source_ip]
-      limit: {rate: 1, burst: 1}
-      on_limit: too_many_requests
-    # Writes are limited per bucket with headroom: visible in `rules list`, never hit in the demo.
-    - id: writes-per-bucket
-      match: {ops: [WRITE]}
-      group_by: [bucket]
-      limit: {rate: 500, burst: 1000}
-    # A frozen bucket: rate 0 blocks every request to it (incident response, a stop button).
-    - id: frozen-bucket
-      match: {buckets: [frozen]}
-      limit: {rate: 0}
+limits:
+  # Tenant A may make 2 GetObject or HeadObject calls a second on each bucket (low, so hand-typed
+  # commands trip it). The third in a second gets 503 SlowDown.
+  - name: tenant-a-reads
+    operation: [GetObject, HeadObject]
+    access_key: DEMO-TENANT-A
+    limit_per_second: 2
+    per: bucket
+
+  # A listing storm: each client address may list once a second, answered with 429 instead.
+  - name: list-storm
+    operation: ListObjectsV2
+    limit_per_second: 1
+    per: source_ip
+    respond: 429
+
+  # Uploads are limited per bucket with headroom: visible in `rules list`, never hit in the demo.
+  - name: uploads-per-bucket
+    operation: [PutObject, UploadPart, CompleteMultipartUpload]
+    limit_per_second: 500
+    burst: 1000
+    per: bucket
+
+  # A frozen bucket: every request to it is refused (incident response, a stop button).
+  - name: frozen-bucket
+    bucket: frozen
+    blocked: true
+    per: access_key                   # list the refusals for each access key in `rules top`
 
 showback:
   dir: @SHOWBACK_DIR@

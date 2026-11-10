@@ -17,7 +17,6 @@ package tui
 import (
 	"fmt"
 	"sort"
-	"strconv"
 	"strings"
 	"time"
 
@@ -285,24 +284,27 @@ func (m Model) limitsLines() []string {
 	if m.testing {
 		return append(lines, m.testFormLines()...)
 	}
-	hdr := fmt.Sprintf("  %-24s %-28s %-20s %-14s %-18s %8s %8s", "ID", "MATCH", "GROUP_BY", "RATE/BURST", "MODE", "KEYS", "DENIED")
+	sumW := m.width - 2 - 22 - 1 - 9 - 9
+	if sumW < 20 {
+		sumW = 20
+	}
+	hdr := fmt.Sprintf("  %-22s %-*s %8s %8s", "NAME", sumW, "LIMIT", "KEYS", "DENIED")
 	lines = append(lines, styleHeader.Render(hdr))
 	if len(rules) == 0 {
 		lines = append(lines, styleDim.Render("  (no rules)"))
 	}
 	for i, r := range rules {
-		row := fmt.Sprintf("  %-24s %-28s %-20s %-14s %-18s %8d %8d", trunc(r.ID, 24), trunc(matchSummary(r.RuleStatus), 28), trunc(strings.Join(r.GroupBy, ","), 20),
-			trunc(rateBurst(r.RuleStatus), 14), r.OnLimit, r.LiveKeys, r.Denied)
+		row := fmt.Sprintf("  %-22s %-*s %8d %8d", trunc(r.Name, 22), sumW, trunc(r.Summary, sumW), r.LiveKeys, r.Denied)
 		if i == m.selected {
 			row = styleSel.Render(row)
 		}
 		lines = append(lines, row)
 	}
 	if m.detail && m.selected < len(rules) {
-		lines = append(lines, "", styleTitle.Render("  Top denied keys, last 60 s, for "+rules[m.selected].ID))
+		lines = append(lines, "", styleTitle.Render("  Top denied keys, last 60 s, for "+rules[m.selected].Name))
 		n := 0
 		for _, e := range m.snap.top.Top {
-			if e.Rule != rules[m.selected].ID {
+			if e.Rule != rules[m.selected].Name {
 				continue
 			}
 			n++
@@ -313,39 +315,6 @@ func (m Model) limitsLines() []string {
 		}
 	}
 	return lines
-}
-
-func matchSummary(r *limiter.RuleStatus) string {
-	var parts []string
-	add := func(name string, vs []string) {
-		switch len(vs) {
-		case 0:
-		case 1:
-			parts = append(parts, name+"="+vs[0])
-		default:
-			parts = append(parts, fmt.Sprintf("%s(%d)", name, len(vs)))
-		}
-	}
-	add("key", r.AccessKeys)
-	add("bucket", r.Buckets)
-	add("prefix", r.Prefixes)
-	add("cidr", r.SourceCIDRs)
-	add("ops", r.Ops)
-	if len(parts) == 0 {
-		return "any"
-	}
-	return strings.Join(parts, " ")
-}
-
-func rateBurst(r *limiter.RuleStatus) string {
-	if r.Rate == 0 {
-		return "0 (block)"
-	}
-	s := strconv.FormatFloat(r.Rate, 'f', -1, 64) + "/" + strconv.Itoa(r.Burst)
-	if r.EffectiveRate != r.Rate {
-		s += "*"
-	}
-	return s
 }
 
 func (m Model) testFormLines() []string {

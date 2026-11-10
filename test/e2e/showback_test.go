@@ -40,11 +40,10 @@ import (
 func TestShowbackReconciliation(t *testing.T) {
 	r := start(t, `
 showback: {dir: /tmp/tb-e2e, dimensions: [access_key, bucket, prefix, operation, status_class], prefixes: {recon: [ckpt/, logs/]}}
-rate_limits:
-  rules:
-    - id: frozen
-      match: {buckets: [frozen]}
-      limit: {rate: 0}
+limits:
+  - name: frozen
+    bucket: frozen
+    blocked: true
 `)
 	// A listing's response has a body too (the backend's XML); its size, measured once direct
 	// at the backend, is what each list contributes to bytes_out.

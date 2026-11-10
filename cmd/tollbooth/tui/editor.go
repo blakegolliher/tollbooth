@@ -157,7 +157,7 @@ func (e *editorState) validate() {
 		e.rules = 0
 		return
 	}
-	e.rules = len(c.RateLimits.Rules)
+	e.rules = len(c.Limits)
 	e.findings = []string{fmt.Sprintf("valid: %d rules", e.rules)}
 	for _, w := range c.Warnings(0) {
 		e.findings = append(e.findings, "warning: "+firstLine(w))

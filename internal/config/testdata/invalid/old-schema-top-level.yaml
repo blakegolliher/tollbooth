@@ -4,4 +4,3 @@ showback: {dir: /d}
 rate_limits:
   rules:
     - {id: x, limit: {rate: 1}}
-    - {id: x, limit: {rate: 1}}

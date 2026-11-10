@@ -50,7 +50,11 @@ func runCheckConfig(args []string, stdout, stderr *os.File) int {
 		_, _ = fmt.Fprintf(stderr, "%s: warning: %s\n", path, w)
 	}
 	if !*quiet {
-		_, _ = fmt.Fprintf(stdout, "%s: ok (%d rules, %d backend endpoints, %d warnings)\n", path, len(c.RateLimits.Rules), len(c.Backend.Endpoints), len(warnings))
+		_, _ = fmt.Fprintf(stdout, "%s: ok (%d rules, %d backend endpoints, %d warnings)\n", path, len(c.Limits), len(c.Backend.Endpoints), len(warnings))
+		// The read-back (ADR-0007): each rule as tollbooth understood it.
+		for i := range c.Limits {
+			_, _ = fmt.Fprintf(stdout, "  %s: %s\n", c.Limits[i].Name, c.Limits[i].Sentence())
+		}
 	}
 	return 0
 }

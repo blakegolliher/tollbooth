@@ -23,20 +23,21 @@ backend:
     ca_bundle: ""                     # the cluster's CA, or empty for the system roots
     insecure_skip_verify: false
 
-rate_limits:
-  default_on_limit: slowdown
-  rules:
-    # Start with observation only (no rules) if the POC is about showback; add rules one at a time.
-    # Each rule is one line of intent; `tollbooth rules test` answers "what would happen to this request".
-    - id: per-key-reads
-      match: {ops: [READ]}
-      group_by: [access_key]
-      limit: {rate: 2000, burst: 4000}
-    - id: list-storm-per-client
-      match: {ops: [LIST]}
-      group_by: [source_ip]
-      limit: {rate: 50, burst: 200}
-      on_limit: too_many_requests
+limits:
+  # Start with no rules if the POC is about showback; add them one at a time, in the file or with
+  # the guided form in `tollbooth tui` (screen 2, n). `tollbooth check-config` reads each rule back
+  # as a sentence, and `tollbooth rules test` answers "what would happen to this request".
+  - name: reads-per-key
+    operation: [GetObject, HeadObject]
+    limit_per_second: 2000
+    burst: 4000
+    per: access_key                   # each access key gets its own 2,000 a second
+  - name: list-storm
+    operation: ListObjectsV2
+    limit_per_second: 50
+    burst: 200
+    per: source_ip                    # each client address gets its own 50 a second
+    respond: 429
 
 showback:
   dir: /var/lib/tollbooth/showback    # persistent: one NDJSON file per hour per node

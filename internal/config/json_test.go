@@ -23,7 +23,7 @@ import (
 // The JSON view (GET /admin/config, `config show --format json`) uses the file's key names,
 // renders durations the way the file does, and never carries the token.
 func TestMarshalJSONUsesFileKeys(t *testing.T) {
-	c, err := Parse([]byte("node_id: a\nbackend: {scheme: http, endpoints: [h:1]}\nshowback: {dir: /d, retention_days: 0}\nadmin: {token: hunter2}\nrate_limits:\n  rules:\n    - id: r\n      match: {ops: [READ]}\n      limit: {rate: 2.5}\n"))
+	c, err := Parse([]byte("node_id: a\nbackend: {scheme: http, endpoints: [h:1]}\nshowback: {dir: /d, retention_days: 0}\nadmin: {token: hunter2}\nlimits:\n  - name: r\n    operation: [GetObject, HeadObject]\n    limit_per_second: 2.5\n    per: total\n"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -41,11 +41,18 @@ func TestMarshalJSONUsesFileKeys(t *testing.T) {
 	listen := m["listen"].(map[string]any)
 	admin := m["admin"].(map[string]any)
 	showback := m["showback"].(map[string]any)
-	rules := m["rate_limits"].(map[string]any)["rules"].([]any)
+	rules := m["limits"].([]any)
 	rule := rules[0].(map[string]any)
 	if m["node_id"] != "a" || listen["read_header_timeout"] != "10s" || listen["max_inflight"] != float64(4096) || admin["token"] != "<redacted>" ||
-		showback["retention_days"] != float64(0) || rule["id"] != "r" || rule["limit"].(map[string]any)["rate"] != 2.5 || rule["limit"].(map[string]any)["burst"] != float64(3) {
+		showback["retention_days"] != float64(0) || rule["name"] != "r" || rule["limit_per_second"] != 2.5 || rule["per"] != "total" ||
+		len(rule["operation"].([]any)) != 2 {
 		t.Fatalf("%s", b)
+	}
+	// The keys a rule does not set are absent, as in the file.
+	for _, k := range []string{"burst", "respond", "blocked", "limit_per_minute", "note"} {
+		if _, ok := rule[k]; ok {
+			t.Fatalf("unset key %q is in the JSON view: %s", k, b)
+		}
 	}
 	// The original is untouched by Redacted.
 	if c.AdminToken() != "hunter2" || c.Admin.Token != "hunter2" {

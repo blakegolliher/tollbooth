@@ -490,7 +490,7 @@ func sampleOf(s *snapshot) sample {
 		out.ttfb[s.status.Backends[i].Endpoint] = s.status.Backends[i].TTFBLastMS
 	}
 	for i := range s.limits.Rules {
-		out.denied[s.limits.Rules[i].ID] = s.limits.Rules[i].Denied
+		out.denied[s.limits.Rules[i].Name] = s.limits.Rules[i].Denied
 	}
 	out.heapMiB = s.metrics["go_memstats_heap_alloc_bytes"] / (1 << 20)
 	out.rssMiB = s.metrics["process_resident_memory_bytes"] / (1 << 20)
@@ -615,7 +615,7 @@ func (m Model) visibleRules() []limiterRule {
 	var out []limiterRule
 	for i := range m.snap.limits.Rules {
 		r := &m.snap.limits.Rules[i]
-		if f != "" && !strings.Contains(strings.ToLower(r.ID+" "+strings.Join(r.Buckets, " ")+" "+strings.Join(r.AccessKeys, " ")+" "+strings.Join(r.Prefixes, " ")), f) {
+		if f != "" && !strings.Contains(strings.ToLower(r.Name+" "+r.Sentence+" "+r.Note), f) {
 			continue
 		}
 		out = append(out, limiterRule{r})
@@ -743,7 +743,7 @@ func (m Model) validate() tea.Cmd {
 			return noticeMsg(fmt.Sprintf("%s: INVALID: %s", path, firstLine(err.Error())))
 		}
 		w := c.Warnings(0)
-		return noticeMsg(fmt.Sprintf("%s: ok (%d rules, %d warnings)", path, len(c.RateLimits.Rules), len(w)))
+		return noticeMsg(fmt.Sprintf("%s: ok (%d rules, %d warnings)", path, len(c.Limits), len(w)))
 	}
 }
 

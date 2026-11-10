@@ -34,20 +34,24 @@ backend: {scheme: http, endpoints: [127.0.0.1:1]}
 showback: {dir: /tmp/x}
 admin: {token: tok}
 cluster: {node_count: 2}
-rate_limits:
-  rules:
-    - id: tenant-a-writes
-      match: {access_keys: [AKIAEXAMPLE1, AKIAEXAMPLE2], buckets: [training-data], prefixes: [ckpt/], ops: [WRITE]}
-      group_by: [access_key, bucket]
-      limit: {rate: 2000, burst: 4000}
-    - id: list-storm
-      match: {ops: [LIST]}
-      group_by: [source_ip]
-      limit: {rate: 50, burst: 200}
-      on_limit: too_many_requests
-    - id: frozen
-      match: {access_keys: [AKIAREVOKED]}
-      limit: {rate: 0}
+limits:
+  - name: tenant-a-writes
+    operation: [PutObject, UploadPart, CopyObject]
+    access_key: [AKIAEXAMPLE1, AKIAEXAMPLE2]
+    bucket: training-data
+    prefix: ckpt/
+    limit_per_second: 2000
+    burst: 4000
+    per: [access_key, bucket]
+  - name: list-storm
+    operation: List*
+    limit_per_second: 50
+    burst: 200
+    per: source_ip
+    respond: 429
+  - name: frozen
+    access_key: AKIAREVOKED
+    blocked: true
 `
 
 // adminFor starts an admin server with the rules loaded and a few denials recorded, and returns
@@ -86,8 +90,11 @@ func TestRulesList(t *testing.T) {
 	if rc != 0 {
 		t.Fatalf("rc %d: %s", rc, errOut)
 	}
-	for _, want := range []string{"ID", "MATCH", "tenant-a-writes", "key(2) bucket=training-data prefix=ckpt/ ops=WRITE", "access_key,bucket", "2000 (1000/node)", "4000 (2000/node)",
-		"list-storm", "ops=LIST", "too_many_requests", "frozen", "key=AKIAREVOKED", "0 (block)", "3 rules, 0 live keys"} {
+	for _, want := range []string{"NAME", "LIMIT", "tenant-a-writes", "access_key(2) bucket=training-data prefix=ckpt/", "access_key,bucket", "2,000 per second (1000/s on this node)",
+		"list-storm", "List*", "429", "frozen", "access_key=AKIAREVOKED", "blocked", "3 rules, 0 live keys",
+		// The read-back: every rule as a sentence under the table.
+		"At most 50 List* calls (11 operations) per second from each source IP, up to 200 at once. Over the limit, the client gets 429 TooManyRequests.",
+		"Refuses every request by access key AKIAREVOKED. The client gets 503 SlowDown."} {
 		if !strings.Contains(out, want) {
 			t.Errorf("table output lacks %q:\n%s", want, out)
 		}
@@ -104,7 +111,7 @@ func TestRulesList(t *testing.T) {
 	}
 
 	rc, out, _ = runOut(t, "rules", "list", "--admin", addr, "--token", "tok", "--format", "csv")
-	if rc != 0 || !strings.HasPrefix(out, "ID,MATCH,GROUP_BY,RATE,BURST,MODE,KEYS,DENIED\n") || !strings.Contains(out, "frozen,key=AKIAREVOKED,,0 (block),-,slowdown,0,3\n") {
+	if rc != 0 || !strings.HasPrefix(out, "NAME,LIMIT,PER,OPERATION,ONLY_FOR,RESPOND,KEYS,DENIED\n") || !strings.Contains(out, "frozen,blocked,-,any,access_key=AKIAREVOKED,503,0,3\n") {
 		t.Fatalf("csv: rc %d\n%s", rc, out)
 	}
 }
@@ -112,12 +119,13 @@ func TestRulesList(t *testing.T) {
 func TestRulesShow(t *testing.T) {
 	addr, _ := adminFor(t)
 	rc, out, _ := runOut(t, "rules", "show", "list-storm", "--admin", addr, "--token", "tok")
-	if rc != 0 || !strings.Contains(out, "group_by") || !strings.Contains(out, "source_ip") || !strings.Contains(out, "50 (25/node)") || !strings.Contains(out, "too_many_requests") {
+	if rc != 0 || !strings.Contains(out, "per") || !strings.Contains(out, "source_ip") || !strings.Contains(out, "50 per second (25/s on this node)") || !strings.Contains(out, "429") ||
+		!strings.Contains(out, "At most 50 List* calls (11 operations) per second from each source IP, up to 200 at once.") {
 		t.Fatalf("rc %d\n%s", rc, out)
 	}
 	rc, out, _ = runOut(t, "rules", "show", "frozen", "--admin", addr, "--token", "tok", "--format", "json")
 	var r limiter.RuleStatus
-	if rc != 0 || json.Unmarshal([]byte(out), &r) != nil || r.ID != "frozen" || r.Denied != 3 {
+	if rc != 0 || json.Unmarshal([]byte(out), &r) != nil || r.Name != "frozen" || r.Denied != 3 || !r.Blocked {
 		t.Fatalf("json: rc %d\n%s", rc, out)
 	}
 	rc, _, errOut := runOut(t, "rules", "show", "nope", "--admin", addr, "--token", "tok")
@@ -125,7 +133,7 @@ func TestRulesShow(t *testing.T) {
 		t.Fatalf("missing rule: rc %d %q", rc, errOut)
 	}
 	if rc, _, _ := runOut(t, "rules", "show", "--admin", addr); rc != 1 {
-		t.Fatal("show without an id must fail")
+		t.Fatal("show without a name must fail")
 	}
 }
 
@@ -169,7 +177,7 @@ func TestRulesTest(t *testing.T) {
 func TestRulesTop(t *testing.T) {
 	addr, _ := adminFor(t)
 	rc, out, _ := runOut(t, "rules", "top", "--admin", addr, "--token", "tok", "--n", "5")
-	// frozen has no group_by, so the key carries no dimensions: the row shows the rule and the count.
+	// frozen has no `per`, so the key carries no dimensions: the row shows the rule and the count.
 	if rc != 0 || !strings.Contains(out, "RULE") || !strings.Contains(out, "frozen") || strings.Contains(out, "AKIAREVOKED") {
 		t.Fatalf("rc %d\n%s", rc, out)
 	}

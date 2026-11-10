@@ -15,6 +15,7 @@
 package config
 
 import (
+	"math"
 	"net/netip"
 	"os"
 	"path/filepath"
@@ -27,39 +28,60 @@ import (
 // invalidWant maps each testdata/invalid file to the substring its error must carry: the key path
 // first, so check-config output points at the key.
 var invalidWant = map[string]string{
-	"unknown-key":                 "listen.addres: unknown key",
-	"missing-node-id":             "node_id: required",
-	"missing-showback-dir":        "showback.dir: required",
-	"backend-no-scheme":           "backend.scheme: required",
-	"backend-endpoint-has-scheme": "backend.endpoints[0]: no scheme",
-	"backend-endpoint-no-port":    "backend.endpoints[0]: ",
-	"backend-http-with-tls":       "backend.tls: not allowed with scheme http",
-	"tls-cert-only":               "listen.tls: cert and key must be set together",
-	"tls-missing-files":           "listen.tls: ",
-	"rule-dup-id":                 "rate_limits.rules[1].id: duplicate of rules[0]",
-	"rule-bad-op":                 "rate_limits.rules[0].match.ops[0]: unknown operation or class \"GetObjekt\"",
-	"rule-prefix-groupby":         "rate_limits.rules[0].group_by[0]: prefix needs match.prefixes",
-	"rule-bad-cidr":               "rate_limits.rules[0].match.source_cidrs[0]: ",
-	"rule-negative-rate":          "rate_limits.rules[0].limit.rate: must be >= 0",
-	"rule-bad-id":                 "rate_limits.rules[0].id: required",
-	"rule-bad-on-limit":           "rate_limits.rules[0].on_limit: must be slowdown or too_many_requests",
-	"rule-bandwidth-reserved":     "rate_limits.rules[0].limit.bandwidth: unknown key",
-	"dims-missing-operation":      "showback.dimensions: operation and status_class",
-	"dims-unknown":                "showback.dimensions[0]: unknown dimension \"key\"",
-	"admin-token-both":            "admin: token and token_file are mutually exclusive",
-	"admin-token-file-missing":    "admin.token_file: ",
-	"retention-negative":          "showback.retention_days: must be >= 0",
-	"node-count-negative":         "cluster.node_count: must be positive",
-	"node-count-huge":             "cluster.node_count: must be at most 1024",
-	"rule-rate-tiny":              "rate_limits.rules[0].limit.rate: must be 0 or between 1e-06 and 1e+09",
-	"rule-rate-huge":              "rate_limits.rules[0].limit.rate: must be 0 or between 1e-06 and 1e+09",
-	"rule-burst-refill":           "rate_limits.rules[0].limit.burst: 2000000000 at rate 0.001 takes 2000000000000 s to refill",
-	"type-error":                  "listen.max_inflight: ",
-	"trusted-proxy-bad":           "listen.trusted_proxies[0]: ",
-	"showback-prefix-bad-bucket":  "showback.prefixes.Bad_Bucket: not a valid bucket name",
-	"copy-buffer-tiny":            "proxy.copy_buffer_bytes: must be at least 4096",
-	"log-level":                   "logging.level: must be debug, info, warn, or error",
-	"not-a-mapping":               "line 1: cannot construct",
+	"unknown-key":                    "listen.addres: unknown key",
+	"missing-node-id":                "node_id: required",
+	"missing-showback-dir":           "showback.dir: required",
+	"backend-no-scheme":              "backend.scheme: required",
+	"backend-endpoint-has-scheme":    "backend.endpoints[0]: no scheme",
+	"backend-endpoint-no-port":       "backend.endpoints[0]: ",
+	"backend-http-with-tls":          "backend.tls: not allowed with scheme http",
+	"tls-cert-only":                  "listen.tls: cert and key must be set together",
+	"tls-missing-files":              "listen.tls: ",
+	"rule-dup-name":                  "limits[1].name: duplicate of limits[0]",
+	"rule-bad-name":                  "limits[0].name: required",
+	"rule-op-typo":                   "limits[0].operation: unknown S3 operation \"GetObjekt\"; did you mean GetObject?",
+	"rule-op-typo-v2":                "limits[0].operation: unknown S3 operation \"ListObjectV2\"; did you mean ListObjectsV2?",
+	"rule-op-class-word":             "limits[0].operation: \"WRITE\" is not an S3 operation; name the operations themselves (it used to mean PostObject, PutObject, CopyObject",
+	"rule-op-star":                   "limits[0].operation: omit `operation` to match every operation",
+	"rule-op-inner-star":             "limits[0].operation: \"Get*Object\": only a trailing * is a wildcard",
+	"rule-op-family-empty":           "limits[0].operation: \"Zz*\" matches no S3 operation",
+	"rule-op-in-list":                "limits[0].operation[1]: unknown S3 operation \"Nope\"",
+	"rule-op-not-scalar":             "limits[0].operation: every item must be a plain value",
+	"rule-per-missing":               "limits[0].per: required: who gets their own budget?",
+	"rule-per-unknown":               "limits[0].per: must be total, access_key, bucket, prefix, or source_ip, got \"key\"",
+	"rule-per-total-combined":        "limits[0].per[0]: total means one shared budget",
+	"rule-per-prefix-without-prefix": "limits[0].per: per: prefix counts each listed prefix separately",
+	"rule-per-repeated":              "limits[0].per[1]: repeated",
+	"rule-bad-source":                "limits[0].source_ip: not an address or a CIDR: \"10.0.0.0/33\"",
+	"rule-empty-prefix":              "limits[0].prefix: empty prefix",
+	"rule-no-limit":                  "limits[0]: no limit: set exactly one of limit_per_second, limit_per_minute, limit_per_hour, or blocked: true",
+	"rule-two-limits":                "limits[0]: more than one limit",
+	"rule-blocked-and-limit":         "limits[0]: set either a limit or blocked: true, not both",
+	"rule-blocked-burst":             "limits[0].burst: a blocked rule has no burst",
+	"rule-negative-limit":            "limits[0].limit_per_second: must be a number above 0, got -1 (to refuse every request write blocked: true)",
+	"rule-zero-limit":                "limits[0].limit_per_second: must be a number above 0, got 0",
+	"rule-limit-not-a-number":        "limits[0].limit_per_second: must be a number",
+	"rule-bad-respond":               "limits[0].respond: must be 503 (SlowDown) or 429 (TooManyRequests), got 500",
+	"rule-unknown-key":               "limits[0].limit_bytes_per_second: unknown key",
+	"rule-rate-tiny":                 "limits[0].limit_per_hour: 0.001 per hour is outside what the limiter can enforce",
+	"rule-rate-huge":                 "limits[0].limit_per_second: 2,000,000,000 per second is outside what the limiter can enforce",
+	"rule-burst-refill":              "limits[0].burst: 2000000000 at 0.001 per second takes 2000000000000 s to refill",
+	"rule-note-long":                 "limits[0].note: at most 200 characters, got 201",
+	"old-schema-top-level":           "rate_limits: unknown key; rules are written under `limits:`",
+	"old-schema-rule-keys":           "limits[0].group_by: unknown key; write `per:`",
+	"dims-missing-operation":         "showback.dimensions: operation and status_class",
+	"dims-unknown":                   "showback.dimensions[0]: unknown dimension \"key\"",
+	"admin-token-both":               "admin: token and token_file are mutually exclusive",
+	"admin-token-file-missing":       "admin.token_file: ",
+	"retention-negative":             "showback.retention_days: must be >= 0",
+	"node-count-negative":            "cluster.node_count: must be positive",
+	"node-count-huge":                "cluster.node_count: must be at most 1024",
+	"type-error":                     "listen.max_inflight: ",
+	"trusted-proxy-bad":              "listen.trusted_proxies[0]: ",
+	"showback-prefix-bad-bucket":     "showback.prefixes.Bad_Bucket: not a valid bucket name",
+	"copy-buffer-tiny":               "proxy.copy_buffer_bytes: must be at least 4096",
+	"log-level":                      "logging.level: must be debug, info, warn, or error",
+	"not-a-mapping":                  "line 1: cannot construct",
 }
 
 func TestInvalidFiles(t *testing.T) {
@@ -131,7 +153,6 @@ func TestMinimalGetsEveryDefault(t *testing.T) {
 		"proxy.copy_buffer_bytes":         {c.Proxy.CopyBufferBytes, DefaultCopyBufferBytes},
 		"proxy.drain_timeout":             {c.Proxy.DrainTimeout, DefaultDrainTimeout},
 		"cluster.node_count":              {c.Cluster.NodeCount, DefaultNodeCount},
-		"rate_limits.default_on_limit":    {c.RateLimits.DefaultOnLimit, DefaultOnLimit},
 		"limiter.max_keys":                {c.Limiter.MaxKeys, DefaultMaxKeys},
 		"limiter.sweep_interval":          {c.Limiter.SweepInterval, DefaultSweepInterval},
 		"showback.flush_interval":         {c.Showback.FlushInterval, DefaultFlushInterval},
@@ -173,8 +194,8 @@ func TestExampleConfigIsTheDefaults(t *testing.T) {
 		if len(o.Listen.TrustedProxies) == 0 {
 			o.Listen.TrustedProxies = nil
 		}
-		if len(o.RateLimits.Rules) == 0 {
-			o.RateLimits.Rules = nil
+		if len(o.Limits) == 0 {
+			o.Limits = nil
 		}
 		if len(o.Showback.Prefixes) == 0 {
 			o.Showback.Prefixes = nil
@@ -191,18 +212,25 @@ func TestRulesParse(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	r := c.RateLimits.Rules
-	if len(r) != 4 || r[0].ID != "tenant-a-writes" || r[0].Limit.Burst != 4000 || r[0].OnLimit != ModeSlowDown {
+	r := c.Limits
+	if len(r) != 6 || r[0].Name != "tenant-a-uploads" || r[0].BurstSize() != 4000 || r[0].Rate() != 2000 || r[0].Mode() != ModeSlowDown ||
+		!reflect.DeepEqual(r[0].GroupBy(), []string{"access_key", "bucket"}) || len(r[0].Operations()) != 3 {
 		t.Fatalf("rules: %+v", r)
 	}
-	if r[1].OnLimit != ModeTooManyRequests {
-		t.Errorf("rule on_limit: %s", r[1].OnLimit)
+	if r[1].Mode() != ModeTooManyRequests || r[1].RespondStatus() != 429 || r[1].Operation[0] != "ListObjectsV2" {
+		t.Errorf("respond: 429 and the operation in S3's spelling: %+v", r[1])
 	}
-	if r[2].Limit.Rate != 0 || r[2].Limit.Burst != 0 {
-		t.Errorf("rate 0 keeps burst 0: %+v", r[2].Limit)
+	if !r[2].Blocked || r[2].Rate() != 0 || r[2].BurstSize() != 0 || len(r[2].GroupBy()) != 0 || r[2].Note == "" {
+		t.Errorf("a blocked rule has no rate, burst, or budget: %+v", r[2])
 	}
-	if r[3].Limit.Rate != 0.5 || r[3].Limit.Burst != 1 {
-		t.Errorf("burst default is max(1, ceil(rate)): %+v", r[3].Limit)
+	if r[3].Rate() != 0.5 || r[3].BurstSize() != 1 {
+		t.Errorf("burst default is max(1, ceil(count)): rate %v burst %d", r[3].Rate(), r[3].BurstSize())
+	}
+	if got := r[4].Operations(); len(got) != 11 || r[4].Rate() != 10 || r[4].BurstSize() != 600 || len(r[4].GroupBy()) != 0 {
+		t.Errorf("List* is 11 operations and 600 a minute is 10 a second with 600 at once: %d ops, rate %v, burst %d", len(got), r[4].Rate(), r[4].BurstSize())
+	}
+	if r[5].AccessKey[0] != "1234567890" || r[5].Bucket[0] != "no" || math.Abs(r[5].Rate()-20.0/3600) > 1e-12 || r[5].BurstSize() != 20 {
+		t.Errorf("digits and `no` stay strings; 20 an hour allows 20 at once: %+v rate %v burst %d", r[5], r[5].Rate(), r[5].BurstSize())
 	}
 	if c.Showback.Retention() != 0 {
 		t.Errorf("retention_days: 0 must stay 0, got %d", c.Showback.Retention())
@@ -217,12 +245,17 @@ func TestRulesParse(t *testing.T) {
 }
 
 func TestBurstDefault(t *testing.T) {
-	for rate, want := range map[float64]int{2000: 2000, 0.5: 1, 2.5: 3, 1: 1, 0.001: 1} {
-		c := Config{RateLimits: RateLimits{Rules: []Rule{{ID: "x", Limit: Limit{Rate: rate}}}}}
-		c.applyDefaults()
-		if got := c.RateLimits.Rules[0].Limit.Burst; got != want {
-			t.Errorf("rate %v: burst %d, want %d", rate, got, want)
+	for count, want := range map[float64]int{2000: 2000, 0.5: 1, 2.5: 3, 1: 1, 0.001: 1} {
+		n := Number(count)
+		for _, r := range []Rule{{LimitPerSecond: &n}, {LimitPerMinute: &n}, {LimitPerHour: &n}} {
+			if got := r.BurstSize(); got != want {
+				t.Errorf("%s: burst %d, want %d", r.LimitText(), got, want)
+			}
 		}
+	}
+	n := Number(20)
+	if r := (Rule{LimitPerHour: &n, Burst: 5}); r.BurstSize() != 5 {
+		t.Errorf("an explicit burst wins: %d", r.BurstSize())
 	}
 }
 
@@ -365,7 +398,8 @@ func FuzzParse(f *testing.F) {
 		}
 	}
 	f.Add([]byte(""))
-	f.Add([]byte("rate_limits: {rules: [1, 2]}"))
+	f.Add([]byte("limits: [1, 2]"))
+	f.Add([]byte("limits: [{name: a, operation: [Get*, x], limit_per_minute: 1e3, per: [total]}]"))
 	f.Add([]byte("showback: {prefixes: {b: x}}"))
 	f.Fuzz(func(t *testing.T, data []byte) {
 		c, err := Parse(data)
