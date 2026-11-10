@@ -10,7 +10,7 @@
   BUSIEST OPERATIONS RIGHT NOW            REQ/S  THROTTLED/S  LIMITED BY
   GetObject                               1,204            0  no limit
   ListObjectsV2                             312          170  list-storm
-  PutObject                                  96            0  tenant-a-writes
+  PutObject                                  96            0  tenant-a-writes (part)
   HeadObject                                4.2            0  no limit
 
 

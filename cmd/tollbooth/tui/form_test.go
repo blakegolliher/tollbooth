@@ -26,6 +26,7 @@ import (
 	"github.com/charmbracelet/x/exp/golden"
 
 	"github.com/blakegolliher/tollbooth/internal/config"
+	"github.com/blakegolliher/tollbooth/internal/limiter"
 )
 
 // typed is a string as key presses.
@@ -394,5 +395,30 @@ func BenchmarkFormView(b *testing.B) {
 	b.ReportAllocs()
 	for b.Loop() {
 		_ = m.View()
+	}
+}
+
+// The busiest-operations table names a rule beside an operation only when the rule is about that
+// operation, and says so when the rule sees only part of it.
+func TestLimitedBy(t *testing.T) {
+	m := Model{snap: &snapshot{}}
+	m.snap.limits.Rules = []limiter.RuleStatus{
+		{Name: "all-lists", Operation: []string{"List*"}},
+		{Name: "one-key-reads", Operation: []string{"GetObject", "HeadObject"}, AccessKey: []string{"AKIAEXAMPLE1"}},
+		{Name: "frozen", Bucket: []string{"frozen"}, Blocked: true},
+		{Name: "everything", Limit: "1000 per second"},
+	}
+	for op, want := range map[string]string{
+		"ListObjectsV2": "all-lists, everything",
+		"GetObject":     "one-key-reads (part), everything",
+		"PutObject":     "everything",
+	} {
+		if got := m.limitedBy(op); got != want {
+			t.Errorf("limitedBy(%s) = %q, want %q", op, got, want)
+		}
+	}
+	m.snap.limits.Rules = m.snap.limits.Rules[:3]
+	if got := m.limitedBy("PutObject"); got != "" {
+		t.Errorf("limitedBy(PutObject) with no rule about it = %q", got)
 	}
 }

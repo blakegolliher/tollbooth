@@ -169,12 +169,15 @@ func (m Model) busiest() []string {
 
 // limitedBy names the rules in force that are about op: the ones whose `operation` covers it, and
 // the ones that limit every request of every client. A rule that names no operation but narrows
-// by key, bucket, prefix, or address is about those, not about the operation, and is left out.
+// by key, bucket, prefix, or address is about those, not about the operation, and is left out. One
+// that names the operation and also narrows sees only part of its traffic and is marked "(part)",
+// so the column never says an operation is limited when most of its requests are not.
 func (m Model) limitedBy(op string) string {
 	var names []string
 	for i := range m.snap.limits.Rules {
 		r := &m.snap.limits.Rules[i]
-		covers := len(r.Operation) == 0 && len(r.AccessKey)+len(r.Bucket)+len(r.Prefix)+len(r.SourceIP) == 0
+		narrowed := len(r.AccessKey)+len(r.Bucket)+len(r.Prefix)+len(r.SourceIP) > 0
+		covers := len(r.Operation) == 0 && !narrowed
 		for _, entry := range r.Operation {
 			if ops, _, err := config.ResolveOperation(entry); err == nil {
 				for _, o := range ops {
@@ -184,7 +187,11 @@ func (m Model) limitedBy(op string) string {
 				}
 			}
 		}
-		if covers {
+		switch {
+		case covers && narrowed:
+			// Only some of the operation's requests: one access key's, one bucket's.
+			names = append(names, r.Name+" (part)")
+		case covers:
 			names = append(names, r.Name)
 		}
 	}
