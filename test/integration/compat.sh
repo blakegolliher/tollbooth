@@ -83,9 +83,15 @@ for b in $BACKENDS; do
       sk=${AWS_SECRET_ACCESS_KEY:?set AWS_SECRET_ACCESS_KEY}
       if [ -n "${VAST_BUCKET:-}" ]; then
         echo "compat: vast: using the existing bucket $VAST_BUCKET on $ep: keys under s3diff/ and compat-<tool>-vast-{direct,via}/ are written and removed; no bucket is created or deleted"
+        how="inside an existing bucket under prefixes of the run's own, so the make-bucket and remove-bucket cells were not run"
       else
         echo "compat: vast: this run creates and deletes the buckets s3diff-vast and compat-<tool>-vast-{direct,via} on $ep"
-      fi ;;
+        how="with buckets of the run's own"
+      fi
+      # What the cluster says it is, and when and how it was run, for the note under the table.
+      server=$(curl -s -m 10 -o /dev/null -D - -I "http://$ep/" | tr -d '\r' | awk -F': ' 'tolower($1)=="server" {print $2}' | head -1) || true
+      printf 'The `vast` column: run by hand on %s against a cluster answering `Server: %s`, path-style addressing over plaintext HTTP, %s. Tools: %s.\n' \
+        "$(date -u +%F)" "${server:-unknown}" "$how" "$(aws --version 2>&1 | cut -d' ' -f1), the others as pinned in clients.sh" > "$RUN/note-vast.txt" ;;
     *) echo "compat: unknown backend $b" >&2; exit 2 ;;
   esac
   listen=127.0.0.1:18${RANDOM:0:3}
@@ -153,7 +159,20 @@ compat_out=$ROOT/docs/COMPAT.md
 [ "$local_backends" = 1 ] || compat_out=$ROOT/docs/COMPAT-vast.md
 python3 - "$RUN" "$compat_out" $BACKENDS <<'PY'
 import glob, os, sys
+import re
 run, out, backends = sys.argv[1], sys.argv[2], sys.argv[3:]
+
+
+def clean(detail):
+    """A cell's detail as one short line of text: a tool that prints the bytes it could not parse
+    (an object's content where it expected XML) must not put them in the table."""
+    detail = re.sub(r"(\\x[0-9a-fA-F]{2}|\\[tnr\\])+", "…", detail)
+    if detail.count("…") > 3:
+        detail = detail[:detail.index("…")] + "… (binary data)"
+    detail = " ".join(detail.replace("|", "/").split())
+    return detail if len(detail) <= 200 else detail[:200] + "…"
+
+
 cells = {}  # (tool, op) -> {backend: (status, detail)}
 for b in backends:
     for f in glob.glob(os.path.join(run, f"results-s3diff-{b}.tsv")) + glob.glob(os.path.join(run, f"results-clients-{b}.tsv")):
@@ -162,7 +181,7 @@ for b in backends:
             if len(parts) < 3:
                 continue
             tool, op, status = parts[0], parts[1], parts[2]
-            detail = parts[3] if len(parts) > 3 else ""
+            detail = clean(parts[3]) if len(parts) > 3 else ""
             cells.setdefault((tool, op), {})[b] = (status, detail)
 tools = []
 for tool, _ in cells:
@@ -192,6 +211,10 @@ for tool in tools:
             row.append("PASS" if st == "PASS" else (f"{st}: {detail}" if st in ("FAIL", "GAP") else st))
         lines.append(f"| {tool} | {op} | " + " | ".join(row) + " |")
 lines += ["", f"{total} cells, {fails} failures, {gaps} backend gaps.", ""]
+for b in backends:
+    note = os.path.join(run, f"note-{b}.txt")
+    if os.path.exists(note):
+        lines += [open(note).read().strip(), ""]
 open(out, "w").write("\n".join(lines))
 print(f"compat: wrote {out} ({total} cells, {fails} failures)")
 PY

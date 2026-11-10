@@ -68,7 +68,7 @@ CI on PR #35 at 1ec0a95, the same tree as 18cacac: run 42872079961, all green (`
 | 3 Limiter unit tests | pass, in the race suite (fake clock), with `TestMatchedCounter` for the new counter; microbenchmarks in `run/g2-phase5/bench.log` (144 benchmark lines; `Decide100Rules` 1,237 to 2,091 ns/op, 0 allocations) | same |
 | 4 Fuzzing | 6 targets × 60 s, 0 crashers: `FuzzParse` (config) 453,069 executions, `FuzzEditRules` 247,828, `FuzzClassify` 1,710,949, `FuzzParse` (s3id) 1,270,156, `FuzzScanQuery` 1,245,483, `FuzzRead` 659,860. CI's 60 s run found a crasher in `FuzzEditRules` on the first push of PR #35 (section 5); fixed, then 300 s of that target clean (455,723 executions) | `run/fuzz.log` |
 | 5 Byte-equivalence | 293 cases, 0 diffs, 0 backend gaps (record mode, dev box); Garage 293 cases, 0 diffs, 28 backend gaps and versitygw 293 cases, 0 diffs, 8 backend gaps in CI | `run/g2-phase5/s3diff-record.log`; run 42872079961 |
-| 6 Client compatibility matrix | 122 cells, 0 failures, 2 backend gaps on Garage and versitygw (CI `integration`); `docs/COMPAT.md` unchanged | `docs/COMPAT.md`; run 42872079961 |
+| 6 Client compatibility matrix | 122 cells, 0 failures, 2 backend gaps on Garage and versitygw (CI `integration`); `docs/COMPAT.md` unchanged **Against a VAST cluster** (5.5.3.0, the lab cluster, by hand on 2026-11-10, §8): byte-equivalence 184 cases, 0 diffs, 0 backend gaps; client matrix 48 cells, 43 pass, 0 failures, 5 backend gaps | `docs/COMPAT.md`; run 42872079961; `docs/COMPAT-vast.md` |
 | 7 Throttling behavior | 7 rows, 5 completed, as in every run so far: aws cli default 68/200 (no), aws cli adaptive 200 (yes), boto3 default 189/200 (no), boto3 adaptive 200 (yes), s5cmd, rclone, s3cmd yes (D-044) | `docs/THROTTLE.md` (updated from run 42872079961) |
 | 8 Showback correctness | pass, in the race suite (reconciliation, rollover, restart recovery); `FuzzRead`; the soak's 17 `showback-ro` steps: 25 failed snapshots logged, counting continued in memory, the next snapshot wrote everything | `run/g2-phase5/race.log`; the soak's `tollbooth.log` |
 | 9 Chaos and resilience, and the Phase 5 soak | **24.00 h, 1,413 samples, 69,520,214 requests at 804 req/s** (half of the calibrated peak), 0 throttled, 141 fault steps: 18 each of backend 503, bounded stall, reset, process down, and invalid reload, 17 each of valid reload, read-only showback directory, and SIGHUP. Error events (proxy errors, backend 5xx, backend transport errors, flush errors) by window: backend-503 8,756 over 1,744,512 requests; backend-down 17,963 over 1,735,587; backend-reset 12,146 over 1,765,111; backend-stall 360 over 1,718,166; showback-ro 25 over 2,507,267; reload-invalid, reload-valid, and sighup 0. **Outside every window: 0.** 34 reloads applied and 18 invalid ones rejected under load. The proxy's log holds exactly what the rotation predicts: 54 "backend endpoint marked down" (18 each timeout, reset, dial), 18 rejected reloads, 25 failed snapshots, nothing else above `info`. RSS 27 to 37 MiB, final 29 MiB, slope over the second half −0.19 MiB/h; heap 5.9 MiB and 43 goroutines at the end (29 to 98 during the run). The generator counted 7,304 failed operations in 69,465,616 (0.0105%): the SDK giving up inside a fault window. Verdict of `bench/soak-report.py`: flat memory, zero unexplained errors | `bench/results/soak-2026-11-09T183931Z/` (`soak-report.txt`, `soak.csv`, `chaos.log`, `tollbooth.log`) |
@@ -125,7 +125,7 @@ the lowest full interval 780 or above.
 | Gap | Proposed fix | Phase |
 | --- | --- | --- |
 | **The benchmark regression gate was wrong twice in this phase.** benchstat compared nothing (found and replaced earlier in the phase), and its replacement matched benchmarks by name across packages and enforced timings across CPU models (found by the nightly on the final build). On a nightly that draws a CPU model other than the baseline's, the 10% timing threshold is now reported and not enforced; allocations always are | fixed in the close-out PR (D-063) with tests for both defects and a re-recorded baseline. What remains open is a machine that does not change: a self-hosted runner, or one baseline per CPU model | 5 (done); the runner question is Blake's |
-| **The client compatibility matrix has never been run against a VAST cluster.** Test-plan category 6 asks for it, by hand, with the results committed. CI runs the matrix against Garage and versitygw; against VAST only the load generator has run (GET, PUT, HEAD through the proxy, all 2xx). This report's first version did not list it | Blake, 2026-11-10: before the tag. `test/integration/compat.sh` gains a mode for an existing endpoint and the run is recorded in `docs/COMPAT.md` | 5 (before the tag) |
+| The client compatibility matrix had never been run against a VAST cluster, which test-plan category 6 asks for; this report's first version did not list it | **done before the tag** (§8): `make compat-vast` with `VAST_BUCKET`, results in `docs/COMPAT-vast.md`. Not covered there: make-bucket and remove-bucket (the key may not create buckets), virtual-hosted addressing, and TLS to the cluster | 5 (done); the three uncovered items with the reference-node session |
 | **The 24 h soak ran the build of PR #24 (40264aa), not the final one.** Between the two, the data path changed in `internal/limiter` only: the matched counter in the decision pass (22 lines in `limiter.go`) and rule compilation from the new schema; `internal/proxy`, `internal/showback`, and `internal/s3id` are byte-identical | the soak smoke on the final build: 0.11 h at 638 req/s, 246,314 requests, 12 chaos steps, 0 unexplained errors, RSS 28 to 33 MiB (`bench/results/soak-2026-11-10T185447Z/`). A 24 h run on the final build has not been done; question 6 | 5 (Blake's call) |
 | **The dev box was shared during the soak**: the POC demo stack (a second tollbooth and a load generator at 300 req/s against the VAST lab cluster) from about 2026-11-10T01:00Z to 18:25Z, the validation runs for PR #35 between about 16:55Z and 18:20Z (the race suite, about 12 minutes of fuzzing at full CPU, throwaway demo stacks at 100 req/s), and a new demo at 100 req/s from 18:28Z. The soak held its rate throughout (section 4), so its error and memory verdicts stand; its latency percentiles include that contention | a soak on a machine with nothing else on it is part of the reference-node session | v0.1.1 |
 | **A resolver outage makes the proxy report not ready while it is serving.** Observed in the POC demo on 2026-11-10 from 18:29Z: the dev box's DNS server stopped answering, the health probe (which resolves the endpoint name on every check) marked the only backend down, `/readyz` went not ready, and the proxy went on serving 100 req/s with 0 errors on its open connections. A load balancer acting on `/readyz` would have pulled a node that was working | **fixed before the tag** on Blake's answer (§8): ADR-0008. The pool remembers what each endpoint's name last resolved to and connects and probes there when a lookup fails; a failed lookup is counted and shown and no longer marks an endpoint down by itself | 5 (done, close-out PR) |
@@ -203,6 +203,41 @@ and answered the questions of section 6, one by one:
 ADR-0005 is accepted. Gate 5 therefore passes on three conditions, all before the tag: the
 resolver fix (ADR-0008) and the benchmark-gate correction, both in the close-out PR, and the client
 matrix against a VAST cluster, which follows it. Phase 6 does not start before them.
+
+### The client matrix against VAST (2026-11-10, Blake's run)
+
+`VAST_ENDPOINT=… VAST_BUCKET=rate make compat-vast` against the lab cluster (`Server: vast
+5.5.3.0`), tollbooth at b5b8bd1 with a default config in front of it, path-style addressing over
+plaintext HTTP, inside an existing bucket under prefixes of the run's own.
+
+| Stage | Result |
+| --- | --- |
+| Byte-equivalence (`test/s3diff`: the Go SDK's operation matrix, 108 cases with objects up to 64 MiB; the five checksum algorithms; 16 signing modes at four sizes each: unsigned payload, SHA-256 payload, streaming-signed with and without each of five trailers, unsigned with each of five trailers, presigned, SigV2 header and presigned; `Expect: 100-continue` accepted and refused) | **184 cases, 0 diffs**, 0 backend gaps: the cluster's answer through the proxy was the same as its answer direct in every case |
+| Client matrix (aws cli, boto3, s5cmd, rclone, s3cmd, elbencho) | 48 cells: **43 pass, 0 failures**, 5 backend gaps |
+
+A failure would be an operation that works direct and not through the proxy; there is none. The
+five gaps failed the same way direct and through the proxy, so the proxy relayed them faithfully.
+What they are:
+
+| Cell | What happened, direct and through the proxy alike |
+| --- | --- |
+| aws cli `get-object-attributes` | the CLI could not parse the cluster's answer as XML; what came back was binary data |
+| boto3 `get_object_attributes` | HTTP 500 from the cluster |
+| boto3 `delete_objects` (five keys, not quiet) | 200, without the five `Deleted` entries the test expects in the answer |
+| boto3 `get_object` with `PartNumber=2` on a six-part object | the bytes returned are not part 2's. The aws cli cells for the same request pass because they check only that the call succeeds |
+| aws cli `put-object --checksum-algorithm CRC64NVME` | not the cluster: the aws cli on the dev box (2.15.31) does not know the algorithm. boto3's checksum cell, which includes CRC64NVME, passes |
+
+The first two attempts tested nothing and found two things. The key may not create buckets on
+that cluster (`CreateBucket` is answered AccessDenied), so the matrix gained a mode that works
+inside an existing bucket and a self-test, run before every matrix, that fails if any command
+there could make or remove a bucket or name a path outside the run's prefixes
+(`test/integration/selftest.sh`). And with a default config tollbooth marked the cluster down two
+seconds after starting: VAST answers the health probe's unsigned `HEAD /` after 2.0 s, which was
+the default timeout. The default is now 5 s (D-064); in the run recorded here the proxy's log has
+no "marked down" line.
+
+With that, the three conditions are met. What remains before the tag is Blake's: merge `phase-5`
+into `main` and say so.
 
 ## Appendix: guardrail passes
 
