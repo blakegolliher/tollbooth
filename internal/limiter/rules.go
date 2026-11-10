@@ -79,9 +79,11 @@ type Rule struct {
 	effBurst int
 
 	// Per-rule counters carried across reloads by id, and the pre-resolved
-	// tollbooth_limiter_denied_total{rule} child (nil without metrics).
-	stats  *ruleStats
-	denied prometheus.Counter
+	// tollbooth_limiter_matched_total{rule} and tollbooth_limiter_denied_total{rule} children (nil
+	// without metrics).
+	stats   *ruleStats
+	matched prometheus.Counter
+	denied  prometheus.Counter
 }
 
 // RuleSet is one compiled configuration, published whole by Apply and read whole by every

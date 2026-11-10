@@ -57,6 +57,20 @@ func lim(t testing.TB, yaml string) (*Limiter, *Metrics) {
 	return l, m
 }
 
+// seriesCount is how many series a collector exposes.
+func seriesCount(c prometheus.Collector) int {
+	ch := make(chan prometheus.Metric, 64)
+	go func() {
+		c.Collect(ch)
+		close(ch)
+	}()
+	n := 0
+	for range ch {
+		n++
+	}
+	return n
+}
+
 // value reads a counter or gauge without the testutil package (and its extra module).
 func value(m prometheus.Metric) float64 {
 	var out dto.Metric
@@ -74,6 +88,7 @@ func testMetrics() *Metrics {
 		Decision: prometheus.NewHistogram(prometheus.HistogramOpts{Name: "d"}),
 		Keys:     prometheus.NewGauge(prometheus.GaugeOpts{Name: "k"}),
 		Overflow: prometheus.NewCounter(prometheus.CounterOpts{Name: "o"}),
+		Matched:  prometheus.NewCounterVec(prometheus.CounterOpts{Name: "test_matched"}, []string{"rule"}),
 		Denied:   prometheus.NewCounterVec(prometheus.CounterOpts{Name: "den"}, []string{"rule"}),
 		Errors:   prometheus.NewCounter(prometheus.CounterOpts{Name: "e"}),
 	}
@@ -684,6 +699,54 @@ limits:
 	}
 	if New(nil).Explain(id, 0).Allowed != true || len(New(nil).Status()) != 0 {
 		t.Fatal("empty limiter")
+	}
+}
+
+// Every rule a real request is charged against counts it as matched, allowed or denied; a rule the
+// traffic never reaches stays at zero, which is how an operator sees a rule that names the wrong
+// key; a dry run counts nothing; the counts survive a reload and leave with a removed rule.
+func TestMatchedCounter(t *testing.T) {
+	const two = `
+limits:
+  - name: wide
+    operation: [GetObject, HeadObject]
+    limit_per_second: 1
+    burst: 10
+    per: total
+  - name: narrow
+    operation: GetObject
+    bucket: hot
+    limit_per_second: 1
+    burst: 1
+    per: total
+  - name: wrong-key
+    access_key: DEMO-TENANT-A
+    limit_per_second: 1
+    per: total
+`
+	l, m := lim(t, two)
+	hot, cold := getObject("AK", "hot", "k"), getObject("AK", "cold", "k")
+	l.Decide(hot, 0, true)  // charged against wide and narrow, allowed
+	l.Decide(hot, 0, true)  // charged against both, denied by narrow
+	l.Decide(cold, 0, true) // charged against wide only
+	l.Explain(hot, 0)       // a dry run
+	l.Decide(hot, 0, false) // and a decision that does not consume
+	st := l.Status()
+	if st[0].Matched != 3 || st[1].Matched != 2 || st[2].Matched != 0 || st[1].Denied != 1 || st[0].Denied != 0 {
+		t.Fatalf("matched wide %d narrow %d wrong-key %d; denied narrow %d wide %d", st[0].Matched, st[1].Matched, st[2].Matched, st[1].Denied, st[0].Denied)
+	}
+	if a, b, c := value(m.Matched.WithLabelValues("wide")), value(m.Matched.WithLabelValues("narrow")), value(m.Matched.WithLabelValues("wrong-key")); a != 3 || b != 2 || c != 0 {
+		t.Fatalf("tollbooth_limiter_matched_total: wide %v narrow %v wrong-key %v", a, b, c)
+	}
+	// A reload keeps the counts of the rules that stay and drops the series of the one removed.
+	if err := l.Apply(cfg(t, strings.Replace(two, "  - name: wrong-key\n    access_key: DEMO-TENANT-A\n    limit_per_second: 1\n    per: total\n", "", 1))); err != nil {
+		t.Fatal(err)
+	}
+	if st := l.Status(); len(st) != 2 || st[0].Matched != 3 || st[1].Matched != 2 {
+		t.Fatalf("after reload: %+v", st)
+	}
+	if n := seriesCount(m.Matched); n != 2 {
+		t.Fatalf("tollbooth_limiter_matched_total has %d series after the rule was removed, want 2", n)
 	}
 }
 

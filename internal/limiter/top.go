@@ -146,7 +146,10 @@ type RuleStatus struct {
 	Respond        int     `json:"respond"`
 	Note           string  `json:"note,omitempty"`
 	LiveKeys       int64   `json:"live_keys"`
-	Denied         int64   `json:"denied"`
+	// Matched counts the requests charged against the rule, allowed or denied; Denied the ones it
+	// refused. Both run since the rule's name first appeared and survive reloads.
+	Matched int64 `json:"matched"`
+	Denied  int64 `json:"denied"`
 }
 
 // Status lists the rules in force, in config order, with live key counts and denials since the
@@ -164,7 +167,7 @@ func (l *Limiter) Status() []RuleStatus {
 			Operation: src.Operation, AccessKey: src.AccessKey, Bucket: src.Bucket, Prefix: src.Prefix, SourceIP: src.SourceIP,
 			Limit: src.LimitText(), Blocked: src.Blocked, RatePerSecond: src.Rate(), Burst: src.BurstSize(), Per: src.Per,
 			EffectiveRate: r.effRate, EffectiveBurst: r.effBurst, Respond: src.RespondStatus(), Note: src.Note,
-			LiveKeys: r.stats.live.Load(), Denied: r.stats.denied.Load(),
+			LiveKeys: r.stats.live.Load(), Matched: r.stats.matched.Load(), Denied: r.stats.denied.Load(),
 		}
 		if st.Per == nil {
 			st.Per = []string{}

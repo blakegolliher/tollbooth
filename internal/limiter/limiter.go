@@ -36,6 +36,7 @@ type Metrics struct {
 	Decision prometheus.Observer    // tollbooth_limiter_decision_seconds
 	Keys     prometheus.Gauge       // tollbooth_limiter_keys
 	Overflow prometheus.Counter     // tollbooth_limiter_keys_overflow_total
+	Matched  *prometheus.CounterVec // tollbooth_limiter_matched_total{rule}
 	Denied   *prometheus.CounterVec // tollbooth_limiter_denied_total{rule}
 	Errors   prometheus.Counter     // tollbooth_limiter_errors_total
 }
@@ -67,9 +68,10 @@ type shard struct {
 // ruleStats are the per-rule counters the admin API shows and the deny ring behind
 // /admin/limits/top. They belong to the rule id, not to one compiled RuleSet.
 type ruleStats struct {
-	live   atomic.Int64 // keys of this rule in the store
-	denied atomic.Int64 // denials since the id first appeared
-	ring   ring
+	live    atomic.Int64 // keys of this rule in the store
+	matched atomic.Int64 // requests charged against the rule since the id first appeared
+	denied  atomic.Int64 // denials since the id first appeared
+	ring    ring
 }
 
 // New returns an empty limiter: no rules, every request allowed. m may be nil.
@@ -109,12 +111,18 @@ func (l *Limiter) Apply(cfg *config.Config) error {
 		if l.m.Denied != nil {
 			r.denied = l.m.Denied.WithLabelValues(r.ID)
 		}
+		if l.m.Matched != nil {
+			r.matched = l.m.Matched.WithLabelValues(r.ID)
+		}
 	}
 	for id := range l.stats {
 		if _, keep := rs.byID[id]; !keep {
 			delete(l.stats, id)
 			if l.m.Denied != nil {
 				l.m.Denied.DeleteLabelValues(id)
+			}
+			if l.m.Matched != nil {
+				l.m.Matched.DeleteLabelValues(id)
 			}
 		}
 	}
@@ -225,6 +233,14 @@ func (l *Limiter) evaluate(rs *RuleSet, id *s3id.RequestIdentity, now int64, con
 			continue
 		}
 		d.Matched++
+		if consume {
+			// One count per rule a real request is charged against (a dry run counts nothing): what
+			// lets an operator see a rule is looking at traffic, and that one is not (ADR-0007).
+			r.stats.matched.Add(1)
+			if r.matched != nil {
+				r.matched.Inc()
+			}
+		}
 		k := r.key(id, prefix)
 		var allow, overflow bool
 		var wait int64
