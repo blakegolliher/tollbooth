@@ -15,6 +15,7 @@
 package config
 
 import (
+	"encoding/json"
 	"math"
 	"net/netip"
 	"os"
@@ -425,5 +426,41 @@ func BenchmarkParse(b *testing.B) {
 		if _, err := Parse(data); err != nil {
 			b.Fatal(err)
 		}
+	}
+}
+
+// deploy/tollbooth.quickstart.yaml is the first thing a newcomer runs, and README.md prints it. The
+// file must load, say what the README says it says, and be the config the README shows, so the
+// two cannot drift apart.
+func TestQuickstartConfigIsWhatTheReadmeShows(t *testing.T) {
+	qs, err := Load("../../deploy/tollbooth.quickstart.yaml")
+	if err != nil {
+		t.Fatalf("quick-start config rejected: %v", err)
+	}
+	const sentence = "At most 50 GetObject calls per second for each access key. Only for requests by access key AKIAEXAMPLEKEY000001. Over the limit, the client gets 503 SlowDown."
+	if len(qs.Limits) != 1 || qs.Limits[0].Sentence() != sentence {
+		t.Fatalf("quick-start limits: %+v", qs.Limits)
+	}
+	readme, err := os.ReadFile("../../README.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(readme), "  one-key-getobject: "+sentence) {
+		t.Error("README.md does not print the sentence check-config gives for the quick-start config")
+	}
+	// The first yaml block of the README is the same configuration.
+	_, rest, ok := strings.Cut(string(readme), "```yaml\n")
+	block, _, ok2 := strings.Cut(rest, "```")
+	if !ok || !ok2 {
+		t.Fatal("README.md has no yaml block")
+	}
+	shown, err := Parse([]byte(block))
+	if err != nil {
+		t.Fatalf("the config README.md shows does not load: %v", err)
+	}
+	a, _ := json.Marshal(qs.Redacted())
+	b, _ := json.Marshal(shown.Redacted())
+	if string(a) != string(b) {
+		t.Errorf("README.md shows a different config than deploy/tollbooth.quickstart.yaml:\nfile   %s\nreadme %s", a, b)
 	}
 }

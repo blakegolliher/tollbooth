@@ -1,0 +1,31 @@
+# tollbooth quick start: one limit in front of one S3 endpoint.
+#
+# The access key below may make at most 50 GetObject calls a second. Every other request, from
+# that key or any other, passes through untouched. Change the three values marked <- and run:
+#
+#   tollbooth check-config tollbooth.quickstart.yaml     # reads the limit back as a sentence
+#   tollbooth serve --config tollbooth.quickstart.yaml
+#
+# deploy/tollbooth.example.yaml lists every key with its default; docs/CONFIG.md explains them.
+
+node_id: tollbooth-1                  # names this node in the usage files; keep it the same across restarts
+
+listen:
+  address: ":8800"                    # S3 clients connect here instead of to the cluster
+
+backend:
+  scheme: http                        # http or https
+  endpoints: ["s3.example.internal:80"]   # <- your S3 endpoint, host:port (several are balanced)
+
+admin:
+  address: "127.0.0.1:9900"           # the CLI, the console, and /metrics; keep it on localhost
+
+showback:
+  dir: ./tollbooth-usage              # <- hourly usage files go here; use a persistent path in production
+
+limits:
+  - name: one-key-getobject
+    operation: GetObject              # an S3 operation name; a list, or a family such as Get*
+    access_key: AKIAEXAMPLEKEY000001  # <- the access key to limit
+    limit_per_second: 50              # or limit_per_minute, limit_per_hour, or blocked: true
+    per: access_key                   # each access key listed gets a budget of its own

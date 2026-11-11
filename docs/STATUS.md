@@ -1,10 +1,9 @@
 # STATUS
 
-Current phase: **5 (Hardening and v0.1.0), closing its gate** on `phase-5` (started 2026-11-09 on
-Blake's go after Gate 4 passed; `phase-4` tagged and in `main`). PRs #24 and #26 to #35 are merged;
-the final `docs/reports/gate-5.md` is in. Blake answered its questions on 2026-11-10 and the three
-things he asked for before the v0.1.0 tag are done (below). Next: his merge of `phase-5` into
-`main`, the tag, then Phase 6 on his word.
+Current phase: **none in progress.** Phase 5 (Hardening and v0.1.0) passed its gate and
+**v0.1.0 was tagged on 2026-11-10** (tags `phase-5` and `v0.1.0` on `main` at 5bf9ec6; release
+artifacts for linux amd64 and arm64 are on the GitHub release). Phase 6 is a backlog: it starts on
+Blake's word, one ADR per item.
 
 ## Phases
 
@@ -15,7 +14,7 @@ things he asked for before the v0.1.0 tag are done (below). Next: his merge of `
 | 2 Rate limiting | rules, matchers, GCRA, single pass, both modes, `Expect: 100-continue` measured, hot reload, limiter metrics, `/admin/limits`, `rules *` verbs | limiter suite green (fake clock); 10 µs p99; reload under load zero failures; SDKs complete work under 1 req/s | **report written 2026-11-09**: limiter suite 25 tests green; p99 4.7 µs at 1,000,000 keys; 20 reloads under load, slowest 0.60 ms, 0 failed; SDK completion by retry mode (D-044) |
 | 3 Showback | aggregator, snapshot and seal, NDJSON, `usage` verbs, `/admin/usage`, dimensions and cap, restart, multi-node sum | reconciliation exact; rollover tests; kill between snapshots loses ≤ `flush_interval`; verify detects a removed hour | **report written 2026-11-09**: reconciliation exact; 19 clock-injected tests green; Record 198 ns, 0 allocs; 257 B per tuple |
 | 4 Operator surface | remaining verbs, shared admin client, `/admin/status`, `/admin/limits/test`, `/admin/backends`, `tollbooth tui` | parity test; CLI goldens ×3 formats; `teatest` goldens; runbook tasks from the TUI and CLI alone | **report written 2026-11-09**: parity test green; 38 CLI goldens ×3 formats; 30 TUI frames at 80×24 and 120×40; two runbook tasks |
-| 5 Hardening and v0.1.0 | bench runs with profiles, tuning, 24 h soak, caps, `OPERATIONS.md`, systemd, container, `CHANGELOG.md`, tag | all performance targets met or ADR'd; soak flat | **report written 2026-11-10**: soak 24 h, 69.5 M requests, memory flat, 0 unexplained errors; four end-to-end performance rows unverified without the reference node (ADR-0005); gate pending |
+| 5 Hardening and v0.1.0 | bench runs with profiles, tuning, 24 h soak, caps, `OPERATIONS.md`, systemd, container, `CHANGELOG.md`, tag | all performance targets met or ADR'd; soak flat | **passed; v0.1.0 tagged 2026-11-10** (Blake's answers in `docs/reports/gate-5.md` §8): soak 24 h, 69.5 M requests, memory flat, 0 unexplained errors; four end-to-end performance rows unverified without the reference node (ADR-0005) |
 | 6 Backlog | shaping, cluster limits, bandwidth, Parquet, OpenTelemetry, connection caps, drain, web UI, observe-only rules, live per-key rates (rule editing moved to Phase 5: ADR-0006, ADR-0007) | each starts with an ADR | not scheduled |
 
 ## Phase 5 record (in progress)
@@ -92,9 +91,9 @@ fix (ADR-0008, PR #37), the benchmark-gate correction (D-063, PR #37), and the c
 against a VAST cluster (PRs #36, #38, #40; `docs/COMPAT-vast.md`: byte-equivalence 184 cases with 0
 diffs, 48 client cells with 43 passing, 0 failures, and 5 gaps that are the cluster's own). That
 run also moved the health probe's default timeout from 2 s to 5 s (D-064, PR #39): VAST answers
-the unsigned probe after 2.0 s. Remaining before the tag: Blake merges `phase-5` into `main` and
-says so; then the changelog's 0.1.0 entry and the `phase-5` and `v0.1.0` tags. Phase 6 starts
-after that, on Blake's word, one ADR per item.
+the unsigned probe after 2.0 s. Blake merged `phase-5` into `main` (PR #43) and said to tag; `phase-5` and `v0.1.0` were tagged
+on 5bf9ec6 on 2026-11-10 with CI green on that commit, and the release was published the same
+day. Phase 6 starts on Blake's word, one ADR per item.
 
 ## Phase 4 record
 
