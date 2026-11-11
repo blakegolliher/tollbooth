@@ -114,7 +114,7 @@ release: ## build release artifacts into ./dist: static binaries (amd64, arm64),
 	@for arch in amd64 arm64; do \
 	  d=$(DIST)/tollbooth-$(VERSION)-linux-$$arch; mkdir -p $$d; \
 	  CGO_ENABLED=0 GOOS=linux GOARCH=$$arch $(GO) build -trimpath -ldflags '$(LDFLAGS)' -o $$d/tollbooth ./cmd/tollbooth || exit 1; \
-	  cp deploy/tollbooth.service deploy/tollbooth.example.yaml deploy/Dockerfile LICENSE THIRD_PARTY_NOTICES.md CHANGELOG.md $$d/; \
+	  cp deploy/tollbooth.service deploy/tollbooth.example.yaml deploy/tollbooth.quickstart.yaml deploy/Dockerfile LICENSE THIRD_PARTY_NOTICES.md CHANGELOG.md $$d/; \
 	  cp docs/OPERATIONS.md docs/CONFIG.md docs/SHOWBACK_SCHEMA.md $$d/; \
 	  tar -C $(DIST) -czf $$d.tar.gz $$(basename $$d) && rm -rf $$d; \
 	done
